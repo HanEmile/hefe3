@@ -1,0 +1,61 @@
+{{define "admin_hats.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hat Management - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Hat Management</h1>
+
+        <p><a href="{{.Subpath}}/admin/hats/grant">+ Grant New Hat</a></p>
+
+        {{if .Hats}}
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr class="muted">
+                <td style="padding: 0.25rem;">User</td>
+                <td style="padding: 0.25rem;">Hat</td>
+                <td style="padding: 0.25rem;">Organization</td>
+                <td style="padding: 0.25rem;">Granted</td>
+                <td style="padding: 0.25rem;">Status</td>
+                <td style="padding: 0.25rem;">Actions</td>
+            </tr>
+            {{range .Hats}}
+            <tr style="border-top: 1px solid var(--border);">
+                <td style="padding: 0.25rem;"><a href="{{.Subpath}}/users/{{.Username}}" class="user-link">{{.Username}}</a></td>
+                <td style="padding: 0.25rem;"><span class="hat">{{.Name}}</span></td>
+                <td style="padding: 0.25rem;">{{.Organization}}</td>
+                <td style="padding: 0.25rem;">{{formatTime .GrantedAt}}</td>
+                <td style="padding: 0.25rem;">
+                    {{if .IsActive}}
+                    <span class="success">Active</span>
+                    {{else}}
+                    <span class="muted">Revoked</span>
+                    {{end}}
+                </td>
+                <td style="padding: 0.25rem;">
+                    <a href="{{.Subpath}}/admin/hats/edit?id={{.ID}}">Edit</a>
+                    {{if .IsActive}}
+                    | <a href="{{.Subpath}}/admin/hats/revoke?id={{.ID}}" onclick="return confirm('Revoke this hat?')">Revoke</a>
+                    {{else}}
+                    | <a href="{{.Subpath}}/admin/hats/reactivate?id={{.ID}}" onclick="return confirm('Reactivate this hat?')">Reactivate</a>
+                    {{end}}
+                    {{if .Link}}
+                    | <a href="{{.Link}}" target="_blank">Verify</a>
+                    {{end}}
+                </td>
+            </tr>
+            {{end}}
+        </table>
+        {{else}}
+        <p class="muted">No hats granted yet.</p>
+        {{end}}
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

@@ -1,0 +1,168 @@
+{{define "tag_feeds.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Manage Feeds - {{.Tag.Name}} - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>RSS Feeds: <a href="{{.Subpath}}/tags/{{.Tag.Name}}" class="tag">{{.Tag.Name}}</a></h1>
+
+        <p class="muted">RSS feeds automatically import posts to this tag. Tag admins can manage feeds.</p>
+
+        {{if .Error}}
+        <p class="error">{{.Error}}</p>
+        {{end}}
+
+        {{if .Errors}}
+        <ul class="error">
+            {{range .Errors}}
+            <li>{{.}}</li>
+            {{end}}
+        </ul>
+        {{end}}
+
+        {{if .Success}}
+        <p class="success">{{.Success}}</p>
+        {{end}}
+
+        <h2>Active Feeds</h2>
+        {{if .Feeds}}
+        <table style="width: 100%;">
+            <thead>
+                <tr>
+                    <th style="text-align: left;">Feed</th>
+                    <th>Interval</th>
+                    <th>Items</th>
+                    <th>Last Poll</th>
+                    <th>Status</th>
+                    <th style="width: 30px;"></th>
+                    <th style="width: 30px;"></th>
+                    <th style="width: 30px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+            {{range .Feeds}}
+            <tr>
+                <td>
+                    <strong>{{if .Title}}{{.Title}}{{else}}{{.URL}}{{end}}</strong>
+                    {{if .Title}}<br><span class="muted" style="font-size: 0.8em;">{{.URL}}</span>{{end}}
+                    {{if .CreatedByName}}<br><span class="muted">Added by {{.CreatedByName}}</span>{{end}}
+                </td>
+                <td style="text-align: center;">{{.IntervalMinutes}}m</td>
+                <td style="text-align: center;">{{.ItemCount}}</td>
+                <td style="text-align: center;">
+                    {{if .LastPolled}}{{timeAgo .LastPolled}}{{else}}-{{end}}
+                </td>
+                <td style="text-align: center;">
+                    {{if not .IsActive}}<span style="color: var(--muted);">disabled</span>
+                    {{else if .LastError}}<span style="color: var(--error);" title="{{.LastError}}">error</span>
+                    {{else if .PollOnView}}<span class="muted">on-view</span>
+                    {{else}}<span style="color: var(--success);">active</span>
+                    {{end}}
+                </td>
+                <td style="text-align: center;">
+                    <details class="feed-edit">
+                        <summary style="cursor: pointer;" title="Edit feed">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </summary>
+                        <form method="post" action="{{.Subpath}}/tags/feeds/update" class="feed-edit-form">
+                            <input type="hidden" name="feed_id" value="{{.ID}}">
+                            <label>Interval (minutes):<br>
+                                <input type="number" name="interval" value="{{.IntervalMinutes}}" min="5" style="width: 80px;">
+                            </label><br>
+                            <label style="display: block; margin-top: 0.3rem;">
+                                <input type="checkbox" name="poll_on_view" {{if .PollOnView}}checked{{end}}> Poll on view only
+                            </label>
+                            <label style="display: block;">
+                                <input type="checkbox" name="auto_approve" {{if .AutoApprove}}checked{{end}}> Auto-approve posts
+                            </label>
+                            <label style="display: block;">
+                                <input type="checkbox" name="is_active" {{if .IsActive}}checked{{end}}> Active
+                            </label>
+                            <label>Max items per poll (0 = unlimited):<br>
+                                <input type="number" name="max_items" value="{{.MaxItemsPerPoll}}" min="0" style="width: 80px;">
+                            </label><br>
+                            <input type="submit" value="Save" style="margin-top: 0.3rem;">
+                        </form>
+                    </details>
+                </td>
+                <td style="text-align: center;">
+                    <a href="{{.Subpath}}/tags/feeds/sync?id={{.ID}}" style="color: var(--link);" title="Sync now">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    </a>
+                </td>
+                <td style="text-align: center;">
+                    <a href="{{.Subpath}}/tags/feeds/delete?id={{.ID}}" style="color: var(--error);" onclick="return confirm('Delete this feed?')" title="Delete feed">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </a>
+                </td>
+            </tr>
+            {{if .LastError}}
+            <tr>
+                <td colspan="8" style="padding-left: 1rem;"><span class="error">{{.LastError}}</span></td>
+            </tr>
+            {{end}}
+            {{end}}
+            </tbody>
+        </table>
+        {{else}}
+        <p class="muted">No feeds configured yet. Add one below.</p>
+        {{end}}
+
+        <h2>Add Feed</h2>
+        <form method="post" action="{{.Subpath}}/tags/feeds" style="max-width: 500px;">
+            <input type="hidden" name="tag_id" value="{{.Tag.ID}}">
+
+            <label for="url">Feed URL</label>
+            <input type="url" name="url" id="url" value="{{.URL}}" placeholder="https://example.com/feed.xml" required>
+
+            <label for="title">Title (optional)</label>
+            <input type="text" name="title" id="title" value="{{.Title}}" placeholder="Feed title">
+
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                <div>
+                    <label for="interval">Poll interval (minutes)</label>
+                    <input type="number" name="interval" id="interval" value="60" min="5" max="1440" style="width: 100px;">
+                </div>
+                <div>
+                    <label for="max_items">Max items per poll (0 = unlimited)</label>
+                    <input type="number" name="max_items" id="max_items" value="10" min="0" style="width: 100px;">
+                </div>
+            </div>
+
+            <label style="display: block; margin-top: 0.5rem;">
+                <input type="checkbox" name="poll_on_view"> Poll only when tag is viewed (lazy mode)
+            </label>
+
+            <label style="display: block;">
+                <input type="checkbox" name="auto_approve" checked> Auto-approve posts
+            </label>
+
+            <div style="margin-top: 1rem;">
+                <input type="submit" value="Add Feed">
+            </div>
+        </form>
+
+        <div style="margin-top: 2rem;" class="muted">
+            <h3>Feed options explained:</h3>
+            <ul>
+                <li><strong>Poll interval:</strong> How often to check for new items (minimum 5 minutes)</li>
+                <li><strong>Poll on view:</strong> Only fetch new items when someone views this tag (saves bandwidth)</li>
+                <li><strong>Auto-approve:</strong> Automatically publish posts (if unchecked, requires manual approval)</li>
+                <li><strong>Max items per poll:</strong> Limit how many items are imported in each poll cycle</li>
+            </ul>
+        </div>
+
+        <div style="margin-top: 1rem;">
+            <a href="{{.Subpath}}/tags/{{.Tag.Name}}">back to tag</a>
+        </div>
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

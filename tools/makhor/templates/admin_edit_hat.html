@@ -1,0 +1,43 @@
+{{define "admin_edit_hat.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Edit Hat - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Edit Hat</h1>
+
+        {{if .Error}}
+        <p class="error">{{.Error}}</p>
+        {{end}}
+
+        <p class="muted">
+            Editing hat for user: <a href="{{.Subpath}}/users/{{.Username}}" class="user-link">{{.Username}}</a>
+        </p>
+
+        <form method="POST" action="{{.Subpath}}/admin/hats/edit?id={{.Hat.ID}}">
+            <label for="name">Hat Name <span class="muted">(e.g., "Core Team Member")</span></label>
+            <input type="text" id="name" name="name" value="{{if .Name}}{{.Name}}{{else}}{{.Hat.Name}}{{end}}" required>
+
+            <label for="organization">Organization <span class="muted">(e.g., "Golang")</span></label>
+            <input type="text" id="organization" name="organization" value="{{if .Organization}}{{.Organization}}{{else}}{{.Hat.Organization}}{{end}}" required>
+
+            <label for="link">Verification Link <span class="muted">(optional)</span></label>
+            <input type="url" id="link" name="link" value="{{if .Link}}{{.Link}}{{else}}{{.Hat.Link}}{{end}}" placeholder="https://...">
+
+            <button type="submit">Save Changes</button>
+        </form>
+
+        <p style="margin-top: 1rem;">
+            <a href="{{.Subpath}}/admin/hats">&larr; Back to hats</a>
+        </p>
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

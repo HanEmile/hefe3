@@ -1,0 +1,73 @@
+{{define "post_revisions.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Edit History - {{.Post.Title}} - makhor</title>
+    {{template "styles"}}
+    <style>
+        .revision {
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .revision-header {
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .revision-title {
+            font-weight: bold;
+        }
+        .revision-body {
+            white-space: pre-wrap;
+            background: var(--border);
+            padding: 0.5rem;
+            margin-top: 0.5rem;
+            font-size: 0.9em;
+        }
+        .current-version {
+            background: rgba(0, 128, 0, 0.1);
+            border-color: green;
+        }
+    </style>
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Edit History</h1>
+        <p><a href="{{.Subpath}}/posts/{{.Post.ID}}">&larr; Back to post</a></p>
+
+        <div class="revision current-version">
+            <div class="revision-header">
+                <span class="muted">Current version</span>
+            </div>
+            <div class="revision-title">{{.Post.Title}}</div>
+            {{if .Post.Body}}
+            <div class="revision-body">{{.Post.Body}}</div>
+            {{end}}
+        </div>
+
+        {{if .Revisions}}
+        <h2 style="margin-top: 1.5rem;">Previous versions</h2>
+        {{range .Revisions}}
+        <div class="revision">
+            <div class="revision-header">
+                <span class="muted">Edited by <a href="{{.Subpath}}/users/{{.Username}}" class="user-link">{{.Username}}</a> {{timeAgo .CreatedAt}}</span>
+                <span class="muted" style="font-size: 0.85em;">({{formatTime .CreatedAt}})</span>
+            </div>
+            <div class="revision-title">{{.Title}}</div>
+            {{if .Body}}
+            <div class="revision-body">{{.Body}}</div>
+            {{end}}
+        </div>
+        {{end}}
+        {{else}}
+        <p class="muted">No previous versions recorded.</p>
+        {{end}}
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

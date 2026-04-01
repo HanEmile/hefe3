@@ -1,0 +1,68 @@
+{{define "invites.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Invites - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Invites</h1>
+
+        {{if .Error}}
+        <p class="error">{{.Error}}</p>
+        {{end}}
+
+        <h2>Create Invite</h2>
+        <form method="POST" action="{{.Subpath}}/invites">
+            <label for="note">Note <span class="muted">(optional, for your reference)</span></label>
+            <input type="text" id="note" name="note" placeholder="e.g., For John">
+
+            <button type="submit">Create Invite</button>
+        </form>
+
+        <h2>Your Invites</h2>
+        {{if .Invites}}
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr class="muted">
+                <td style="padding: 0.25rem;">Code</td>
+                <td style="padding: 0.25rem;">Note</td>
+                <td style="padding: 0.25rem;">Created</td>
+                <td style="padding: 0.25rem;">Status</td>
+            </tr>
+            {{range .Invites}}
+            <tr style="border-top: 1px solid var(--border);">
+                <td style="padding: 0.25rem;">
+                    {{if .UsedBy}}
+                    <span class="muted">{{.Code}}</span>
+                    {{else}}
+                    <code>{{.Code}}</code>
+                    {{end}}
+                </td>
+                <td style="padding: 0.25rem;">{{.Note}}</td>
+                <td style="padding: 0.25rem;">{{timeAgo .CreatedAt}}</td>
+                <td style="padding: 0.25rem;">
+                    {{if .UsedBy}}
+                    <span class="success">Used {{timeAgo .UsedAt}}</span>
+                    {{else}}
+                    <span class="muted">Pending</span>
+                    {{end}}
+                </td>
+            </tr>
+            {{end}}
+        </table>
+        {{else}}
+        <p class="muted">No invites yet. Create one above.</p>
+        {{end}}
+
+        <h2>Invite Link Format</h2>
+        <p class="muted">Share this link with the invite code:</p>
+        <code>{{.BaseURL}}/register?invite=CODE</code>
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

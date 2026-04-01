@@ -1,0 +1,50 @@
+{{define "collection_form.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{if .IsCreate}}Create{{else}}Edit{{end}} Collection - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>{{if .IsCreate}}Create Collection{{else}}Edit Collection{{end}}</h1>
+        <p class="muted"><a href="{{.Subpath}}/collections">&larr; Back to collections</a></p>
+
+        {{if .Error}}
+        <p class="error">{{.Error}}</p>
+        {{end}}
+
+        <form method="POST" action="{{if .IsCreate}}/collections/new{{else}}/collections/{{.Collection.ID}}/edit{{end}}">
+            <label for="name">Name</label>
+            <input type="text" id="name" name="name" value="{{if .IsCreate}}{{.Name}}{{else}}{{.Collection.Name}}{{end}}" required placeholder="My Collection">
+
+            <label for="description">Description <span class="muted">(optional)</span></label>
+            <input type="text" id="description" name="description" value="{{if .IsCreate}}{{.Description}}{{else}}{{.Collection.Description}}{{end}}" placeholder="What this collection is for">
+
+            <label>Select Tags</label>
+            <div style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border); padding: 0.5rem; margin-bottom: 1rem;">
+                {{if .Tags}}
+                {{range .Tags}}
+                <div style="margin: 0.25rem 0;">
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" name="tags" value="{{.ID}}"{{if $.SelectedTagIDs}}{{if index $.SelectedTagIDs .ID}} checked{{end}}{{end}}>
+                        <span class="tag">{{.Name}}</span>
+                        {{if .Description}}<span class="muted">- {{.Description}}</span>{{end}}
+                    </label>
+                </div>
+                {{end}}
+                {{else}}
+                <p class="muted">No tags available. Create some tags first.</p>
+                {{end}}
+            </div>
+
+            <button type="submit">{{if .IsCreate}}Create Collection{{else}}Save Changes{{end}}</button>
+        </form>
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

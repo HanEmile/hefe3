@@ -1,0 +1,35 @@
+{{define "edit_comment.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Edit Comment - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Edit Comment</h1>
+
+        {{if .Error}}
+        <p class="error">{{.Error}}</p>
+        {{end}}
+
+        <p class="muted">On: <a href="{{.Subpath}}/posts/{{.Comment.PostID}}">{{.Comment.PostTitle}}</a></p>
+
+        <form method="POST" action="{{.Subpath}}/comments/{{.Comment.ID}}/edit">
+            <label for="body">Comment</label>
+            <textarea id="body" name="body" required>{{.Comment.Body}}</textarea>
+
+            <button type="submit">Save Changes</button>
+        </form>
+
+        <p style="margin-top: 1rem;">
+            <a href="{{.Subpath}}/posts/{{.Comment.PostID}}#c{{.Comment.ID}}">← Back to comment</a>
+        </p>
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

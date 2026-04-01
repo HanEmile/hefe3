@@ -1,0 +1,54 @@
+{{define "modlog.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Moderation Log - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Moderation Log</h1>
+        <p class="muted">Public record of moderation actions.</p>
+
+        {{if .Logs}}
+        <table style="margin: 0.5rem 0;">
+            <tr class="muted">
+                <td>Time</td>
+                <td>Mod</td>
+                <td>Action</td>
+                <td>Target</td>
+                <td>Reason</td>
+            </tr>
+            {{range .Logs}}
+            <tr>
+                <td>{{formatTime .CreatedAt}}</td>
+                <td><a href="{{.Subpath}}/users/{{.ModeratorName}}">{{.ModeratorName}}</a></td>
+                <td><code>{{.Action}}</code></td>
+                <td>
+                    {{if .TargetUsername}}
+                    <a href="{{.Subpath}}/users/{{.TargetUsername}}">{{.TargetUsername}}</a>
+                    {{end}}
+                    {{if .TargetPostTitle}}
+                    <a href="{{.Subpath}}/posts/{{.TargetPostID}}">{{.TargetPostTitle}}</a>
+                    {{end}}
+                    {{if .TargetCommentID}}
+                    comment #{{.TargetCommentID}}
+                    {{end}}
+                </td>
+                <td class="muted">{{.Reason}}</td>
+            </tr>
+            {{end}}
+        </table>
+
+        {{template "pagination" .}}
+        {{else}}
+        <p class="muted">No moderation actions yet.</p>
+        {{end}}
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

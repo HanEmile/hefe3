@@ -1,0 +1,260 @@
+body {
+    font-family: monospace;
+    display: flex; /* for sidebar and main */
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    height: 100vh;
+    width: 100vw;
+    margin: 0;
+    background: #1e1e1e;
+    color: #ccc;
+    overflow: hidden; /* Prevent body-level scrollbars */
+}
+
+.rows {
+    display: flex;
+    flex-direction: rows;
+}
+
+.cols {
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar {
+    width: 100%;
+    padding: 0ex;
+
+    flex: 1;
+    overflow-y: auto;
+
+    display: flex;
+    flex-direction: column;
+}
+
+.main {
+    /*width: 100%;*/
+    width: 100%;
+    min-width: 0;
+    padding: 0px;
+    border-left: 1px solid #dddddd;
+
+    flex: 3;
+
+    display: flex; /* for tabs and view */
+    flex-direction: column;
+    align-items: stretch;
+
+    /*height: 100%; /* Fill the height */
+    /*overflow-y: auto; /* Scroll internally */
+}
+
+.tabs {
+    display: flex;
+    flex: 0 0 auto;
+}
+
+.tab {
+    padding: 0 1ex 0;
+    cursor: pointer;
+}
+
+.tab.active {
+    background-color: #dddddd;
+    color: #000000
+}
+
+.view {
+    display: flex;
+    flex: 1;
+    flex-direction: row;
+    overflow: hidden;
+}
+
+/* ================= repeat =============== */
+
+#inspector-view, #repeat-view {
+    flex: 1;
+    display: flex; /* for repeat-request and repeat-response */
+    height: 100%;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+
+    justify-content: space-evenly;
+}
+
+#intercept-view {
+    height: 100%;
+    width: 100%;
+    flex-direction: column;
+}
+
+.repeat-request {
+    display: flex; /* for textbox and button */
+    height: 100%;
+    max-width: 100%;
+    flex-direction: column;
+}
+
+.repeat-request textarea {
+    height: 100%;
+    resize: horizontal;
+}
+.repeat-request button {
+    width: 100%;
+}
+
+button {
+    background: #444;
+    color: white;
+    border: none;
+    padding: 1ex;
+    cursor: pointer;
+}
+
+.repeat-response {
+    width: 100%;
+    flex-direction: column;
+    overflow-y: scroll;
+}
+
+/* intercept */
+
+.intercept-controls {
+    width: 100%;
+    overflow-y: scroll;
+    align-items: stretch;
+    justify-content: space-evenly;
+    display: flex;
+    flex-direction: cols;
+}
+
+.intercept-controls button {
+    padding: 1ex;
+    width: 100%;
+    border: 1px solid white;
+}
+.intercept-panels {
+    width: 100%;
+    overflow-y: scroll;
+
+    flex: 1;
+    align-items: stretch;
+    justify-content: space-evenly;
+    display: flex;
+    flex-direction: cols;
+}
+
+.intercept-request {
+    width: 100%;
+    flex-direction: column;
+}
+#intercept-request {
+    width: 100%;
+    height: 100%;
+}
+.intercept-response {
+    width: 100%;
+}
+
+/* ===================== Sidebar flow list ================== */
+
+#flow-list {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.flow-item {
+    height: 3ex;
+    padding: 5px;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+
+    display: flex;
+    flex: 0 0 3ex;
+    flex-direction: row;
+
+    cursor: pointer;
+    font-size: 12px;
+
+    padding: 0;
+}
+
+.flow-item div {
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    text-align: center;
+    padding: 0 1ex;
+}
+
+.flow-item-id {
+    flex: 1;
+}
+
+.flow-item-method {
+    flex: 1;
+}
+
+.flow-item-url {
+    text-align: left !important;
+    flex: 7;
+}
+
+.flow-item-status {
+    flex: 1;
+}
+
+.flow-item:hover {
+    background: #333;
+}
+
+textarea {
+    background: #2d2d2d;
+    color: #85e89d;
+    border: 1px solid #444;
+    padding: 10px;
+    font-family: monospace;
+}
+
+/* === Helpers === */
+
+.active-flow {
+    background-color: #444 !important;
+    border-left: 3px solid #85e89d;
+}
+
+.resizable-x {
+    resize: horizontal;
+    overflow: auto;
+}
+.resizable-y {
+    resize: vertical;
+    overflow: auto;
+}
+
+::-webkit-resizer {
+    background: white;
+}
+div .h3 {
+    padding-left: 1ex;
+    margin: 0;
+    font-size: 1em;
+    background-color: #dddddd;
+    color: #000000
+}
+
+pre {
+    margin: 0;
+    padding-left: 1ex;
+    white-space: pre-wrap;
+    overflow-x: hidden;
+}

@@ -1,0 +1,47 @@
+{{define "domain.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Domain}} - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>{{.Domain}}</h1>
+
+        <p class="muted" style="margin: 0.5rem 0;">
+            {{.Total}} post{{if ne .Total 1}}s{{end}} from this domain
+        </p>
+
+        {{if .Posts}}
+        {{range .Posts}}
+        <div class="post">
+            <span class="post-title">
+                <a href="{{.Subpath}}/posts/{{.ID}}/vote" class="vote{{if .UserVoted}} voted{{end}}">▲</a>
+                <span class="title-text">
+                <a href="{{.URL}}">{{.Title}}</a>
+                </span>
+            </span>
+            <div class="post-meta">
+                {{.Score}}pt | {{if eq .SourceType "rss"}}<img src="{{.Subpath}}/avatar/_rss" class="avatar-small" alt=""><a href="{{.Subpath}}/feeds/{{.SourceID}}" title="{{.SourceName}}">rss</a>{{else}}<img src="{{.Subpath}}/avatar/{{.Username}}" class="avatar-small" alt=""><a href="{{.Subpath}}/users/{{.Username}}" class="user-link">{{.Username}}</a>{{end}} |
+                {{timeAgo .CreatedAt}} |
+                <a href="{{.Subpath}}/posts/{{.ID}}">{{.CommentCount}} comments</a>
+                {{range .Tags}}
+                <a href="{{.Subpath}}/tags/{{.Name}}" class="tag">{{.Name}}</a>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+
+        {{template "pagination" .}}
+        {{else}}
+        <p class="muted">No posts from this domain.</p>
+        {{end}}
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

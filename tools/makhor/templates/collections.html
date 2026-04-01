@@ -1,0 +1,45 @@
+{{define "collections.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>My Collections - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>My Collections</h1>
+        <p class="muted">Collections let you group tags together for combined viewing.</p>
+
+        <p><a href="{{.Subpath}}/collections/new">Create New Collection</a></p>
+
+        {{if .Collections}}
+        <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
+            <tr class="muted">
+                <th style="text-align: left; padding: 0.25rem;">Name</th>
+                <th style="text-align: left; padding: 0.25rem;">Description</th>
+                <th style="text-align: left; padding: 0.25rem;">Tags</th>
+                <th style="text-align: left; padding: 0.25rem;">Actions</th>
+            </tr>
+            {{range .Collections}}
+            <tr style="border-top: 1px solid var(--border);">
+                <td style="padding: 0.25rem;"><a href="{{.Subpath}}/collections/{{.ID}}">{{.Name}}</a></td>
+                <td style="padding: 0.25rem;" class="muted">{{if .Description}}{{.Description}}{{else}}-{{end}}</td>
+                <td style="padding: 0.25rem;">{{.TagCount}} tag{{if ne .TagCount 1}}s{{end}}</td>
+                <td style="padding: 0.25rem;">
+                    <a href="{{.Subpath}}/collections/{{.ID}}/edit">edit</a>
+                    | <a href="{{.Subpath}}/collections/delete?id={{.ID}}" onclick="return confirm('Delete this collection?')" style="color: var(--danger);">delete</a>
+                </td>
+            </tr>
+            {{end}}
+        </table>
+        {{else}}
+        <p class="muted" style="margin-top: 1rem;">No collections yet. Create one to group tags together!</p>
+        {{end}}
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

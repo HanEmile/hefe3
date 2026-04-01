@@ -1,0 +1,3 @@
+{ ... }:
+
+import ./npins/default.nix

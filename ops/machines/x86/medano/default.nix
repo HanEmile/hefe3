@@ -1,0 +1,323 @@
+# readTree options
+{
+  hefe,
+  lib,
+  pkgs,
+  ...
+}@args1:
+
+# passed by module system
+{
+  config,
+  nixvirt,
+  ...
+}@args2:
+
+let
+  mod = name: hefe.path.origSrc + ("/ops/modules/" + name);
+  vm = name: hefe.path.origSrc + ("/ops/vms/x86/" + name + "/libvirt.nix");
+in
+{
+  imports = [
+    (import ./boot.nix (args1 // args2))
+    ./networking.nix
+    ./hardware-configuration.nix
+    ./libvirt
+
+    hefe.tools.sshrouter.module
+
+    (mod "ports.nix")
+
+    (vm "naraj") # general nginx router
+    (vm "rou") # route VPN traffic
+    (vm "arr") # media
+    (vm "auth") # sso
+    (vm "md") # hedgedoc
+    # (vm "irc") # irc
+    (vm "git") # git
+    (vm "data") # data
+    (vm "miki") # md wiki
+    (vm "photo") # public immich
+    (vm "rss") # rss feed
+    (vm "social") # gotosocial
+    (vm "tmp") # tmpfile host
+
+    # ctf
+    (vm "ctf") # capture the flag foo
+    # (vm "win1") # Windows 11 25H2
+  ];
+
+  fileSystems = {
+    "/proc" = {
+      device = "/proc";
+      options = [
+        "nosuid"
+        "nodev"
+        "noexec"
+        "relatime" # normal foo
+
+        # mount -o remount,hidepid=2 /proc
+        "hidepid=2" # this makes sure users can only see their own processes
+      ];
+    };
+  };
+
+  security.acme = {
+    acceptTerms = true;
+    defaults.email = "letsencrypt@emile.space";
+  };
+
+  users =
+    let
+      aclconf = with hefe.ops.acl; (usersForHost host."${config.networking.hostName}");
+    in
+    {
+      users = aclconf.users // {
+        # Just manually adding this here as a sort of "safeguard", I don't want
+        # to accidentally remove the key from the ACL and be stuck without a con
+        root.openssh.authorizedKeys.keys = hefe.users.hanemile.keys.all;
+      };
+      groups = aclconf.groups;
+    };
+
+  environment.systemPackages = with pkgs; [
+    vim
+    libgbm
+
+    # for the networkd-dispatcher service used by tailscale
+    ethtool
+    networkd-dispatcher
+  ];
+
+  hardware.enableRedistributableFirmware = true;
+
+  nix.settings.trusted-users = [
+    "root"
+    "@wheel"
+  ];
+
+
+  services = {
+
+    openssh = {
+      enable = true;
+      ports = [ 2222 ];
+      settings.PasswordAuthentication = false;
+    };
+
+    tailscale = {
+      enable = true;
+      extraUpFlags = [ "--ssh --advertise-exit-node" ];
+      interfaceName = "eno1";
+    };
+
+    networkd-dispatcher = {
+      enable = true;
+      rules."50-tailscale" = {
+        onState = ["routable"];
+        script = ''
+          "${pkgs.ethtool}/sbin/ethtool" -K "${config.services.tailscale.interfaceName}" rx-udp-gro-forwarding on rx-gro-list off
+        '';
+      };
+    };
+
+    vnstat.enable = true;
+
+    nfs.server = {
+      enable = true;
+      exports = ''
+        /grave/data  192.168.75.7/32(rw,async,no_root_squash,no_subtree_check)
+        /grave/media 192.168.33.3/32(rw,async,no_root_squash,no_subtree_check)
+      '';
+      lockdPort = 4001;
+      mountdPort = 4002;
+      statdPort = 4000;
+      extraNfsdConfig = "";
+    };
+
+    # SSH Router - routes users to target hosts
+    sshrouter = {
+      enable = false;
+      listenHost = "0.0.0.0";
+      listenPort = 22;
+      routes = {
+        # Add user -> target mappings here
+        hanemile = "${hefe.ops.ipam.default.miki.v4}:22";
+        root-arr = "${hefe.ops.ipam.private.arr.v4}:22";
+      };
+      default = "${hefe.ops.ipam.default.naraj.v4}:22";
+    };
+
+    nginx = {
+      enable = true;
+      enableReload = true;
+
+      recommendedUwsgiSettings = true;
+      recommendedTlsSettings = true;
+      recommendedProxySettings = true;
+      recommendedOptimisation = true;
+      recommendedGzipSettings = true;
+      recommendedBrotliSettings = true;
+
+      virtualHosts = let
+        tlsify = content: content // {
+          forceSSL = true;
+          enableACME = true;
+        };
+      in {
+        "photo.medano.emile.space" =
+          let
+            host = hefe.ops.ipam.default.photo.v4;
+            port = hefe.ops.ipam.default.photo.ports.immich;
+          in
+          tlsify {
+            locations."/".proxyPass = "http://${host}:${toString port}";
+          };
+
+        "md.medano.emile.space" =
+          let
+            host = hefe.ops.ipam.default.md.v4;
+            port = hefe.ops.ipam.default.md.ports.hedgedoc;
+          in
+          tlsify {
+            locations."/".proxyPass = "http://${host}:${toString port}";
+          };
+
+        # Just to get the crt and key, store it in an age secret an pass it to
+        # the `irc` VM~
+        # TODO(emile): automate this... ...somehow
+        "irc.medano.emile.space" = tlsify { };
+
+        "auth.medano.emile.space" =
+          let
+            proxyPass = "http://192.168.75.3:9091";
+          in
+          tlsify {
+            locations = {
+              "/" = {
+                inherit proxyPass;
+
+                extraConfig = ''
+                  ## Headers
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_set_header X-Forwarded-Host $http_host;
+                  proxy_set_header X-Forwarded-URI $request_uri;
+                  proxy_set_header X-Forwarded-Ssl on;
+                  proxy_set_header X-Forwarded-For $remote_addr;
+                  proxy_set_header X-Real-IP $remote_addr;
+
+                  ## Basic Proxy Configuration
+                  client_body_buffer_size 128k;
+                  proxy_next_upstream error timeout invalid_header http_500 http_502 http_503; ## Timeout if the real server is dead.
+                  proxy_redirect  http://  $scheme://;
+                  proxy_http_version 1.1;
+                  proxy_cache_bypass $cookie_session;
+                  proxy_no_cache $cookie_session;
+                  proxy_buffers 64 256k;
+
+                  ## Trusted Proxies Configuration
+                  ## Please read the following documentation before configuring this:
+                  ##     https://www.authelia.com/integration/proxies/nginx/#trusted-proxies
+                  # set_real_ip_from 10.0.0.0/8;
+                  # set_real_ip_from 172.16.0.0/12;
+                  # set_real_ip_from 192.168.0.0/16;
+                  # set_real_ip_from fc00::/7;
+                  set_real_ip_from 127.0.0.1/32;
+                  real_ip_header X-Forwarded-For;
+                  real_ip_recursive on;
+
+                  ## Advanced Proxy Configuration
+                  send_timeout 5m;
+                  proxy_read_timeout 360;
+                  proxy_send_timeout 360;
+                  proxy_connect_timeout 360;
+                '';
+              };
+
+              "/api/verify" = {
+                inherit proxyPass;
+              };
+
+              "/api/authz/" = {
+                inherit proxyPass;
+              };
+            };
+          };
+
+        "medano.emile.space" = tlsify {
+          locations = {
+            "/" = {
+              root = "/keep/www/emile.space";
+              extraConfig = ''
+                add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+              '';
+            };
+
+            # "/info/" = {
+            #   extraConfig =
+            #     let
+            #       acl = hefe.ops.acl;
+            #       hosts = builtins.attrNames acl.host;
+            #       usersForHost = x: acl.usersForHost acl.host."${x}";
+            #       a = builtins.toJSON (map usersForHost hosts);
+            #       filePath = pkgs.writeText "usersforhost.json" a;
+            #     in
+            #     ''
+            #       add_header Content-Type application/json;
+            #       alias ${filePath};
+            #     '';
+            # };
+
+            "/guacamole" = {
+              proxyPass = "http://127.0.0.1:8080";
+              extraConfig = ''
+                proxy_buffering off;
+                proxy_http_version 1.1;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection $http_connection;
+                access_log off;
+              '';
+            };
+
+            # As the social.emile.space server actually uses redirects from emile.space, they have to be
+            # setup somewhere. Well... this is that place
+            "/@hanemile".extraConfig = ''
+              return 301 https://social.emile.space/@hanemile;
+            '';
+
+            #"/.well-known" = {
+            #  root = "/var/www/emile.space";
+            #  extraConfig = ''
+            #    autoindex on;
+            #  '';
+            #};
+
+            ## I ran a matrix homeserver for some time, then stopped, but the other
+            ## homeserver don't know and don't stop sending me requests (5e5 a day or
+            ## so).
+            #"/.well-known/matrix/server".extraConfig = ''
+            #  return 410;
+            #'';
+          };
+        };
+
+        "tmp.medano.emile.space" = tlsify {
+          locations = {
+            "/" = {
+              root = "/keep/www/tmp.medano.emile.space";
+              extraConfig = ''
+                add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+                autoindex on;
+              '';
+            };
+          };
+        };
+      };
+    };
+  };
+
+  system.stateVersion = "25.05";
+}

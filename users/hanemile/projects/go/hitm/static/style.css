@@ -1,0 +1,277 @@
+* {
+    -ms-overflow-style: none;  /* Internet Explorer 10+ */
+    scrollbar-width: none;  /* Firefox, Safari 18.2+, Chromium 121+ */
+}
+*::-webkit-scrollbar {
+    display: none;  /* Older Safari and Chromium */
+}
+
+body {
+    font-family: monospace;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    height: 100vh;
+    width: 100vw;
+    margin: 0;
+    background: #1e1e1e;
+    color: #ccc;
+    overflow: hidden; /* Prevent body-level scrollbars */
+}
+
+.rows {
+    display: flex;
+    flex-direction: column;
+    /*border: 1px solid blue;*/
+}
+
+.cols {
+    display: flex;
+    flex-direction: row;
+    /*border: 1px solid red;*/
+}
+
+.w-1 { flex: 1; }
+.w-2 { flex: 2; }
+.w-3 { flex: 3; }
+.wmax { width: 100%; }
+.hmax { height: 100%; }
+pre {
+    padding: 1ex;
+    white-space: pre-wrap;
+    border: 1px solid #dddddd;
+    min-width: 0;
+}
+button {
+    background: #444;
+    color: #dddddd;
+    border: none;
+    padding: 1ex;
+    cursor: pointer;
+    width: 100%;
+    border: 1px solid #333;
+}
+button:hover {
+    background: #dddddd;
+    color: #444;
+}
+textarea {
+    background: #2d2d2d;
+    color: #85e89d;
+    border: 1px solid #dddddd;
+    padding: 1ex;
+    font-family: monospace;
+    width: 100%;
+    height: 100%;
+}
+
+/* header */
+
+#header {
+    /*display: none;*/
+    background: #dddddd;
+    color: #000000;
+    border-bottom: 1px solid #000000;
+}
+
+
+/* main */
+
+#main {
+    flex: 1;
+    min-height: 0;
+}
+
+/* Left sidebar */
+
+#left-sidebar .h3 {
+    background: #dddddd;
+    color: #000000;
+}
+
+/* flows */
+
+#flow-list {
+    overflow-y: auto;
+    max-width: 50vw;
+}
+
+.flow-item {
+    height: 3ex;
+    padding: 0px;
+
+    display: flex;
+    flex: 0 0 3ex;
+    flex-direction: row;
+
+    cursor: pointer;
+}
+
+.flow-item:hover { background: #333; }
+
+.active-flow {
+    background-color: #444;
+    border-left: 3px solid green;
+}
+
+.flow-item div {
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    text-align: center;
+    padding: 0 1ex;
+
+    flex: 1;
+}
+
+.flow-item-url {
+    text-align: left !important;
+    flex: 5 !important;
+}
+
+/* general view */
+
+#content {
+    width: 100%;
+    height: 100%;
+    border-left: 1px solid #dddddd;
+}
+
+#view {
+    height: 100%;
+    width: 100%;
+}
+
+/* tabs */
+
+.tab { padding: 0 1ex 0; }
+.tab.active { background: #dddddd; color: #000000 }
+.tab:hover {
+    cursor: pointer;
+    background: #dddddd;
+    color: #444;
+}
+
+/* Inspect */
+
+#inspect-view {
+    overflow-y: auto;
+    min-width: 0;
+    flex: 1;
+}
+#details {
+    width: 100%;
+    overflow-y: auto;
+}
+
+#inspect-request, #inspect-response {
+    padding-left: 1ex;
+    background-color: #dddddd;
+    color: #000000;
+}
+
+#details pre {
+    width: 100%;
+    padding: 1ex;
+    border: 1px solid #dddddd;
+    word-break: break-all; /* Essential for long base64/tokens */
+    box-sizing: border-box;
+}
+
+/* Intercept */
+
+#intercept-view {
+    width: 100%;
+    height: 100%;
+}
+
+#intercept-controls {
+    width: 100%;
+    align-items: stretch;
+    justify-content: space-evenly;
+}
+
+#intercept-panels {
+    width: 100%;
+    height: 100%;
+}
+#intercept-request {
+    width: 100%;
+    height: 100%;
+}
+
+#intercept-request textarea {
+    resize: none;
+}
+
+/* Repeat */
+
+#repeat-view {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+}
+
+#repeat-send{
+    flex: 1;
+}
+#repeat-receive{
+    flex: 3;
+    overflow-y: auto;
+    min-width: 0;
+}
+
+#repeat-request {
+    flex: 5
+}
+pre#repeat-response {
+    width: 100%;
+    overflow: auto;
+    white-space: pre-wrap; /* Better than pre-line for raw HTTP data */
+    word-break: break-all; /* Forces breaks even in long strings of random chars */
+    box-sizing: border-box; /* Ensures padding doesn't add to width */
+}
+
+#repeat-request-button {
+    flex: 1;
+    border: 1px solid #dddddd;
+}
+
+/* Intrude */
+/* Sitemap */
+
+#sitemap-view {
+    overflow-y: auto;
+    background: #1e1e1e;
+    width: 100%;
+}
+
+summary {
+    outline: none;
+    user-select: none;
+}
+
+
+summary:hover {
+    background: #333;
+}
+
+details div:hover {
+    background: #dddddd;
+    color: #000000;
+}
+
+/* Jobs */
+/* CA */
+
+/* footer */
+
+#footer {
+    flex: 0 0 3ex;
+    background: #dddddd;
+    color: #000000;
+    border-top: 1px solid #000000;
+    z-index: 999;
+}

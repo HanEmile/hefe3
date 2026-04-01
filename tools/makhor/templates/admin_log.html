@@ -1,0 +1,93 @@
+{{define "admin_log.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Action Log - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Action Log</h1>
+
+        <p class="muted">Full audit trail of all user actions.
+            {{if .Username}}
+            <a href="{{.Subpath}}/rss/log.xml?username={{urlquery .Username}}{{if and .Category (ne .Category "all")}}&category={{urlquery .Category}}{{end}}">RSS feed</a>
+            {{else if and .Category (ne .Category "all")}}
+            <a href="{{.Subpath}}/rss/log.xml?category={{urlquery .Category}}">RSS feed</a>
+            {{else}}
+            <a href="{{.Subpath}}/rss/log.xml">RSS feed</a>
+            {{end}}
+        </p>
+
+        <div class="filter-bar">
+            <div class="filter-group">
+                <span class="filter-label">category:</span>
+                {{if or (eq .Category "") (eq .Category "all")}}<span class="filter-item active">all</span>{{else}}<a href="{{.Subpath}}/admin/log" class="filter-item">all</a>{{end}}
+                {{if eq .Category "post"}}<span class="filter-item active">posts</span>{{else}}<a href="{{.Subpath}}/admin/log?category=post" class="filter-item">posts</a>{{end}}
+                {{if eq .Category "comment"}}<span class="filter-item active">comments</span>{{else}}<a href="{{.Subpath}}/admin/log?category=comment" class="filter-item">comments</a>{{end}}
+                {{if eq .Category "admin"}}<span class="filter-item active">admin</span>{{else}}<a href="{{.Subpath}}/admin/log?category=admin" class="filter-item">admin</a>{{end}}
+                {{if eq .Category "user"}}<span class="filter-item active">users</span>{{else}}<a href="{{.Subpath}}/admin/log?category=user" class="filter-item">users</a>{{end}}
+            </div>
+            <form method="get" action="{{.Subpath}}/admin/log" class="filter-group" style="gap: 0.3rem;">
+                <input type="hidden" name="category" value="{{.Category}}">
+                <input type="text" name="username" value="{{.Username}}" placeholder="username" style="width: 100px; padding: 0.15rem 0.3rem; font-size: 0.9em;">
+                <input type="submit" value="filter" style="padding: 0.15rem 0.4rem; font-size: 0.9em;">
+                {{if .Username}}<a href="{{.Subpath}}/admin/log{{if .Category}}?category={{.Category}}{{end}}" class="filter-item">[clear]</a>{{end}}
+            </form>
+        </div>
+
+        {{if .Logs}}
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr class="muted">
+                <td style="padding: 0.25rem;">Time</td>
+                <td style="padding: 0.25rem;">User</td>
+                <td style="padding: 0.25rem;">Action</td>
+                <td style="padding: 0.25rem;">Target</td>
+                <td style="padding: 0.25rem;">IP</td>
+            </tr>
+            {{range .Logs}}
+            <tr style="border-top: 1px solid var(--border);">
+                <td style="padding: 0.25rem;">{{formatTime .CreatedAt}}</td>
+                <td style="padding: 0.25rem;">
+                    {{if .UserID}}
+                    <a href="{{.Subpath}}/users/{{.Username}}">{{.Username}}</a>
+                    {{else}}
+                    <span class="muted">anonymous</span>
+                    {{end}}
+                </td>
+                <td style="padding: 0.25rem;"><code>{{.Action}}</code></td>
+                <td style="padding: 0.25rem;">
+                    {{if .TargetType}}
+                    {{.TargetType}}:
+                    {{if eq .TargetType "tag"}}
+                    <a href="{{.Subpath}}/tags/{{.TargetInfo}}">{{.TargetInfo}}</a>
+                    {{else if eq .TargetType "user"}}
+                    <a href="{{.Subpath}}/users/{{.TargetInfo}}">{{.TargetInfo}}</a>
+                    {{else if eq .TargetType "post"}}
+                    <a href="{{.Subpath}}/posts/{{.TargetID}}">{{.TargetInfo}}</a>
+                    {{else if eq .TargetType "comment"}}
+                    <a href="{{.Subpath}}/comments/{{.TargetID}}" title="{{.TargetInfo}}">#{{.TargetID}}</a>
+                    {{else}}
+                    {{.TargetInfo}}
+                    {{end}}
+                    {{else}}
+                    {{.TargetInfo}}
+                    {{end}}
+                </td>
+                <td style="padding: 0.25rem;"><span class="muted">{{.IPAddress}}</span></td>
+            </tr>
+            {{end}}
+        </table>
+
+        {{template "pagination" .}}
+        {{else}}
+        <p class="muted">No actions logged yet.</p>
+        {{end}}
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

@@ -1,0 +1,70 @@
+<html>
+    <head>
+        <script src="/static/frontend.js"></script>
+        <link rel="stylesheet" href="/static/style.css">
+    </head>
+    <body class="rows">
+		<div id="header" class="cols">
+			<div id="selected-flow"></div>
+		</div>
+        <div id="main" class="cols">
+    		<div id="left-sidebar" class="rows w-1">
+    			<div class="h3">Flows</div>
+    			<div id="flow-list" class="rows"></div>
+    		</div>
+    		<div id="content" class="rows w-3">
+    			<div id="tabs" class="cols">
+    				<div id="inspect-tab" class="tab active" onclick="showTab('inspect')">Inspect</div>
+    				<div id="intercept-tab" class="tab active" onclick="showTab('intercept')">Intercept</div>
+    				<div id="repeat-tab" class="tab" onclick="showTab('repeat')">Repeat</div>
+    				<div id="intrude-tab" class="tab" onclick="showTab('intrude')">Intrude</div>
+    				<div id="sitemap-tab" class="tab" onclick="showTab('sitemap')">Sitemap</div>
+    				<div id="jobs-tab" class="tab" onclick="showTab('jobs')">Jobs</div>
+    				<div id="ca-tab" class="tab" onclick="showTab('ca')">CA</div>
+    				<div id="listeners-tab" class="tab" onclick="showTab('listeners')">Listeners</div>
+    			</div>
+    			<div id="view" class="cols">
+         			<div id="inspect-view" class="rows">
+        				<div id="details">Select a flow to inspect</div>
+         			</div>
+         			<div id="intercept-view" class="rows">
+        				<div id="intercept-controls" class="cols">
+            				<button id="enable-intercept" onclick="enableIntercept()">Enable Interception</button>
+            				<button id="disable-intercept" onclick="disableIntercept()" style="display: none;">Disable Interception</button>
+            				<button id="forward-request" onclick="forwardRequest()">Forward</button>
+            				<button id="drop-request" onclick="dropRequest()">Drop</button>
+                        </div>
+                        <div id="intercept-panels" class="cols">
+                            <textarea id="intercept-request"></textarea>
+                        </div>
+         			</div>
+         			<div id="repeat-view" class="rows">
+         			    <div id="repeat-send" class="cols">
+                            <textarea id="repeat-request"></textarea>
+            				<button id="repeat-request-button" onclick="sendRepeat()">Send Request</button>
+        				</div>
+         			    <div id="repeat-receive" class="cols">
+                            <pre id="repeat-response"></pre>
+        				</div>
+         			</div>
+         			<div id="intrude-view" class="rows">
+         			</div>
+         			<div id="sitemap-view" class="rows">
+         			</div>
+         			<div id="jobs-view" class="rows">
+         			</div>
+         			<div id="ca-view" class="rows">
+         			</div>
+         			<div id="listeners-view" class="rows">
+         			</div>
+    			</div>
+    		</div>
+    		<div id="right-sidebar" class="rows w-1" style="display: none;">
+    			<div class="h3">Things</div>
+    		</div>
+        </div>
+		<div id="footer" class="cols">
+		    <div>Footer 🐾</div>
+		</div>
+	</body>
+</html>

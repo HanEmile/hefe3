@@ -1,0 +1,84 @@
+{{define "home.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{if .ActiveTag}}{{.ActiveTag}} - {{end}}makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <div class="filter-bar">
+            <div class="filter-group">
+                {{if eq .View "hot"}}
+                <span class="filter-item active">hot</span>
+                {{else}}
+                <a href="{{.Subpath}}/" class="filter-item">hot</a>
+                {{end}}
+                {{if eq .View "top"}}
+                <span class="filter-item active">top</span>
+                {{else}}
+                <a href="{{.Subpath}}/?view=top" class="filter-item">top</a>
+                {{end}}
+                {{if eq .View "new"}}
+                <span class="filter-item active">new</span>
+                {{else}}
+                <a href="{{.Subpath}}/?view=new" class="filter-item">new</a>
+                {{end}}
+            </div>
+            {{if eq .View "top"}}
+            <div class="filter-group">
+                <span class="filter-label">period:</span>
+                {{if eq .Period "24h"}}<span class="filter-item active">24h</span>{{else}}<a href="{{.Subpath}}/?view=top&t=24h" class="filter-item">24h</a>{{end}}
+                {{if or (eq .Period "7d") (eq .Period "")}}<span class="filter-item active">7d</span>{{else}}<a href="{{.Subpath}}/?view=top&t=7d" class="filter-item">7d</a>{{end}}
+                {{if eq .Period "30d"}}<span class="filter-item active">30d</span>{{else}}<a href="{{.Subpath}}/?view=top&t=30d" class="filter-item">30d</a>{{end}}
+                {{if eq .Period "90d"}}<span class="filter-item active">90d</span>{{else}}<a href="{{.Subpath}}/?view=top&t=90d" class="filter-item">90d</a>{{end}}
+                {{if eq .Period "1y"}}<span class="filter-item active">1y</span>{{else}}<a href="{{.Subpath}}/?view=top&t=1y" class="filter-item">1y</a>{{end}}
+                {{if eq .Period "all"}}<span class="filter-item active">all</span>{{else}}<a href="{{.Subpath}}/?view=top&t=all" class="filter-item">all</a>{{end}}
+            </div>
+            {{end}}
+            {{if .ActiveTag}}
+            <div class="filter-group">
+                <span class="filter-label">tag:</span>
+                <a href="{{.Subpath}}/tags/{{.ActiveTag}}" class="tag">{{.ActiveTag}}</a>
+                <a href="{{.Subpath}}/" class="filter-item">[clear]</a>
+            </div>
+            {{end}}
+        </div>
+
+        {{if .Posts}}
+        {{range $i, $post := .Posts}}
+        <div class="post">
+            <span class="post-title">
+                <a href="{{$.Subpath}}/posts/{{$post.ID}}/vote" class="vote{{if $post.UserVoted}} voted{{end}}">▲</a>
+                <span class="title-text">
+                {{if $post.URL}}
+                <a href="{{$post.URL}}">{{$post.Title}}</a>
+                {{else}}
+                <a href="{{$.Subpath}}/posts/{{$post.ID}}">{{$post.Title}}</a>
+                {{end}}
+                </span>
+                {{if $post.Domain}}<a href="{{$.Subpath}}/domain/{{$post.Domain}}" class="domain muted">({{$post.Domain}})</a>{{end}}
+            </span>
+            <div class="post-meta">
+                {{$post.Score}}pt | {{if eq $post.SourceType "rss"}}<img src="{{$.Subpath}}/avatar/_rss" class="avatar-small" alt=""><a href="{{$.Subpath}}/feeds/{{$post.SourceID}}" title="{{$post.SourceName}}">rss</a>{{else}}<img src="{{$.Subpath}}/avatar/{{$post.Username}}" class="avatar-small" alt=""><a href="{{$.Subpath}}/users/{{$post.Username}}" class="user-link">{{$post.Username}}</a>{{if $post.Hat}} <span class="hat" title="{{$post.Hat.Organization}}">{{$post.Hat.Name}}</span>{{end}}{{end}} |
+                {{timeAgo $post.CreatedAt}} |
+                <a href="{{$.Subpath}}/posts/{{$post.ID}}">{{$post.CommentCount}} comments</a>
+                {{range $post.Tags}}
+                <a href="{{$.Subpath}}/tags/{{.Name}}" class="tag">{{.Name}}</a>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+
+        {{template "pagination" .}}
+        {{else}}
+        <p class="muted">No posts yet.</p>
+        {{end}}
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

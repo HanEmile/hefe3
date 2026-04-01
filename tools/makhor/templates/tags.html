@@ -1,0 +1,46 @@
+{{define "tags.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tags - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Tags</h1>
+        <p class="muted">Browse posts by category. Click a tag to see posts and subtags.</p>
+        <p class="muted">RSS: <code>/rss/tag/tagname.xml</code> or combine multiple tags: <code>/rss/tags.xml?tags=go,rust</code> (includes subtags)</p>
+        {{if .User}}
+        <p><a href="{{.Subpath}}/tags/new">create new tag</a></p>
+        {{end}}
+
+        {{if .Tags}}
+        <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
+            <tr class="muted">
+                <th style="text-align: left; padding: 0.4rem 0.5rem; border-bottom: 2px solid var(--border);">Tag</th>
+                <th style="text-align: right; padding: 0.4rem 0.5rem; border-bottom: 2px solid var(--border); width: 80px;">Posts</th>
+                <th style="text-align: right; padding: 0.4rem 0.5rem; border-bottom: 2px solid var(--border); width: 80px;">Subtags</th>
+                <th style="text-align: left; padding: 0.4rem 0.5rem; border-bottom: 2px solid var(--border);">Description</th>
+                <th style="text-align: left; padding: 0.4rem 0.5rem; border-bottom: 2px solid var(--border); width: 100px;">Creator</th>
+            </tr>
+            {{range .Tags}}
+            <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 0.4rem 0.5rem;"><a href="{{$.Subpath}}/tags/{{.Name}}" class="tag">{{.Name}}</a></td>
+                <td style="padding: 0.4rem 0.5rem; text-align: right;">{{.PostCount}}</td>
+                <td style="padding: 0.4rem 0.5rem; text-align: right;">{{if gt .SubtagCount 0}}{{.SubtagCount}}{{else}}<span class="muted">-</span>{{end}}</td>
+                <td style="padding: 0.4rem 0.5rem;" class="muted">{{if .Description}}{{.Description}}{{else}}-{{end}}</td>
+                <td style="padding: 0.4rem 0.5rem;">{{if .CreatorUsername}}<a href="{{$.Subpath}}/users/{{.CreatorUsername}}" class="user-link">{{.CreatorUsername}}</a>{{else}}<span class="muted">-</span>{{end}}</td>
+            </tr>
+            {{end}}
+        </table>
+        {{else}}
+        <p class="muted">No tags configured.</p>
+        {{end}}
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

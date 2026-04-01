@@ -1,0 +1,45 @@
+{{define "settings.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Settings - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Settings</h1>
+
+        {{if .Success}}
+        <p class="success">{{.Success}}</p>
+        {{end}}
+
+        {{if .Error}}
+        <p class="error">{{.Error}}</p>
+        {{end}}
+
+        <h2>Profile</h2>
+        <form method="POST" action="{{.Subpath}}/settings">
+            <label for="about">About <span class="muted">(max 1000 characters)</span></label>
+            <textarea id="about" name="about" maxlength="1000">{{.User.About}}</textarea>
+
+            <button type="submit">Save</button>
+        </form>
+
+        <h2>Avatar</h2>
+        <div>
+            <img src="{{.Subpath}}/avatar/{{.User.Username}}" class="avatar" alt="Current avatar">
+            <a href="{{.Subpath}}/settings/avatar">Change avatar</a>
+        </div>
+
+        <h2>Account</h2>
+        <p>Email: <span class="muted">{{.User.Email}}</span></p>
+        <p>Username: <span class="muted">{{.User.Username}}</span></p>
+        <p>Member since: <span class="muted">{{formatTime .User.CreatedAt}}</span></p>
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

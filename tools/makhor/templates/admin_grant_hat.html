@@ -1,0 +1,46 @@
+{{define "admin_grant_hat.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Grant Hat - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Grant Hat</h1>
+
+        {{if .Error}}
+        <p class="error">{{.Error}}</p>
+        {{end}}
+
+        <p class="muted">
+            A hat lets users speak officially for an organization when posting comments.
+        </p>
+
+        <form method="POST" action="{{.Subpath}}/admin/hats/grant">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" value="{{.Username}}" required>
+
+            <label for="name">Hat Name <span class="muted">(e.g., "Core Team Member")</span></label>
+            <input type="text" id="name" name="name" value="{{.Name}}" required>
+
+            <label for="organization">Organization <span class="muted">(e.g., "Golang")</span></label>
+            <input type="text" id="organization" name="organization" value="{{.Organization}}" required>
+
+            <label for="link">Verification Link <span class="muted">(optional)</span></label>
+            <input type="url" id="link" name="link" value="{{.Link}}" placeholder="https://...">
+
+            <button type="submit">Grant Hat</button>
+        </form>
+
+        <p style="margin-top: 1rem;">
+            <a href="{{.Subpath}}/admin/hats">← Back to hats</a>
+        </p>
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

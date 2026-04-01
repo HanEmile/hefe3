@@ -1,0 +1,54 @@
+{{define "admin_feeds.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RSS Feeds - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>RSS Feeds</h1>
+
+        <p class="muted" style="margin-bottom: 1rem;">{{len .Feeds}} feed{{if ne (len .Feeds) 1}}s{{end}} configured</p>
+
+        {{if .Feeds}}
+        <table style="width: 100%;">
+            <tr class="muted">
+                <td style="padding: 0.3rem;">Feed</td>
+                <td style="padding: 0.3rem;">Tag</td>
+                <td style="padding: 0.3rem;">Items</td>
+                <td style="padding: 0.3rem;">Last Poll</td>
+                <td style="padding: 0.3rem;">Status</td>
+            </tr>
+            {{range .Feeds}}
+            <tr{{if not .IsActive}} style="opacity: 0.5;"{{end}}>
+                <td style="padding: 0.3rem;">
+                    <a href="{{.Subpath}}/feeds/{{.ID}}">{{if .Title}}{{.Title}}{{else}}{{.URL}}{{end}}</a>
+                </td>
+                <td style="padding: 0.3rem;">
+                    <a href="{{.Subpath}}/tags/{{.TagName}}" class="tag">{{.TagName}}</a>
+                </td>
+                <td style="padding: 0.3rem;">{{.ItemCount}}</td>
+                <td style="padding: 0.3rem;">
+                    {{if .LastPolled}}{{timeAgo .LastPolled}}{{else}}<span class="muted">never</span>{{end}}
+                </td>
+                <td style="padding: 0.3rem;">
+                    {{if not .IsActive}}<span class="muted">inactive</span>
+                    {{else if .LastError}}<span style="color: var(--error);" title="{{.LastError}}">error</span>
+                    {{else}}<span style="color: var(--success);">ok</span>
+                    {{end}}
+                </td>
+            </tr>
+            {{end}}
+        </table>
+        {{else}}
+        <p class="muted">No feeds configured. Add feeds from the <a href="{{.Subpath}}/tags">tags</a> page.</p>
+        {{end}}
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

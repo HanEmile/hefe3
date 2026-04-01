@@ -1,0 +1,51 @@
+{{define "register.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Register - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Register</h1>
+
+        {{if .Errors}}
+        <ul class="errors">
+            {{range .Errors}}
+            <li>{{.}}</li>
+            {{end}}
+        </ul>
+        {{end}}
+
+        {{if .Success}}
+        <p class="success">{{.Success}}</p>
+        {{else}}
+
+        <p class="muted">Create a new account. Registration may require an invite code.</p>
+
+        <form method="POST" action="{{.Subpath}}/register">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" value="{{.Username}}" required
+                   pattern="[a-zA-Z][a-zA-Z0-9_]{2,19}" title="3-20 chars, start with letter, letters/numbers/underscores only">
+
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" value="{{.Email}}" required>
+
+            <label for="invite_code">Invite Code <span class="muted">(if you have one)</span></label>
+            <input type="text" id="invite_code" name="invite_code" value="{{.InviteCode}}">
+
+            <button type="submit">Register</button>
+        </form>
+
+        <p style="margin-top: 1rem;">
+            Already have an account? <a href="{{.Subpath}}/login">Login</a>
+        </p>
+        {{end}}
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

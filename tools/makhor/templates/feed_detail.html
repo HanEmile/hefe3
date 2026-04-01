@@ -1,0 +1,192 @@
+{{define "feed_detail.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Feed.Title}} - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1><img src="{{.Subpath}}/avatar/_rss" class="avatar" alt="">{{.Feed.Title}}</h1>
+
+        <div class="muted" style="margin-bottom: 1rem;">
+            <p>
+                <a href="{{.Feed.URL}}" target="_blank" rel="noopener">{{.Feed.URL}}</a>
+            </p>
+            <p>
+                Posts to: <a href="{{.Subpath}}/tags/{{.Feed.TagName}}" class="tag">{{.Feed.TagName}}</a>
+                {{if .Feed.CreatedByName}}
+                | Added by: <a href="{{.Subpath}}/users/{{.Feed.CreatedByName}}">{{.Feed.CreatedByName}}</a>
+                {{end}}
+                {{if not .Feed.IsActive}}
+                | <span style="color: var(--danger);">Inactive</span>
+                {{end}}
+            </p>
+            <p>
+                Poll interval: {{.Feed.IntervalMinutes}} minutes
+                {{if .Feed.LastPolled}}
+                | Last polled: {{timeAgo .Feed.LastPolled}}
+                {{end}}
+                | Items imported: {{.Feed.ItemCount}}
+            </p>
+            {{if .Feed.LastError}}
+            <p style="color: var(--danger);">Last error: {{.Feed.LastError}}</p>
+            {{end}}
+        </div>
+
+        {{if and .CanEdit .Stats}}
+        <details style="margin-bottom: 1rem; border: 1px solid var(--border); padding: 0.5rem;">
+            <summary style="cursor: pointer;">Feed Statistics</summary>
+            <div style="margin-top: 0.5rem;">
+                <table style="width: 100%; max-width: 500px;">
+                    <tr>
+                        <td style="padding: 0.25rem;" class="muted">Total polls</td>
+                        <td style="padding: 0.25rem;">{{.Stats.TotalPolls}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.25rem;" class="muted">Successful</td>
+                        <td style="padding: 0.25rem;">{{.Stats.SuccessfulPolls}} ({{printf "%.1f" .Stats.SuccessRate}}%)</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.25rem;" class="muted">Failed</td>
+                        <td style="padding: 0.25rem;">{{.Stats.FailedPolls}}{{if gt .Stats.FailRate24h 0.0}} <span style="color: var(--error);">({{printf "%.1f" .Stats.FailRate24h}}% in last 24h)</span>{{end}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.25rem;" class="muted">Items found</td>
+                        <td style="padding: 0.25rem;">{{.Stats.TotalItemsFound}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.25rem;" class="muted">Items imported</td>
+                        <td style="padding: 0.25rem;">{{.Stats.TotalItemsImported}} (avg {{printf "%.1f" .Stats.AvgItemsPerPoll}}/poll)</td>
+                    </tr>
+                    {{if .Stats.StatusCounts}}
+                    <tr>
+                        <td style="padding: 0.25rem;" class="muted">HTTP responses</td>
+                        <td style="padding: 0.25rem;">
+                            {{range $status, $count := .Stats.StatusCounts}}
+                            <span{{if ge $status 400}} style="color: var(--error);"{{end}}>{{$status}}: {{$count}}</span>
+                            {{end}}
+                        </td>
+                    </tr>
+                    {{end}}
+                </table>
+
+                {{if .Stats.LastPolls}}
+                <details style="margin-top: 0.5rem;">
+                    <summary style="cursor: pointer;" class="muted">Recent poll history</summary>
+                    <table style="width: 100%; margin-top: 0.25rem; font-size: 0.9em;">
+                        <tr class="muted">
+                            <td style="padding: 0.2rem;">Time</td>
+                            <td style="padding: 0.2rem;">Status</td>
+                            <td style="padding: 0.2rem;">Found</td>
+                            <td style="padding: 0.2rem;">Imported</td>
+                            <td style="padding: 0.2rem;">Duration</td>
+                        </tr>
+                        {{range .Stats.LastPolls}}
+                        <tr{{if not .Success}} style="color: var(--error);"{{end}}>
+                            <td style="padding: 0.2rem;">{{timeAgo .PolledAt}}</td>
+                            <td style="padding: 0.2rem;">{{if .Success}}OK{{else}}{{if .HTTPStatus}}HTTP {{.HTTPStatus}}{{else}}Error{{end}}{{end}}</td>
+                            <td style="padding: 0.2rem;">{{.ItemsFound}}</td>
+                            <td style="padding: 0.2rem;">{{.ItemsImported}}</td>
+                            <td style="padding: 0.2rem;">{{.DurationMs}}ms</td>
+                        </tr>
+                        {{if and (not .Success) .ErrorMessage}}
+                        <tr>
+                            <td colspan="5" style="padding: 0.2rem; font-size: 0.85em; color: var(--error);">{{.ErrorMessage}}</td>
+                        </tr>
+                        {{end}}
+                        {{end}}
+                    </table>
+                </details>
+                {{end}}
+            </div>
+        </details>
+        {{end}}
+
+        {{if .CanEdit}}
+        <details style="margin-bottom: 1rem; border: 1px solid var(--border); padding: 0.5rem;">
+            <summary style="cursor: pointer;">Edit Feed Settings</summary>
+            <form method="POST" action="{{.Subpath}}/feeds/{{.Feed.ID}}" style="margin-top: 0.5rem;">
+                <table style="width: 100%; max-width: 500px;">
+                    <tr>
+                        <td style="padding: 0.25rem;"><label for="title">Title</label></td>
+                        <td style="padding: 0.25rem;"><input type="text" id="title" name="title" value="{{.Feed.Title}}" required style="width: 100%;"></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.25rem;"><label for="url">URL</label></td>
+                        <td style="padding: 0.25rem;"><input type="url" id="url" name="url" value="{{.Feed.URL}}" required style="width: 100%;"></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.25rem;"><label for="interval_minutes">Poll interval</label></td>
+                        <td style="padding: 0.25rem;"><input type="number" id="interval_minutes" name="interval_minutes" value="{{.Feed.IntervalMinutes}}" min="5" style="width: 80px;"> minutes</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.25rem;"><label for="max_items_per_poll">Max items/poll</label></td>
+                        <td style="padding: 0.25rem;"><input type="number" id="max_items_per_poll" name="max_items_per_poll" value="{{.Feed.MaxItemsPerPoll}}" min="1" max="50" style="width: 80px;"></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.25rem;"></td>
+                        <td style="padding: 0.25rem;">
+                            <label><input type="checkbox" name="is_active"{{if .Feed.IsActive}} checked{{end}}> Active</label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.25rem;"></td>
+                        <td style="padding: 0.25rem;">
+                            <label><input type="checkbox" name="auto_approve"{{if .Feed.AutoApprove}} checked{{end}}> Auto-approve posts</label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.25rem;"></td>
+                        <td style="padding: 0.25rem;">
+                            <label><input type="checkbox" name="poll_on_view"{{if .Feed.PollOnView}} checked{{end}}> Poll only when tag is viewed</label>
+                        </td>
+                    </tr>
+                </table>
+                <div style="margin-top: 0.5rem;">
+                    <button type="submit">Save Changes</button>
+                    <a href="{{.Subpath}}/feeds/delete?id={{.Feed.ID}}" onclick="return confirm('Delete this feed? Posts will remain but will no longer be linked to this feed.')" style="margin-left: 1rem; color: var(--danger);">Delete Feed</a>
+                </div>
+            </form>
+        </details>
+        {{end}}
+
+        <p class="muted">{{.Total}} post{{if ne .Total 1}}s{{end}} from this feed</p>
+
+        {{if .Posts}}
+        {{range .Posts}}
+        <div class="post">
+            <span class="post-title">
+                <a href="{{.Subpath}}/posts/{{.ID}}/vote" class="vote{{if .UserVoted}} voted{{end}}">▲</a>
+                <span class="title-text">
+                {{if .URL}}
+                <a href="{{.URL}}">{{.Title}}</a>
+                {{else}}
+                <a href="{{.Subpath}}/posts/{{.ID}}">{{.Title}}</a>
+                {{end}}
+                </span>
+                {{if .Domain}}<a href="{{.Subpath}}/domain/{{.Domain}}" class="domain muted">({{.Domain}})</a>{{end}}
+            </span>
+            <div class="post-meta">
+                {{.Score}}pt
+                {{timeAgo .CreatedAt}} |
+                <a href="{{.Subpath}}/posts/{{.ID}}">{{.CommentCount}} comments</a>
+                {{range .Tags}}
+                <a href="{{.Subpath}}/tags/{{.Name}}" class="tag">{{.Name}}</a>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+
+        {{template "pagination" .}}
+        {{else}}
+        <p class="muted" style="margin-top: 1rem;">No posts from this feed yet.</p>
+        {{end}}
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

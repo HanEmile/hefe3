@@ -1,0 +1,36 @@
+{{define "invite_tree.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Invite Tree - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Invite Tree</h1>
+
+        <p class="muted">Shows who invited whom. The community grows through invitations.</p>
+
+        {{template "tree_node" .Tree}}
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}
+
+{{define "tree_node"}}
+{{if .}}
+<div class="tree">
+    <a href="{{.Subpath}}/users/{{.User.Username}}">{{.User.Username}}</a>
+    <span class="muted">({{formatTime .User.CreatedAt}})</span>
+    {{if .Children}}
+    {{range .Children}}
+    {{template "tree_node" .}}
+    {{end}}
+    {{end}}
+</div>
+{{end}}
+{{end}}

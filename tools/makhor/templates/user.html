@@ -1,0 +1,279 @@
+{{define "user.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{if .ProfileUser}}{{.ProfileUser.Username}}{{else}}User{{end}} - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        {{if .ProfileUser}}
+        <h1>
+            <img src="{{.Subpath}}/avatar/{{.ProfileUser.Username}}" class="avatar" alt="">
+            {{.ProfileUser.Username}}
+            {{if .ProfileUser.IsAdmin}}<span class="muted">[admin]</span>{{end}}
+            {{if .ProfileUser.IsBanned}}<span class="error">[banned]</span>{{end}}
+        </h1>
+
+        {{if .ProfileUser.IsBanned}}
+        <div class="error" style="margin-bottom: 1rem; padding: 0.5rem; border: 1px solid var(--error);">
+            <strong>This user is banned.</strong>
+            {{if .ProfileUser.BanReason}}
+            <div style="margin-top: 0.25rem;">Reason: {{.ProfileUser.BanReason}}</div>
+            {{end}}
+            {{if .ProfileUser.BanExpiresAt}}
+            <div style="margin-top: 0.25rem;">Expires: {{formatTime .ProfileUser.BanExpiresAt}}</div>
+            {{else}}
+            <div style="margin-top: 0.25rem;" class="muted">Permanent ban</div>
+            {{end}}
+            {{if .ProfileUser.BannedByUsername}}
+            <div style="margin-top: 0.25rem;" class="muted">Banned by: <a href="{{.Subpath}}/users/{{.ProfileUser.BannedByUsername}}">{{.ProfileUser.BannedByUsername}}</a></div>
+            {{end}}
+        </div>
+        {{end}}
+
+        <div class="muted" style="margin-bottom: 1rem;">
+            Member since {{formatTime .ProfileUser.CreatedAt}}
+            {{if .Inviter}}
+            | Invited by <a href="{{.Subpath}}/users/{{.Inviter.Username}}">{{.Inviter.Username}}</a>
+            {{end}}
+        </div>
+
+        {{if .ProfileUser.About}}
+        <div style="margin: 1rem 0; padding: 0.5rem; border: 1px solid var(--border);">
+            <pre style="white-space: pre-wrap; font-family: monospace;">{{.ProfileUser.About}}</pre>
+        </div>
+        {{end}}
+
+        {{if .Hats}}
+        <div style="margin: 1rem 0;">
+            <span class="muted">Hats:</span>
+            {{range .Hats}}
+            <span class="hat" title="{{.Organization}}">{{.Name}}</span>
+            {{end}}
+        </div>
+        {{end}}
+
+        {{if .User}}
+        {{if not (eq .User.ID .ProfileUser.ID)}}
+        <div style="margin: 1rem 0;">
+            {{if .CanBan}}
+                {{if .ProfileUser.IsBanned}}
+                {{if .User.IsAdmin}}<a href="{{.Subpath}}/admin/unban?username={{.ProfileUser.Username}}">Unban User</a> | {{end}}
+                {{else}}
+                <a href="{{.Subpath}}/admin/ban?username={{.ProfileUser.Username}}">Ban User</a> |
+                {{end}}
+            {{end}}
+            {{if .User.IsAdmin}}<a href="{{.Subpath}}/admin/hats/grant?username={{.ProfileUser.Username}}">Grant Hat</a>{{end}}
+        </div>
+        {{end}}
+        {{end}}
+
+        {{/* Profile sections navigation for own profile */}}
+        {{if .IsOwnProfile}}
+        <div class="filter-bar" style="margin: 1rem 0;">
+            <div class="filter-group">
+                {{if eq .Section "posts"}}<span class="filter-item active">posts</span>{{else}}<a href="{{.Subpath}}/users/{{.ProfileUser.Username}}" class="filter-item">posts</a>{{end}}
+                {{if eq .Section "settings"}}<span class="filter-item active">settings</span>{{else}}<a href="{{.Subpath}}/users/{{.ProfileUser.Username}}?section=settings" class="filter-item">settings</a>{{end}}
+                {{if eq .Section "invites"}}<span class="filter-item active">invites</span>{{else}}<a href="{{.Subpath}}/users/{{.ProfileUser.Username}}?section=invites" class="filter-item">invites</a>{{end}}
+                {{if .Hats}}{{if eq .Section "hats"}}<span class="filter-item active">hats</span>{{else}}<a href="{{.Subpath}}/users/{{.ProfileUser.Username}}?section=hats" class="filter-item">hats</a>{{end}}{{end}}
+            </div>
+        </div>
+        {{end}}
+
+        {{/* Settings Section */}}
+        {{if and .IsOwnProfile (eq .Section "settings")}}
+        {{if .Success}}
+        <p class="success">{{.Success}}</p>
+        {{end}}
+
+        {{if .Error}}
+        <p class="error">{{.Error}}</p>
+        {{end}}
+
+        <h2>Settings</h2>
+        <form method="POST" action="{{.Subpath}}/users/{{.ProfileUser.Username}}/settings" enctype="multipart/form-data">
+            <table class="settings-form">
+                <tr>
+                    <td class="settings-label">Username</td>
+                    <td class="settings-value muted">{{.ProfileUser.Username}}</td>
+                </tr>
+                <tr>
+                    <td class="settings-label">Email</td>
+                    <td class="settings-value muted">{{.ProfileUser.Email}}</td>
+                </tr>
+                <tr>
+                    <td class="settings-label">Member since</td>
+                    <td class="settings-value muted">{{formatTime .ProfileUser.CreatedAt}}</td>
+                </tr>
+                <tr>
+                    <td class="settings-label">
+                        <label for="avatar">Avatar</label>
+                    </td>
+                    <td class="settings-value">
+                        <img src="{{.Subpath}}/avatar/{{.ProfileUser.Username}}?v={{.ProfileUser.ID}}" class="avatar" alt="Current avatar" style="vertical-align: middle; margin-right: 0.5rem;">
+                        <input type="file" id="avatar" name="avatar" accept="image/png,image/jpeg,image/gif" style="display: inline-block;">
+                        <div class="muted" style="margin-top: 0.25rem;">PNG, JPEG, or GIF. Max 256KB.</div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="settings-label">
+                        <label for="about">About</label>
+                    </td>
+                    <td class="settings-value">
+                        <textarea id="about" name="about" maxlength="1000" style="width: 100%; min-height: 80px;">{{.ProfileUser.About}}</textarea>
+                        <div class="muted">Max 1000 characters</div>
+                    </td>
+                </tr>
+            </table>
+            <div style="margin-top: 1rem;">
+                <button type="submit">Save Settings</button>
+            </div>
+        </form>
+
+        <h3 style="margin-top: 2rem;">Change Email</h3>
+        <form method="POST" action="{{.Subpath}}/settings/email/change" class="settings-form" style="display: table; width: 100%; max-width: 600px;">
+            <div style="display: table-row;">
+                <div class="settings-label" style="display: table-cell; padding: 0.5rem 0; width: 120px;">
+                    <label for="new_email">New Email</label>
+                </div>
+                <div class="settings-value" style="display: table-cell; padding: 0.5rem 0;">
+                    <input type="email" id="new_email" name="new_email" required placeholder="new@example.com" style="width: 100%; max-width: 300px;">
+                    <button type="submit" style="margin-left: 0.5rem;">Change</button>
+                    <div class="muted" style="margin-top: 0.25rem;">A verification link will be sent to your current email.</div>
+                </div>
+            </div>
+        </form>
+
+        {{/* Invites Section */}}
+        {{else if and .IsOwnProfile (eq .Section "invites")}}
+        {{if .Error}}
+        <p class="error">{{.Error}}</p>
+        {{end}}
+
+        <h2>Create Invite</h2>
+        <form method="POST" action="{{.Subpath}}/users/{{.ProfileUser.Username}}/invites">
+            <label for="note">Note <span class="muted">(optional, for your reference)</span></label>
+            <input type="text" id="note" name="note" placeholder="e.g., For John">
+
+            <button type="submit">Create Invite</button>
+        </form>
+
+        <h2>Your Invites</h2>
+        {{if .Invites}}
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr class="muted">
+                <td style="padding: 0.25rem;">Invite Link</td>
+                <td style="padding: 0.25rem;">Note</td>
+                <td style="padding: 0.25rem;">Created</td>
+                <td style="padding: 0.25rem;">Status</td>
+            </tr>
+            {{range .Invites}}
+            <tr style="border-top: 1px solid var(--border);">
+                <td style="padding: 0.25rem;">
+                    {{if .UsedBy}}
+                    <span class="muted" style="font-size: 0.85em;">{{$.BaseURL}}/register?invite={{.Code}}</span>
+                    {{else}}
+                    <code style="font-size: 0.85em; user-select: all;">{{$.BaseURL}}/register?invite={{.Code}}</code>
+                    {{end}}
+                </td>
+                <td style="padding: 0.25rem;">{{.Note}}</td>
+                <td style="padding: 0.25rem;">{{timeAgo .CreatedAt}}</td>
+                <td style="padding: 0.25rem;">
+                    {{if .UsedBy}}
+                    <span class="success">Used by <a href="{{$.Subpath}}/users/{{.UsedByUsername}}">{{.UsedByUsername}}</a> {{timeAgo .UsedAt}}</span>
+                    {{else}}
+                    <span class="muted">Pending</span>
+                    {{end}}
+                </td>
+            </tr>
+            {{end}}
+        </table>
+        {{else}}
+        <p class="muted">No invites yet. Create one above.</p>
+        {{end}}
+
+        {{/* Hats Section */}}
+        {{else if and .IsOwnProfile (eq .Section "hats")}}
+        <h2>Your Hats</h2>
+        {{if .Hats}}
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr class="muted">
+                <td style="padding: 0.25rem;">Hat</td>
+                <td style="padding: 0.25rem;">Organization</td>
+                <td style="padding: 0.25rem;">Granted</td>
+                <td style="padding: 0.25rem;">Verification</td>
+            </tr>
+            {{range .Hats}}
+            <tr style="border-top: 1px solid var(--border);">
+                <td style="padding: 0.25rem;"><span class="hat">{{.Name}}</span></td>
+                <td style="padding: 0.25rem;">{{.Organization}}</td>
+                <td style="padding: 0.25rem;">{{formatTime .GrantedAt}}</td>
+                <td style="padding: 0.25rem;">
+                    {{if .Link}}
+                    <a href="{{.Link}}" target="_blank">View</a>
+                    {{else}}
+                    <span class="muted">-</span>
+                    {{end}}
+                </td>
+            </tr>
+            {{end}}
+        </table>
+        {{else}}
+        <p class="muted">You don't have any hats yet.</p>
+        {{end}}
+
+        {{/* Default Posts/Comments Section */}}
+        {{else}}
+        <h2>Recent Posts</h2>
+        {{if .Posts}}
+        {{range .Posts}}
+        <div class="post">
+            <span class="post-title">
+                <span class="title-text">
+                {{if .URL}}
+                <a href="{{.URL}}">{{.Title}}</a>
+                {{else}}
+                <a href="{{$.Subpath}}/posts/{{.ID}}">{{.Title}}</a>
+                {{end}}
+                </span>
+                {{if .Domain}}<a href="{{$.Subpath}}/domain/{{.Domain}}" class="domain muted">({{.Domain}})</a>{{end}}
+            </span>
+            <div class="post-meta">
+                {{.Score}} points {{timeAgo .CreatedAt}} |
+                <a href="{{$.Subpath}}/posts/{{.ID}}">{{.CommentCount}} comments</a>
+            </div>
+        </div>
+        {{end}}
+        {{else}}
+        <p class="muted">No posts yet.</p>
+        {{end}}
+
+        <h2>Recent Comments</h2>
+        {{if .Comments}}
+        {{range .Comments}}
+        <div class="comment">
+            <div class="comment-meta">
+                on <a href="{{$.Subpath}}/posts/{{.PostID}}">{{.PostTitle}}</a>
+                {{timeAgo .CreatedAt}}
+            </div>
+            <div class="comment-body">{{truncate .Body 200}}</div>
+        </div>
+        {{end}}
+        {{else}}
+        <p class="muted">No comments yet.</p>
+        {{end}}
+        {{end}}
+
+        <p style="margin-top: 1rem;">
+            <a href="{{.Subpath}}/rss/user/{{.ProfileUser.Username}}.xml">RSS feed</a>
+        </p>
+        {{end}}
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

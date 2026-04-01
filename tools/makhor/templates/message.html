@@ -1,0 +1,28 @@
+{{define "message.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Title}} - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>{{.Title}}</h1>
+
+        {{if .IsError}}
+        <p class="error">{{.Message}}</p>
+        {{else}}
+        <p class="success">{{.Message}}</p>
+        {{end}}
+
+        <p style="margin-top: 1rem;">
+            <a href="{{.Subpath}}/">← Back to home</a>
+        </p>
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

@@ -1,0 +1,320 @@
+{{define "styles"}}
+<style>
+    /* High contrast theme with system preference support */
+    :root {
+        --bg: #0a0a0a;
+        --fg: #fff;
+        --link: #ccc;
+        --link-user: #ccc;
+        --muted: #888;
+        --border: #444;
+        --accent: #fff;
+        --error: #f66;
+        --success: #999;
+        --tag-bg: #442800;
+        --tag-fg: #fa3;
+        --hat-bg: #333;
+    }
+    @media (prefers-color-scheme: light) {
+        :root {
+            --bg: #fff;
+            --fg: #000;
+            --link: #333;
+            --link-user: #333;
+            --muted: #666;
+            --border: #ccc;
+            --accent: #000;
+            --error: #c00;
+            --success: #555;
+            --tag-bg: #fff3e0;
+            --tag-fg: #c60;
+            --hat-bg: #e0e0e0;
+        }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        font-family: monospace;
+        font-size: 14px;
+        font-weight: 500;
+        line-height: 1.5;
+        background: var(--bg);
+        color: var(--fg);
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 0.5rem;
+        -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--link); text-decoration: none; font-weight: 600; }
+    a:visited { color: var(--link); }
+    a:hover { text-decoration: underline; }
+    a.user-link { color: var(--link-user); }
+    header { border-bottom: 2px solid var(--border); padding-bottom: 0.4rem; margin-bottom: 0.6rem; }
+    nav { display: flex; flex-wrap: wrap; gap: 0.3rem 0.8rem; align-items: center; }
+    nav .logo { font-weight: bold; font-size: 1.1em; }
+    nav .spacer { flex-grow: 1; }
+    main { min-height: 60vh; }
+    .muted { color: var(--muted); }
+    .error { color: var(--error); font-weight: 600; }
+    .success { color: var(--success); }
+    h1, h2, h3 { margin: 0.5rem 0 0.3rem; font-weight: 600; }
+    h1 { font-size: 1.3em; }
+    h2 { font-size: 1.1em; }
+    form { margin: 0.5rem 0; }
+    label { display: block; margin: 0.3rem 0 0.15rem; font-weight: 600; }
+    input[type="text"], input[type="email"], input[type="url"], input[type="number"],
+    textarea, select {
+        background: var(--bg);
+        color: var(--fg);
+        border: 1px solid var(--border);
+        padding: 0.4rem;
+        font-family: monospace;
+        font-size: 14px;
+        width: 100%;
+        max-width: 500px;
+    }
+    input:focus, textarea:focus, select:focus {
+        outline: none;
+        border-color: var(--link);
+    }
+    textarea { min-height: 100px; resize: vertical; }
+    /* Custom checkbox styling */
+    input[type="checkbox"] {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 16px;
+        height: 16px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        cursor: pointer;
+        vertical-align: middle;
+        position: relative;
+    }
+    input[type="checkbox"]:checked {
+        background: var(--link);
+        border-color: var(--link);
+    }
+    input[type="checkbox"]:checked::after {
+        content: "";
+        position: absolute;
+        left: 4px;
+        top: 1px;
+        width: 5px;
+        height: 9px;
+        border: solid var(--bg);
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+    }
+    input[type="checkbox"]:focus {
+        outline: none;
+        border-color: var(--link);
+    }
+    button, input[type="submit"] {
+        background: var(--border);
+        color: var(--fg);
+        border: 2px solid var(--border);
+        padding: 0.4rem 1rem;
+        font-family: monospace;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    button:hover, input[type="submit"]:hover { background: var(--muted); border-color: var(--muted); }
+    .post { margin: 0.4rem 0; padding: 0.3rem 0; border-bottom: 1px solid var(--border); }
+    .post:last-child { border-bottom: none; }
+    .post-title { font-size: 1em; font-weight: 600; display: flex; }
+    .post-title .vote { flex-shrink: 0; }
+    .post-title .title-text { flex: 1; }
+    .post-title .domain { margin-left: auto; flex-shrink: 0; padding-left: 0.5em; }
+    .post-meta { color: var(--muted); font-size: 0.9em; }
+    .vote {
+        cursor: pointer;
+        color: var(--muted);
+        font-size: 1.4em;
+        padding: 0 0.3rem;
+        line-height: 1;
+        vertical-align: middle;
+    }
+    .vote:hover { color: var(--fg); }
+    .vote.voted { color: var(--tag-fg); font-weight: bold; }
+    .tag {
+        background: var(--tag-bg);
+        color: var(--tag-fg);
+        padding: 0.1rem 0.4rem;
+        margin-right: 0.2rem;
+        font-size: 0.85em;
+        font-weight: 600;
+        border-radius: 2px;
+    }
+    a.tag { text-decoration: none; }
+    a.tag:hover { text-decoration: underline; }
+    a.tag:visited { color: var(--tag-fg); }
+    .tag.active, a.tag.active { background: var(--fg); color: var(--bg); }
+    a.tag.active:visited { color: var(--bg); }
+    .comment { margin: 0.2rem 0; padding: 0.3rem 0.5rem; border-left: 3px solid var(--border); }
+    .comment-meta { color: var(--muted); font-size: 0.9em; }
+    .comment-body { margin: 0.2rem 0; white-space: pre-wrap; }
+    .hat { background: var(--hat-bg); color: var(--fg); padding: 0.1rem 0.4rem; font-size: 0.85em; font-style: italic; border-radius: 2px; }
+    .pagination { margin: 0.5rem 0; display: flex; gap: 0.3rem; flex-wrap: wrap; }
+    .pagination a, .pagination span { padding: 0.2rem 0.5rem; }
+    .pagination .current { background: var(--border); font-weight: 600; }
+    .avatar { width: 40px; height: 40px; vertical-align: middle; margin-right: 0.3rem; border-radius: 50%; }
+    .avatar-small { width: 18px; height: 18px; vertical-align: middle; margin-right: 0.2rem; border-radius: 50%; }
+    .tags { display: flex; flex-wrap: wrap; gap: 0.2rem; margin: 0.3rem 0; }
+    ul.errors { color: var(--error); margin: 0.3rem 0; padding-left: 1.2rem; }
+    .tree { margin-left: 0.8rem; border-left: 2px solid var(--border); padding-left: 0.5rem; }
+    footer {
+        border-top: 2px solid var(--border);
+        margin-top: 1rem;
+        padding-top: 0.4rem;
+        color: var(--muted);
+        font-size: 0.9em;
+    }
+    /* Filter bar */
+    .filter-bar {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+        margin: 0.4rem 0;
+        padding: 0.2rem 0.4rem;
+        background: var(--border);
+        border-radius: 3px;
+    }
+    .filter-bar .filter-group { display: flex; gap: 0.3rem; align-items: center; }
+    .filter-bar .filter-label { color: var(--muted); font-size: 0.9em; margin-right: 0.2rem; }
+    .filter-bar .filter-item {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.9em;
+        border-radius: 2px;
+    }
+    .filter-bar .filter-item.active { background: var(--bg); font-weight: 600; }
+    /* Comment form */
+    .comment-form {
+        border: 1px solid var(--border);
+        padding: 0.4rem;
+        margin: 0.5rem 0;
+    }
+    .comment-form textarea { max-width: 100%; }
+    .comment-form button { margin-top: 0.3rem; padding: 0.2rem 0.5rem; font-size: 0.85em; }
+    /* Comment folding */
+    details.comment-fold { margin: 0.3rem 0; }
+    details.comment-fold > summary {
+        cursor: pointer;
+        list-style: none;
+        font-size: 0.9em;
+    }
+    details.comment-fold > summary::-webkit-details-marker { display: none; }
+    details.comment-fold > summary::before { content: "[+] "; color: var(--muted); }
+    details.comment-fold[open] > summary::before { content: "[-] "; }
+    details.comment-fold[open] > summary { margin-bottom: 0.2rem; }
+    /* Table styling */
+    table { border-collapse: collapse; width: 100%; }
+    td { padding: 0.2rem 0.4rem; vertical-align: top; }
+    tr:not(:first-child) { border-top: 1px solid var(--border); }
+    /* Settings form table */
+    .settings-form { border-collapse: collapse; width: 100%; max-width: 600px; }
+    .settings-form td { padding: 0.5rem 0; vertical-align: top; border: none; }
+    .settings-form tr { border: none; }
+    .settings-form tr:not(:first-child) { border-top: 1px solid var(--border); }
+    .settings-form .settings-label { width: 120px; font-weight: 600; color: var(--muted); }
+    .settings-form .settings-value { }
+    /* Tag hierarchy */
+    .tag-tree { margin: 0.5rem 0; }
+    .tag-tree-item { padding: 0.3rem 0; border-bottom: 1px solid var(--border); }
+    .tag-tree-item:last-child { border-bottom: none; }
+    .tag-children { margin-left: 1.5rem; margin-top: 0.2rem; }
+    .subtag-list { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.3rem; }
+    /* Feed edit form */
+    details.feed-edit > summary { list-style: none; }
+    details.feed-edit > summary::-webkit-details-marker { display: none; }
+    details.feed-edit > summary svg { vertical-align: middle; }
+    .feed-edit-form {
+        position: absolute;
+        right: 0;
+        z-index: 10;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        padding: 0.5rem;
+        margin-top: 0.3rem;
+        text-align: left;
+        min-width: 200px;
+    }
+    @media (max-width: 600px) {
+        body { font-size: 13px; padding: 0.3rem; }
+    }
+</style>
+{{end}}
+
+{{define "nav"}}
+<header>
+    <nav>
+        <a href="{{.Subpath}}/" class="logo">makhor</a>
+        <a href="{{.Subpath}}/comments">comments</a>
+        <a href="{{.Subpath}}/search">search</a>
+        <a href="{{.Subpath}}/tags">tags</a>
+        {{if .User}}
+        <a href="{{.Subpath}}/submit">submit</a>
+        <a href="{{.Subpath}}/collections">collections</a>
+        {{end}}
+        <span class="spacer"></span>
+        {{if .User}}
+        <a href="{{.Subpath}}/users/{{.User.Username}}" class="user-link">{{.User.Username}}</a>
+        {{if .User.IsAdmin}}
+        <a href="{{.Subpath}}/admin/feeds">feeds</a>
+        <a href="{{.Subpath}}/admin/log">log</a>
+        <a href="{{.Subpath}}/admin/hats">hats</a>
+        {{end}}
+        <a href="{{.Subpath}}/logout">logout</a>
+        {{else}}
+        <a href="{{.Subpath}}/login">login</a>
+        <a href="{{.Subpath}}/register">register</a>
+        {{end}}
+    </nav>
+</header>
+{{end}}
+
+{{define "footer"}}
+<footer>
+    <a href="{{.Subpath}}/about">about</a> |
+    <a href="{{.Subpath}}/rss.xml">rss</a> |
+    <a href="{{.Subpath}}/invite-tree">invite tree</a> |
+    <a href="{{.Subpath}}/modlog">modlog</a>
+</footer>
+{{end}}
+
+{{define "pagination"}}
+{{if .Pagination}}
+{{if or .Pagination.HasPrev .Pagination.HasNext}}
+<div class="pagination">
+    {{if .Pagination.HasPrev}}
+    <a href="?page={{sub .Pagination.Page 1}}{{if .ActiveTag}}&tag={{.ActiveTag}}{{end}}{{if .Query}}&q={{.Query}}{{end}}{{if .View}}&view={{.View}}{{end}}{{if .Period}}&t={{.Period}}{{end}}">← prev</a>
+    {{end}}
+
+    {{/* Show first page with ellipsis if window doesn't start at 1 */}}
+    {{if .Pagination.ShowFirstPage}}
+    <a href="?page=1{{if .ActiveTag}}&tag={{.ActiveTag}}{{end}}{{if .Query}}&q={{.Query}}{{end}}{{if .View}}&view={{.View}}{{end}}{{if .Period}}&t={{.Period}}{{end}}">1</a>
+    <span class="muted">…</span>
+    {{end}}
+
+    {{/* Show sliding window of pages */}}
+    {{range .Pagination.WindowPages}}
+    {{if eq . $.Pagination.Page}}
+    <span class="current">{{.}}</span>
+    {{else}}
+    <a href="?page={{.}}{{if $.ActiveTag}}&tag={{$.ActiveTag}}{{end}}{{if $.Query}}&q={{$.Query}}{{end}}{{if $.View}}&view={{$.View}}{{end}}{{if $.Period}}&t={{$.Period}}{{end}}">{{.}}</a>
+    {{end}}
+    {{end}}
+
+    {{/* Show last page with ellipsis if window doesn't end at last page */}}
+    {{if .Pagination.ShowLastPage}}
+    <span class="muted">…</span>
+    <a href="?page={{.Pagination.TotalPages}}{{if .ActiveTag}}&tag={{.ActiveTag}}{{end}}{{if .Query}}&q={{.Query}}{{end}}{{if .View}}&view={{.View}}{{end}}{{if .Period}}&t={{.Period}}{{end}}">{{.Pagination.TotalPages}}</a>
+    {{end}}
+
+    {{if .Pagination.HasNext}}
+    <a href="?page={{add .Pagination.Page 1}}{{if .ActiveTag}}&tag={{.ActiveTag}}{{end}}{{if .Query}}&q={{.Query}}{{end}}{{if .View}}&view={{.View}}{{end}}{{if .Period}}&t={{.Period}}{{end}}">next →</a>
+    {{end}}
+</div>
+{{end}}
+{{end}}
+{{end}}

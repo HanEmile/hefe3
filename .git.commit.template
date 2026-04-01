@@ -1,0 +1,11 @@
+
+# type(scope): Subject line with at most a 72 character length       72^
+#
+# Types:
+# - feat: A new feature has been introduced
+# - fix: An issue of some kind has been fixed
+# - docs: Documentation or comments have been updated
+# - style: Formatting changes only
+# - refactor: Hopefully self-explanatory!
+# - test: Added missing tests / fixed tests
+# - chore: Maintenance work

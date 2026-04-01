@@ -1,0 +1,64 @@
+{{define "view_tag_feeds.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Feeds - {{.Tag.Name}} - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>RSS Feeds: <a href="{{.Subpath}}/tags/{{.Tag.Name}}" class="tag">{{.Tag.Name}}</a></h1>
+
+        <p class="muted">These RSS feeds automatically import posts to this tag.</p>
+
+        {{if .CanManage}}
+        <p><a href="{{.Subpath}}/tags/feeds?tag={{.Tag.ID}}">Manage feeds</a></p>
+        {{end}}
+
+        {{if .Feeds}}
+        <table style="width: 100%;">
+            <thead>
+                <tr>
+                    <th style="text-align: left;">Feed</th>
+                    <th>Items Imported</th>
+                    <th>Last Updated</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+            {{range .Feeds}}
+            {{if .IsActive}}
+            <tr>
+                <td>
+                    <strong>{{if .Title}}{{.Title}}{{else}}{{.URL}}{{end}}</strong>
+                    {{if .Title}}<br><span class="muted" style="font-size: 0.8em;">{{.URL}}</span>{{end}}
+                </td>
+                <td style="text-align: center;">{{.ItemCount}}</td>
+                <td style="text-align: center;">
+                    {{if .LastPolled}}{{timeAgo .LastPolled}}{{else}}-{{end}}
+                </td>
+                <td style="text-align: center;">
+                    {{if .LastError}}<span style="color: var(--error);" title="{{.LastError}}">error</span>
+                    {{else}}<span style="color: var(--success);">active</span>
+                    {{end}}
+                </td>
+            </tr>
+            {{end}}
+            {{end}}
+            </tbody>
+        </table>
+        {{else}}
+        <p class="muted">No feeds configured for this tag yet.</p>
+        {{end}}
+
+        <div style="margin-top: 1rem;">
+            <a href="{{.Subpath}}/tags/{{.Tag.Name}}">back to tag</a>
+        </div>
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

@@ -1,0 +1,41 @@
+{{define "recent_comments.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Recent Comments - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Recent Comments</h1>
+
+        {{if .Comments}}
+        {{range .Comments}}
+        <div class="comment">
+            <div class="comment-meta">
+                <img src="{{$.Subpath}}/avatar/{{.Username}}" class="avatar-small" alt="">
+                <a href="{{$.Subpath}}/users/{{.Username}}">{{.Username}}</a>
+                {{if .Hat}}
+                <span class="hat" title="{{.Hat.Organization}}">{{.Hat.Name}}</span>
+                {{end}}
+                {{.Score}} points
+                {{timeAgo .CreatedAt}}
+                on <a href="{{$.Subpath}}/posts/{{.PostID}}">{{.PostTitle}}</a>
+            </div>
+            <div class="comment-body">{{truncate .Body 300}}</div>
+            <div class="comment-meta">
+                <a href="{{$.Subpath}}/posts/{{.PostID}}#c{{.ID}}">view in context</a>
+            </div>
+        </div>
+        {{end}}
+        {{else}}
+        <p class="muted">No comments yet.</p>
+        {{end}}
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

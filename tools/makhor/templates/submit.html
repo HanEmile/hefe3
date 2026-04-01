@@ -1,0 +1,172 @@
+{{define "submit.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Submit - makhor</title>
+    {{template "styles"}}
+    <style>
+        .tag-autocomplete {
+            position: relative;
+        }
+        .tag-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-top: none;
+            max-height: 150px;
+            overflow-y: auto;
+            display: none;
+            z-index: 100;
+        }
+        .tag-suggestions.show {
+            display: block;
+        }
+        .tag-suggestion {
+            padding: 0.5rem;
+            cursor: pointer;
+        }
+        .tag-suggestion:hover, .tag-suggestion.selected {
+            background: var(--hover);
+        }
+    </style>
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Submit</h1>
+
+        {{if .Errors}}
+        <ul class="errors">
+            {{range .Errors}}
+            <li>{{.}}</li>
+            {{end}}
+        </ul>
+        {{end}}
+
+        <form method="POST" action="{{.Subpath}}/submit">
+            <label for="title">Title</label>
+            <input type="text" id="title" name="title" value="{{.Title}}" required maxlength="200" style="width:100%">
+
+            <label for="url">URL <span class="muted">(optional if posting text)</span></label>
+            <input type="url" id="url" name="url" value="{{.URL}}" placeholder="https://..." style="width:100%">
+
+            <label for="body">Text <span class="muted">(optional if posting URL)</span></label>
+            <textarea id="body" name="body" placeholder="Your thoughts..." style="width:100%">{{.Body}}</textarea>
+
+            <label for="tags">Tags <span class="muted">(comma-separated)</span></label>
+            <div class="tag-autocomplete">
+                <input type="text" id="tags" name="tags" value="{{.SelectedTags}}" placeholder="e.g. programming, golang" autocomplete="off" style="width:100%">
+                <div class="tag-suggestions" id="tag-suggestions"></div>
+            </div>
+
+            {{if .Hats}}
+            <label for="hat_id">Wear a hat <span class="muted">(optional)</span></label>
+            <select id="hat_id" name="hat_id" style="width:100%">
+                <option value="">None</option>
+                {{range .Hats}}
+                <option value="{{.ID}}">{{.Name}} ({{.Organization}})</option>
+                {{end}}
+            </select>
+            {{end}}
+
+            <button type="submit">Submit</button>
+        </form>
+
+        <p class="muted" style="margin-top: 1rem;">
+            Leave URL blank for text posts. Leave text blank for link-only posts.
+        </p>
+    </main>
+    {{template "footer"}}
+    <script>
+    (function() {
+        const allTags = [{{range $i, $t := .Tags}}{{if $i}},{{end}}"{{$t.Name}}"{{end}}];
+        const input = document.getElementById('tags');
+        const suggestions = document.getElementById('tag-suggestions');
+        let selectedIndex = -1;
+
+        function getLastTag() {
+            const parts = input.value.split(',');
+            return parts[parts.length - 1].trim().toLowerCase();
+        }
+
+        function replaceLastTag(tag) {
+            const parts = input.value.split(',');
+            parts[parts.length - 1] = (parts.length > 1 ? ' ' : '') + tag;
+            input.value = parts.join(',');
+        }
+
+        function showSuggestions() {
+            const query = getLastTag();
+            if (!query) {
+                suggestions.classList.remove('show');
+                return;
+            }
+
+            const existingTags = input.value.toLowerCase().split(',').map(t => t.trim());
+            const matches = allTags.filter(t =>
+                t.toLowerCase().startsWith(query) &&
+                !existingTags.slice(0, -1).includes(t.toLowerCase())
+            ).slice(0, 8);
+
+            if (matches.length === 0) {
+                suggestions.classList.remove('show');
+                return;
+            }
+
+            selectedIndex = -1;
+            suggestions.innerHTML = matches.map((t, i) =>
+                '<div class="tag-suggestion" data-tag="' + t + '">' + t + '</div>'
+            ).join('');
+            suggestions.classList.add('show');
+        }
+
+        function selectSuggestion(tag) {
+            replaceLastTag(tag);
+            suggestions.classList.remove('show');
+            input.focus();
+        }
+
+        input.addEventListener('input', showSuggestions);
+        input.addEventListener('focus', showSuggestions);
+
+        input.addEventListener('keydown', function(e) {
+            const items = suggestions.querySelectorAll('.tag-suggestion');
+            if (!suggestions.classList.contains('show') || items.length === 0) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                items.forEach((item, i) => item.classList.toggle('selected', i === selectedIndex));
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, 0);
+                items.forEach((item, i) => item.classList.toggle('selected', i === selectedIndex));
+            } else if (e.key === 'Enter' && selectedIndex >= 0) {
+                e.preventDefault();
+                selectSuggestion(items[selectedIndex].dataset.tag);
+            } else if (e.key === 'Escape') {
+                suggestions.classList.remove('show');
+            }
+        });
+
+        suggestions.addEventListener('click', function(e) {
+            if (e.target.classList.contains('tag-suggestion')) {
+                selectSuggestion(e.target.dataset.tag);
+            }
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!input.contains(e.target) && !suggestions.contains(e.target)) {
+                suggestions.classList.remove('show');
+            }
+        });
+    })();
+    </script>
+</body>
+</html>
+{{end}}

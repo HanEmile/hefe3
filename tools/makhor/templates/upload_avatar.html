@@ -1,0 +1,51 @@
+{{define "upload_avatar.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Upload Avatar - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Upload Avatar</h1>
+
+        {{if .Error}}
+        <p class="error">{{.Error}}</p>
+        {{end}}
+
+        <p class="muted">Upload a profile picture. PNG, JPEG, or GIF. Max 256KB. Will be resized to 100x100px.</p>
+
+        <div style="margin: 1rem 0;">
+            {{if .ProfileUser}}
+            Current: <img src="{{.Subpath}}/avatar/{{.ProfileUser.Username}}" class="avatar" alt="Current avatar">
+            {{else if .User}}
+            Current: <img src="{{.Subpath}}/avatar/{{.User.Username}}" class="avatar" alt="Current avatar">
+            {{end}}
+        </div>
+
+        {{if .ProfileUser}}
+        <form method="POST" enctype="multipart/form-data">
+        {{else}}
+        <form method="POST" action="{{.Subpath}}/settings/avatar" enctype="multipart/form-data">
+        {{end}}
+            <label for="avatar">Select image</label>
+            <input type="file" id="avatar" name="avatar" accept="image/png,image/jpeg,image/gif" required>
+
+            <button type="submit">Upload</button>
+        </form>
+
+        <p style="margin-top: 1rem;">
+            {{if .ProfileUser}}
+            <a href="{{.Subpath}}/users/{{.ProfileUser.Username}}?section=settings">← Back to settings</a>
+            {{else}}
+            <a href="{{.Subpath}}/settings">← Back to settings</a>
+            {{end}}
+        </p>
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

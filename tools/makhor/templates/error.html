@@ -1,0 +1,22 @@
+{{define "error.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Error {{.Status}} - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Error {{.Status}}</h1>
+        <p class="error">{{.Message}}</p>
+        <p style="margin-top: 1rem;">
+            <a href="{{.Subpath}}/">← Back to home</a>
+        </p>
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

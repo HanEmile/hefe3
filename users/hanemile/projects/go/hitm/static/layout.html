@@ -1,0 +1,831 @@
+<style>
+    * {
+        box-sizing: border-box; /* Crucial: padding/borders won't grow the div */
+    }
+
+    body, html {
+        margin: 0;
+        padding: 0;
+        overflow: hidden; /* Prevents outer scrollbars */
+        background: #1e1e1e;
+        height: 100%;
+        width: 100%;
+    }
+
+    /* Reset & Base */
+    :root {
+        --gutter-size: 4px;
+        --gutter-color: #333;
+        --gutter-hover: #007acc;
+        --panel-header-height: 30px;
+        --bg-color: #1e1e1e;
+        --text-color: #cccccc;
+    }
+
+    #bsp-root {
+        position: fixed; /* Lock to viewport */
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--bg-color);
+        color: var(--text-color);
+        display: flex;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+
+    /* Split Containers */
+    .bsp-split {
+        display: flex;
+        flex: 1;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+    }
+    #bsp-root, .bsp-split {
+        overflow: hidden !important;
+    }
+
+    .bsp-split.horizontal { flex-direction: column; } /* Top/Bottom */
+    .bsp-split.vertical { flex-direction: row; }     /* Left/Right */
+
+    /* Gutters */
+    .bsp-gutter {
+        background: var(--gutter-color);
+        z-index: 10;
+        transition: background 0.2s;
+    }
+    .bsp-gutter:hover, .bsp-gutter.dragging { background: var(--gutter-hover); }
+    .bsp-split.vertical > .bsp-gutter {
+        width: var(--gutter-size);
+        cursor: col-resize;
+    }
+    .bsp-split.horizontal > .bsp-gutter {
+        height: var(--gutter-size);
+        cursor: row-resize;
+    }
+
+    /* Panel Containers */
+    .bsp-panel-wrapper {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        width: 100%;
+        min-height: 0; /* THE MAGIC FIX: Allows child to be smaller than content */
+        min-width: 0;
+    }
+
+    /* Panel Header */
+    .bsp-header {
+        height: var(--panel-header-height);
+        background: #252526;
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+        border-bottom: 1px solid #333;
+        user-select: none;
+    }
+    .bsp-title {
+        flex: 1;
+        font-weight: bold;
+        font-size: 0.9em;
+        text-transform: uppercase;
+        color: #85e89d;
+    }
+    .bsp-controls {
+        margin-left: auto;
+    }
+    .bsp-controls button {
+        background: none;
+        border: none;
+        color: #888;
+        cursor: pointer;
+        font-size: 1.1em;
+        margin-left: 5px;
+        padding: 2px 5px;
+    }
+    .bsp-controls button:hover { color: #fff; background: #444; border-radius: 3px; }
+
+    /* The actual content area where your views go */
+    .bsp-content {
+        flex: 1;
+        min-height: 0;
+        overflow: hidden; /* We handle scrolling in the view-panel instead */
+    }
+
+    .view-panel {
+        height: 100%;
+        width: 100%;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Dropdown for View Selection */
+    .view-selector {
+        background: #333;
+        color: white;
+        border: 1px solid #555;
+        font-family: monospace;
+    }
+
+    /* Flow List Grid */
+    #flow-list {
+        display: flex;
+        flex-direction: column;
+        font-family: 'JetBrains Mono', 'Fira Code', monospace;
+        font-size: 12px;
+    }
+
+    .flow-item {
+        display: grid;
+        grid-template-columns: 60px 80px 1fr 80px;
+        gap: 10px;
+        padding: 4px 8px;
+        border-bottom: 1px solid #2d2d2d;
+        cursor: pointer;
+        white-space: nowrap;
+        align-items: center;
+    }
+
+    .flow-item:hover { background: #2a2d2e; }
+    .flow-item.active-flow { background: #094771 !important; color: white; }
+
+    .flow-item-url {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #ce9178; /* String color */
+    }
+
+    .flow-item-method { font-weight: bold; color: #569cd6; }
+    .flow-item-status { text-align: right; font-weight: bold; }
+
+    /* Panel Toolbars */
+    .panel-toolbar {
+        background: #252526;
+        padding: 5px;
+        display: flex;
+        gap: 5px;
+        border-bottom: 1px solid #333;
+    }
+
+    .panel-toolbar input {
+        background: #3c3c3c;
+        border: 1px solid #666;
+        color: white;
+        padding: 2px 5px;
+        flex: 1;
+    }
+
+    /* Certificates View Styling */
+    #ca-view {
+        padding: 10px;
+        background: #1e1e1e;
+        color: #d4d4d4;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+    }
+
+    #ca-view h4 {
+        color: #f1e05a; /* Warning/Gold color */
+        margin: 20px 0 10px 0;
+        text-transform: uppercase;
+        font-size: 12px;
+        letter-spacing: 1px;
+        border-bottom: 1px solid #333;
+        padding-bottom: 5px;
+    }
+
+    #ca-view h4:first-child { margin-top: 0; }
+
+    .ca-card {
+        background: #252526;
+        border: 1px solid #333;
+        padding: 12px;
+        margin-bottom: 15px;
+    }
+
+    .ca-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .ca-list li {
+        padding: 4px 8px;
+        border-bottom: 1px solid #2d2d2d;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .ca-list li:hover {
+        background: #2a2d2e;
+    }
+
+    .ca-link {
+        color: #85e89d; /* Theme Green */
+        text-decoration: none;
+    }
+
+    .ca-link:hover {
+        text-decoration: underline;
+    }
+
+    .btn-download {
+        background: #333;
+        color: #ccc;
+        border: 1px solid #555;
+        padding: 5px 10px;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 11px;
+    }
+
+    .btn-download:hover {
+        background: #444;
+        color: #fff;
+    }
+</style>
+
+<div id="bsp-root"></div>
+<div id="bsp-staging" style="display: none;"></div>
+
+<div id="view-source-container" style="display:none">
+    <div id="history-view" class="view-panel">
+        <div class="panel-toolbar">
+            <input type="text" placeholder="Filter traffic..." id="filter-history">
+        </div>
+        <div id="flow-list"></div>
+    </div>
+
+    <div id="inspect-view" class="view-panel">
+        <div id="details">
+            <div class="empty-state">Select a request to inspect</div>
+        </div>
+    </div>
+
+    <div id="sitemap-view" class="view-panel"></div>
+
+    <div id="ca-view" class="view-panel"></div>
+
+    <div id="intercept-view" class="view-panel">
+        <div class="panel-toolbar">
+            <button onclick="ProxyApp.toggleIntercept(true)" id="enable-intercept">Enable Intercept</button>
+            <button onclick="ProxyApp.toggleIntercept(false)" id="disable-intercept" style="display:none">Disable Intercept</button>
+            <button onclick="ProxyApp.forwardIntercept()">Forward</button>
+        </div>
+        <textarea id="intercept-request" spellcheck="false" style="width:100%; height:100%; flex:1; background:#1e1e1e; color:#fff; border:none;"></textarea>
+    </div>
+</div>
+
+<script>
+const BSP = (function() {
+    // --- Configuration ---
+    // Map your internal view IDs to readable names
+
+    const VIEW_MAP = {
+        'history': { label: 'Traffic History', elementId: 'history-view' },
+        'inspect': { label: 'Inspector', elementId: 'inspect-view' },
+        'sitemap': { label: 'Sitemap', elementId: 'sitemap-view' },
+        'ca': { label: 'Certificates', elementId: 'ca-view' }, // Ensure this matches HTML id
+        'intercept': { label: 'Intercept', elementId: 'intercept-view' }
+    };
+
+    // --- State ---
+    let rootContainer = document.getElementById('bsp-root');
+    let stagingArea = document.getElementById('bsp-staging');
+    let layoutTree = null; // The JSON structure
+
+    // --- Core Logic ---
+
+    // 1. Initialize: Steal existing views from the DOM
+
+    function init() {
+        // 1. Move the source container into staging immediately
+        const source = document.getElementById('view-source-container');
+        if (source) {
+            stagingArea.appendChild(source);
+            source.style.display = 'block';
+        }
+
+        // 2. Define initial layout
+        layoutTree = {
+            type: 'split', dir: 'vertical', ratio: 30,
+            children: [
+                { type: 'panel', viewId: 'history' },
+                {
+                    type: 'split', dir: 'horizontal', ratio: 70,
+                    children: [
+                        { type: 'panel', viewId: 'inspect' },
+                        { type: 'panel', viewId: 'sitemap' }
+                    ]
+                }
+            ]
+        };
+        render();
+    }
+
+    function render() {
+        // SAFETY: Find every view-panel inside bsp-root and move them to staging
+        // BEFORE we wipe the innerHTML. This prevents "View missing" errors.
+        const currentPanels = rootContainer.querySelectorAll('.view-panel');
+        currentPanels.forEach(p => stagingArea.appendChild(p));
+
+        rootContainer.innerHTML = '';
+        if (layoutTree) {
+            rootContainer.appendChild(renderNode(layoutTree));
+        }
+    }
+
+    function renderNode(node, path = []) {
+        if (node.type === 'panel') return createPanelDOM(node, path);
+        return createSplitDOM(node, path);
+    }
+
+    // 3. Component: Split Container
+    function createSplitDOM(node, path) {
+        const wrapper = document.createElement('div');
+        wrapper.className = `bsp-split ${node.dir}`;
+        const childA = document.createElement('div');
+        const childB = document.createElement('div');
+        const gutter = document.createElement('div');
+        gutter.className = 'bsp-gutter';
+
+        const sizeA = node.ratio + '%';
+        const sizeB = (100 - node.ratio) + '%';
+        if (node.dir === 'vertical') {
+            childA.style.width = sizeA; childB.style.width = sizeB;
+        } else {
+            childA.style.height = sizeA; childB.style.height = sizeB;
+        }
+
+        childA.appendChild(renderNode(node.children[0], [...path, 0]));
+        childB.appendChild(renderNode(node.children[1], [...path, 1]));
+        gutter.addEventListener('mousedown', (e) => startDrag(e, node, wrapper));
+
+        wrapper.appendChild(childA);
+        wrapper.appendChild(gutter);
+        wrapper.appendChild(childB);
+        return wrapper;
+    }
+
+    // 4. Component: Panel Wrapper
+    function createPanelDOM(node, path) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'bsp-panel-wrapper';
+
+        const header = document.createElement('div');
+        header.className = 'bsp-header';
+
+        const select = document.createElement('select');
+        select.className = 'view-selector';
+
+        // Build dropdown options
+        Object.keys(VIEW_MAP).forEach(key => {
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.text = VIEW_MAP[key].label;
+            if (key === node.viewId) opt.selected = true;
+            select.appendChild(opt);
+        });
+
+        select.onchange = (e) => {
+            node.viewId = e.target.value;
+            render();
+        };
+
+        const controls = document.createElement('div');
+        controls.className = 'bsp-controls';
+        const btnV = document.createElement('button'); btnV.innerHTML = '◫'; btnV.onclick = () => splitNode(path, 'vertical');
+        const btnH = document.createElement('button'); btnH.innerHTML = '⊟'; btnH.onclick = () => splitNode(path, 'horizontal');
+        const btnC = document.createElement('button'); btnC.innerHTML = '×'; btnC.onclick = () => closeNode(path);
+        controls.append(btnV, btnH, btnC);
+
+        header.append(select, controls);
+
+        const content = document.createElement('div');
+        content.className = 'bsp-content';
+
+        const viewDef = VIEW_MAP[node.viewId];
+        const el = document.getElementById(viewDef.elementId);
+
+        if (el) {
+            content.appendChild(el);
+            // Wait for DOM to settle then trigger refresh
+            requestAnimationFrame(() => {
+                if (node.viewId === 'history') ProxyApp.Panels.History.render();
+                if (node.viewId === 'inspect') ProxyApp.Panels.Inspect.render();
+                if (node.viewId === 'sitemap') ProxyApp.Panels.Sitemap.render();
+                if (node.viewId === 'ca') ProxyApp.loadCATab();
+            });
+        } else {
+            content.innerHTML = `<div style="padding:10px; color:red">Missing View: ${node.viewId}</div>`;
+        }
+
+        wrapper.append(header, content);
+        return wrapper;
+    }
+
+
+    // --- Actions ---
+
+    function splitNode(path, direction) {
+        const node = getNodeByPath(path);
+        const currentView = node.viewId;
+        node.type = 'split'; node.dir = direction; node.ratio = 50;
+        node.children = [{ type: 'panel', viewId: currentView }, { type: 'panel', viewId: 'inspect' }];
+        delete node.viewId;
+        render();
+    }
+
+    function closeNode(path) {
+        if (path.length === 0) return;
+        const parentNode = getNodeByPath(path.slice(0, -1));
+        const sibling = parentNode.children[path[path.length - 1] === 0 ? 1 : 0];
+        Object.assign(parentNode, sibling);
+        render();
+    }
+
+    function getNodeByPath(path) {
+        let node = layoutTree;
+        for (let i of path) node = node.children[i];
+        return node;
+    }
+
+    function startDrag(e, node, container) {
+        const isV = node.dir === 'vertical';
+        const startPos = isV ? e.clientX : e.clientY;
+        const startRatio = node.ratio;
+        const totalSize = isV ? container.offsetWidth : container.offsetHeight;
+
+        const onMove = (me) => {
+            const delta = (isV ? me.clientX : me.clientY) - startPos;
+            node.ratio = Math.max(10, Math.min(90, startRatio + (delta / totalSize) * 100));
+            container.children[0].style[isV ? 'width' : 'height'] = node.ratio + '%';
+            container.children[2].style[isV ? 'width' : 'height'] = (100 - node.ratio) + '%';
+        };
+        const onUp = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    }
+
+    return { init };
+})();
+
+/**
+ * HITM Proxy Controller - Refactored for BSP Layout
+ * This handles Data State, Backend Sync (SSE), and Panel Updates.
+ */
+
+const ProxyApp = (function() {
+    // --- State ---
+    const state = {
+        flows: new Map(),
+        selectedFlowId: null,
+        interceptEnabled: false,
+        interceptedFlowId: null
+    };
+
+    // --- API Service ---
+    const API = {
+        async fetchHistory() {
+            try {
+                const res = await fetch('/history');
+                const history = await res.json();
+
+                // Clear current map to prevent duplicates on refresh
+                state.flows.clear();
+
+                // Load historical data into state
+                history.forEach(flow => {
+                    const id = flow.ID || flow.id;
+                    state.flows.set(id, flow);
+                });
+
+                console.log(`Loaded ${state.flows.size} historical flows.`);
+
+                // Tell the UI to draw everything we just loaded
+                this.notify('history');
+            } catch (err) {
+                console.error("Failed to fetch history:", err);
+            }
+        },
+
+        async fetchFlow(id) {
+            const res = await fetch(`/flow?id=${id}`);
+            const flow = await res.json();
+            state.flows.set(id, flow);
+            return flow;
+        },
+
+        async sendRepeat(raw) {
+            const res = await fetch('/repeat', { method: 'POST', body: raw });
+            return await res.text();
+        },
+
+        async postIntercept(enable) {
+            state.interceptEnabled = enable;
+            await fetch(`/intercept?enable=${enable}`, { method: 'POST' });
+            this.notify('ui-header');
+        },
+
+        async forward(id, raw) {
+            const res = await fetch(`/forward?id=${id}`, { method: 'POST', body: raw });
+            if (res.ok) state.interceptedFlowId = null;
+        },
+
+        async drop(id) {
+            await fetch(`/drop?id=${id}`, { method: 'POST' });
+            state.interceptedFlowId = null;
+        },
+
+        // Helper to notify relevant panels to refresh
+        notify(panelId) {
+            if (panelId === 'history') Panels.History.render();
+            if (panelId === 'sitemap') Panels.Sitemap.render();
+            if (panelId === 'inspect') Panels.Inspect.render();
+        }
+    };
+
+    // --- SSE Event Handler ---
+    const initSSE = () => {
+        const es = new EventSource("/events");
+        es.onmessage = (e) => {
+            const flow = JSON.parse(e.data);
+            const id = flow.ID || flow.id;
+
+            state.flows.set(id, flow);
+
+            // Logic: Update History panel
+            Panels.History.updateItem(flow);
+
+            // Logic: Auto-populate Intercept if active
+            if (!flow.response && state.interceptEnabled) {
+                state.interceptedFlowId = id;
+                Panels.Inspect.fillIntercept(flow);
+            }
+
+            // If we are inspecting this specific flow, update the details
+            if (state.selectedFlowId === id) {
+                Panels.Inspect.render();
+            }
+        };
+        es.onerror = (err) => console.error("SSE Error:", err);
+    };
+
+    // --- Panel Controllers ---
+    const Panels = {
+        History: {
+            render() {
+                const list = document.getElementById('flow-list');
+                if (!list) return;
+
+                // Clear the list so we don't double-up on re-renders
+                list.innerHTML = '';
+
+                // Convert Map to Array, sort by ID (newest at top), and render each
+                const allFlows = Array.from(state.flows.values())
+                    .sort((a, b) => (b.ID || b.id) - (a.ID || a.id));
+
+                allFlows.forEach(flow => this.updateItem(flow));
+            },
+
+            updateItem(flow) {
+                const list = document.getElementById('flow-list');
+                if (!list) return;
+                const id = flow.ID || flow.id;
+
+                let row = document.getElementById(`flow-row-${id}`);
+                if (!row) {
+                    row = document.createElement('div');
+                    row.id = `flow-row-${id}`;
+                    row.className = 'flow-item';
+                    row.onclick = () => ProxyApp.selectFlow(id);
+
+                    // Maintain Sort Order (Prepend or find spot)
+                    list.prepend(row);
+                }
+
+                const statusColor = flow.status >= 400 ? '#ff4444' : flow.status >= 300 ? '#ffbb33' : '#00C851';
+                row.innerHTML = `
+                    <span class="flow-id">${id}</span>
+                    <span class="flow-method">${flow.method || 'WAIT'}</span>
+                    <span class="flow-url">${flow.url}</span>
+                    <span class="flow-status" style="color:${statusColor}">${flow.status || '...'}</span>
+                `;
+                if (state.selectedFlowId === id) row.classList.add('active-flow');
+            }
+        },
+
+        Inspect: {
+            async render() {
+                const container = document.getElementById('details');
+                if (!container || !state.selectedFlowId) return;
+
+                const flow = await API.fetchFlow(state.selectedFlowId);
+                container.innerHTML = '';
+
+                const decode = (b64) => {
+                    try { return b64 ? atob(b64) : ''; } catch(e) { return "[Binary Data]"; }
+                };
+
+                // Request Section
+                this.addSection(container, `Request (${flow.requestTime})`, "inspect-request");
+                this.addPre(container, decode(flow.request));
+                this.addPre(container, decode(flow.requestBody), "body-text");
+
+                // Response Section
+                if (flow.response) {
+                    this.addSection(container, `Response (${flow.responseTime})`, "inspect-response");
+                    this.addPre(container, decode(flow.response));
+                    this.addPre(container, decode(flow.responseBody), "body-text");
+                } else {
+                    this.addSection(container, "Waiting for response...", "inspect-wait");
+                }
+            },
+
+            addSection(parent, text, className) {
+                const div = document.createElement('div');
+                div.className = `h3 ${className}`;
+                div.textContent = text;
+                parent.appendChild(div);
+            },
+
+            addPre(parent, text, className = "") {
+                if (!text) return;
+                const pre = document.createElement('pre');
+                if (className) pre.className = className;
+                pre.textContent = text;
+                parent.appendChild(pre);
+            },
+
+            fillIntercept(flow) {
+                const area = document.getElementById('intercept-request');
+                if (area) area.value = atob(flow.request);
+            }
+        },
+
+        Sitemap: {
+            render() {
+                const view = document.getElementById('sitemap-view');
+                if (!view) return;
+                view.innerHTML = '<div class="h3">Sitemap</div>';
+
+                const tree = this.buildTree();
+                const container = document.createElement('div');
+                Object.keys(tree).sort().forEach(host => {
+                    container.appendChild(this.renderNode(host, tree[host], true));
+                });
+                view.appendChild(container);
+            },
+
+            buildTree() {
+                const tree = {};
+                state.flows.forEach(flow => {
+                    try {
+                        const url = new URL(flow.url);
+                        const host = url.host;
+                        const parts = url.pathname.split('/').filter(p => p);
+                        if (!tree[host]) tree[host] = { children: {} };
+                        let curr = tree[host].children;
+                        parts.forEach((p, i) => {
+                            if (!curr[p]) curr[p] = { children: {} };
+                            if (i === parts.length - 1) {
+                                curr[p]._isLeaf = true;
+                                curr[p]._flowId = flow.ID || flow.id;
+                            }
+                            curr = curr[p].children;
+                        });
+                    } catch(e) {}
+                });
+                return tree;
+            },
+
+            renderNode(name, data, isRoot = false) {
+                if (data._isLeaf && Object.keys(data.children).length === 0) {
+                    const el = document.createElement('div');
+                    el.className = 'sitemap-leaf';
+                    el.textContent = `📄 ${name}`;
+                    el.onclick = () => ProxyApp.selectFlow(data._flowId);
+                    return el;
+                }
+                const details = document.createElement('details');
+                if (isRoot) details.open = true;
+                const summary = document.createElement('summary');
+                summary.textContent = `📁 ${name}`;
+                details.appendChild(summary);
+                Object.keys(data.children).sort().forEach(k => {
+                    details.appendChild(this.renderNode(k, data.children[k]));
+                });
+                return details;
+            }
+        }
+    };
+
+    // --- CA Logic (added back in) ---
+    async function loadCATab() {
+        const caView = document.getElementById('ca-view');
+        if (!caView) return;
+
+        caView.innerHTML = '<div style="color:#888;">> FETCHING_CERTIFICATES...</div>';
+
+        try {
+            const res = await fetch('/ca/list');
+            const files = await res.json();
+
+            caView.innerHTML = `
+                <h4>[ROOT_CA]</h4>
+                <div class="ca-card">
+                    <div style="margin-bottom:10px;">HITM-Proxy.pem</div>
+                    <button class="btn-download" onclick="window.location='/ca/download?name=HITM-Proxy.pem'">
+                        DOWNLOAD_PEM
+                    </button>
+                </div>
+
+                <h4>[GENERATED_HOST_CERTS]</h4>
+                <ul class="ca-list">
+                    ${files.map(file => `
+                        <li>
+                            <span>${file}</span>
+                            <a href="/ca/download?name=${file}" class="ca-link">[DOWNLOAD]</a>
+                        </li>
+                    `).join('')}
+                </ul>
+            `;
+        } catch (err) {
+            caView.innerHTML = `<div style="color:#f44;">> ERROR: ${err.message}</div>`;
+        }
+    }
+
+    // --- Global Actions ---
+    return {
+        Panels: Panels,
+        loadCATab: loadCATab,
+        init() {
+            API.fetchHistory();
+            initSSE();
+            this.loadStateFromUrl();
+        },
+
+        selectFlow(id) {
+            state.selectedFlowId = id;
+            // Update URL hash
+            window.location.hash = `inspect/${id}`;
+            // Refresh panels
+            document.querySelectorAll('.flow-item').forEach(el => el.classList.remove('active-flow'));
+            const row = document.getElementById(`flow-row-${id}`);
+            if (row) row.classList.add('active-flow');
+
+            Panels.Inspect.render();
+        },
+
+        toggleIntercept(enable) {
+            API.postIntercept(enable);
+            const header = document.getElementById('header');
+            if (header) {
+                header.style.background = enable ? "#aa0000" : "#333";
+            }
+        },
+
+        async forwardIntercept() {
+            const raw = document.getElementById('intercept-request').value;
+            if (state.interceptedFlowId) {
+                await API.forward(state.interceptedFlowId, raw);
+                document.getElementById('intercept-request').value = "";
+            }
+        },
+
+        async dropIntercept() {
+            if (state.interceptedFlowId) {
+                await API.drop(state.interceptedFlowId);
+                document.getElementById('intercept-request').value = "";
+            }
+        },
+
+        loadStateFromUrl() {
+            const hash = window.location.hash.substring(1);
+            if (!hash) return;
+            const [action, id] = hash.split('/');
+            if (id) this.selectFlow(parseInt(id));
+        },
+
+        // Exposed for BSP hooks
+        refreshSitemap: () => Panels.Sitemap.render(),
+        refreshHistory: () => Panels.History.render()
+    };
+})();
+
+// Start the app
+document.addEventListener('DOMContentLoaded', () => ProxyApp.init());
+
+// Auto-start if loaded
+window.addEventListener('load', () => {
+    // Small delay to ensure original DOM is ready
+    setTimeout(BSP.init, 100);
+});
+</script>

@@ -1,0 +1,73 @@
+{{define "about.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>About - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>About makhor</h1>
+
+        <p>
+            makhor is a minimal link aggregator inspired by
+            <a href="https://lobste.rs">Lobste.rs</a> and
+            <a href="https://news.ycombinator.com">Hacker News</a>.
+        </p>
+
+        <h2>Features</h2>
+        <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li>Passwordless login via email</li>
+            <li>Invite-only registration with visible invite tree</li>
+            <li>Tagged posts with multiple categories</li>
+            <li>Threaded comments</li>
+            <li>Hats for verified organizational affiliation</li>
+            <li>Full action log for transparency</li>
+            <li>RSS feeds for posts, tags, and users</li>
+            <li>No JavaScript required</li>
+        </ul>
+
+        <h2>RSS Feeds</h2>
+        <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li><a href="{{.Subpath}}/rss.xml">Latest posts</a></li>
+            <li><a href="{{.Subpath}}/rss/comments.xml">Recent comments</a></li>
+            <li>/rss/tag/NAME.xml - Posts by tag</li>
+            <li>/rss/user/USERNAME.xml - Posts by user</li>
+        </ul>
+
+        <h2>Hats</h2>
+        <p>
+            A hat is a verified identity that lets you speak officially for an organization.
+            When commenting with a hat, your organizational role is displayed.
+            Hats are granted by admins after verification.
+        </p>
+
+        <h2>Design Philosophy</h2>
+        <p>
+            This site is intentionally minimal:
+        </p>
+        <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li>No JavaScript - works in any browser</li>
+            <li>Minimal CSS - fast load times</li>
+            <li>High contrast - easy to read</li>
+            <li>No tracking - respects privacy</li>
+            <li>Pure Go backend - no dependencies</li>
+        </ul>
+
+        {{if .Stats}}
+        <h2>Statistics</h2>
+        <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li>{{.Stats.Users}} users</li>
+            <li>{{.Stats.Posts}} posts</li>
+            <li>{{.Stats.Comments}} comments</li>
+            <li>{{.Stats.Tags}} tags</li>
+        </ul>
+        {{end}}
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

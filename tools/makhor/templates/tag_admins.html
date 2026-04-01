@@ -1,0 +1,59 @@
+{{define "tag_admins.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Manage Admins - {{.Tag.Name}} - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Manage Admins: <a href="{{.Subpath}}/tags/{{.Tag.Name}}" class="tag">{{.Tag.Name}}</a></h1>
+
+        {{if .Tag.CreatorUsername}}
+        <p class="muted">Creator: <a href="{{.Subpath}}/users/{{.Tag.CreatorUsername}}" class="user-link">{{.Tag.CreatorUsername}}</a> (has full control)</p>
+        {{end}}
+
+        {{if .Error}}
+        <p class="error">{{.Error}}</p>
+        {{end}}
+
+        {{if .Success}}
+        <p class="success">{{.Success}}</p>
+        {{end}}
+
+        <h2>Current Admins</h2>
+        {{if .Tag.Admins}}
+        <table>
+            {{range .Tag.Admins}}
+            <tr>
+                <td><a href="{{.Subpath}}/users/{{.Username}}" class="user-link">{{.Username}}</a></td>
+                <td class="muted">added {{timeAgo .GrantedAt}}{{if .GrantedByName}} by {{.GrantedByName}}{{end}}</td>
+                <td><a href="{{.Subpath}}/tags/admins/remove?tag={{$.Tag.ID}}&user={{.UserID}}" style="color: var(--error);">remove</a></td>
+            </tr>
+            {{end}}
+        </table>
+        {{else}}
+        <p class="muted">No admins yet. Add users below.</p>
+        {{end}}
+
+        <h2>Add Admin</h2>
+        <form method="post" action="{{.Subpath}}/tags/admins">
+            <input type="hidden" name="tag_id" value="{{.Tag.ID}}">
+            <label for="username">Username</label>
+            <input type="text" name="username" id="username" placeholder="username" required style="max-width: 250px;">
+            <div style="margin-top: 0.5rem;">
+                <input type="submit" value="Add Admin">
+            </div>
+        </form>
+
+        <div style="margin-top: 1rem;">
+            <a href="{{.Subpath}}/tags/{{.Tag.Name}}">back to tag</a>
+        </div>
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

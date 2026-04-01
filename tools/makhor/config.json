@@ -1,0 +1,10 @@
+{
+  "email": {
+    "host": "mail.emile.space",
+    "port": 587,
+    "user": "mail@emile.space",
+    "password": "abc",
+    "from": "noreply@emile.space",
+    "user_tls": true,
+  }
+}

@@ -1,0 +1,53 @@
+{{define "reply.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Reply to Comment - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Reply to Comment</h1>
+
+        <p class="muted">On: <a href="{{.Subpath}}/posts/{{.Post.ID}}">{{.Post.Title}}</a></p>
+
+        <div class="comment" style="margin: 1rem 0;">
+            <div class="comment-meta">
+                <a href="{{.Subpath}}/users/{{.Comment.Username}}">{{.Comment.Username}}</a>
+                {{timeAgo .Comment.CreatedAt}}
+            </div>
+            <div class="comment-body">{{.Comment.Body}}</div>
+        </div>
+
+        <form method="POST" action="{{.Subpath}}/posts/{{.Post.ID}}/comment">
+            <input type="hidden" name="parent_id" value="{{.Comment.ID}}">
+
+            <label for="body">Your Reply</label>
+            <textarea id="body" name="body" required autofocus></textarea>
+
+            {{if .Hats}}
+            <label>
+                <span class="muted">Wear a hat:</span>
+                <select name="hat_id">
+                    <option value="">None</option>
+                    {{range .Hats}}
+                    <option value="{{.ID}}">{{.Name}} ({{.Organization}})</option>
+                    {{end}}
+                </select>
+            </label>
+            {{end}}
+
+            <button type="submit">Post Reply</button>
+        </form>
+
+        <p style="margin-top: 1rem;">
+            <a href="{{.Subpath}}/posts/{{.Post.ID}}#c{{.Comment.ID}}">← Back to thread</a>
+        </p>
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

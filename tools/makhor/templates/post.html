@@ -1,0 +1,242 @@
+{{define "post.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Post.Title}} - makhor</title>
+    {{template "styles"}}
+    <style>
+        /* Post page layout with TOC sidebar */
+        .post-layout {
+            display: flex;
+            gap: 1rem;
+        }
+        .post-content {
+            flex: 1;
+            min-width: 0;
+        }
+        .comment-toc {
+            width: 180px;
+            flex-shrink: 0;
+            position: sticky;
+            top: 0.5rem;
+            align-self: flex-start;
+            max-height: calc(100vh - 1rem);
+            overflow-y: auto;
+            font-size: 0.8em;
+            border-left: 2px solid var(--border);
+            padding-left: 0.5rem;
+        }
+        .comment-toc::-webkit-scrollbar {
+            width: 4px;
+        }
+        .comment-toc::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+        .comment-toc::-webkit-scrollbar-thumb {
+            background: var(--border);
+        }
+        .toc-item {
+            display: block;
+            padding: 0.15rem 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--muted);
+            text-decoration: none;
+        }
+        .toc-item:hover {
+            color: var(--fg);
+        }
+        .toc-item .toc-user {
+            color: var(--link-user);
+        }
+        .toc-item .toc-chars {
+            color: var(--muted);
+            font-size: 0.85em;
+        }
+        .toc-item.blurred {
+            opacity: 0.5;
+        }
+        .comment.blurred {
+            opacity: 0.6;
+            border-left-color: var(--muted);
+        }
+        .blurred-label {
+            background: var(--muted);
+            color: var(--bg);
+            padding: 0.1rem 0.3rem;
+            font-size: 0.75em;
+            margin-left: 0.3rem;
+        }
+        /* Comment tree structure */
+        .comment-thread {
+            position: relative;
+        }
+        .comment-wrapper {
+            position: relative;
+        }
+        /* Highlighted comment (when navigated via fragment) */
+        .comment-wrapper:target .comment,
+        .comment-wrapper:target > details.comment-fold > .comment {
+            background: rgba(108, 204, 255, 0.1);
+        }
+        @media (prefers-color-scheme: light) {
+            .comment-wrapper:target .comment,
+            .comment-wrapper:target > details.comment-fold > .comment {
+                background: rgba(0, 102, 204, 0.08);
+            }
+        }
+        /* Comment actions in header */
+        .comment-actions {
+            font-size: 0.85em;
+            margin-left: 0.3rem;
+        }
+        .comment-actions a {
+            color: var(--muted);
+        }
+        .comment-actions a:hover {
+            color: var(--link);
+        }
+        @media (max-width: 800px) {
+            .post-layout {
+                flex-direction: column;
+            }
+            .comment-toc {
+                width: 100%;
+                position: static;
+                max-height: 150px;
+                border-left: none;
+                border-bottom: 2px solid var(--border);
+                padding-left: 0;
+                padding-bottom: 0.5rem;
+                margin-bottom: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <div class="post" style="border-bottom: none; padding-bottom: 0;">
+            <h1 class="post-title" style="margin-top: 0;">
+                <a href="{{.Subpath}}/posts/{{.Post.ID}}/vote" class="vote{{if .Post.UserVoted}} voted{{end}}">▲</a>
+                <span class="title-text">
+                {{if .Post.URL}}
+                <a href="{{.Post.URL}}">{{.Post.Title}}</a>
+                {{else}}
+                {{.Post.Title}}
+                {{end}}
+                </span>
+                {{if .Post.Domain}}<a href="{{.Subpath}}/domain/{{.Post.Domain}}" class="domain muted">({{.Post.Domain}})</a>{{end}}
+            </h1>
+            <div class="post-meta">
+                {{.Post.Score}} points |
+                {{if eq .Post.SourceType "rss"}}<img src="{{.Subpath}}/avatar/_rss" class="avatar-small" alt=""><a href="{{.Subpath}}/feeds/{{.Post.SourceID}}">rss</a>{{else}}<img src="{{.Subpath}}/avatar/{{.Post.Username}}" class="avatar-small" alt=""><a href="{{.Subpath}}/users/{{.Post.Username}}" class="user-link">{{.Post.Username}}</a>{{end}}
+                {{if .Post.Hat}}<span class="hat" title="{{.Post.Hat.Organization}}">{{.Post.Hat.Name}}</span>{{end}} |
+                <span title="{{formatTime .Post.CreatedAt}}">{{timeAgo .Post.CreatedAt}}</span>
+                <span class="muted" style="font-size: 0.85em;">({{formatTime .Post.CreatedAt}})</span>
+                {{range .Post.Tags}}
+                <a href="{{$.Subpath}}/tags/{{.Name}}" class="tag">{{.Name}}</a>
+                {{if or $.CanModerate (and $.User (eq $.User.ID $.Post.UserID))}}<a href="{{$.Subpath}}/posts/remove-tag?post={{$.Post.ID}}&tag={{.ID}}" onclick="return confirm('Remove this tag from post?')" style="color: var(--error); font-size: 0.8em;" title="Remove tag">[x]</a>{{end}}
+                {{end}}
+                {{if gt .RevisionCount 0}}| <a href="{{.Subpath}}/posts/{{.Post.ID}}/history" class="muted">{{.RevisionCount}} edit{{if gt .RevisionCount 1}}s{{end}}</a>{{end}}
+                {{if .User}}
+                {{if or (eq .User.ID .Post.UserID) .User.IsAdmin}}
+                | <a href="{{.Subpath}}/posts/{{.Post.ID}}/edit">edit</a>
+                | <a href="{{.Subpath}}/posts/{{.Post.ID}}/delete" onclick="return confirm('Delete this post?')">delete</a>
+                {{end}}
+                {{end}}
+            </div>
+
+            {{if .Post.Body}}
+            <div class="post-body" style="margin: 0.6rem 0; padding: 0.5rem; background: var(--border); border-radius: 3px; white-space: pre-wrap;">{{.Post.Body}}</div>
+            {{end}}
+        </div>
+
+        {{if .User}}
+        <div class="comment-form">
+            <form method="POST" action="{{.Subpath}}/posts/{{.Post.ID}}/comment" style="margin: 0;">
+                <textarea name="body" placeholder="Write a comment..." required style="max-width: 100%;"></textarea>
+                {{if .Hats}}
+                <div style="margin: 0.3rem 0;">
+                    <label style="display: inline; margin: 0; font-weight: normal;">
+                        <span class="muted">Wear a hat:</span>
+                        <select name="hat_id" style="width: auto; max-width: 200px;">
+                            <option value="">None</option>
+                            {{range .Hats}}
+                            <option value="{{.ID}}">{{.Name}} ({{.Organization}})</option>
+                            {{end}}
+                        </select>
+                    </label>
+                </div>
+                {{end}}
+                <button type="submit">Post Comment</button>
+            </form>
+        </div>
+        {{else}}
+        <p class="muted" style="margin: 0.5rem 0;"><a href="{{.Subpath}}/login">Log in</a> to comment.</p>
+        {{end}}
+
+        {{if .Comments}}
+        <div class="post-layout">
+            <div class="post-content comment-thread">
+                {{range .Comments}}
+                <div class="comment-wrapper depth-{{.Depth}}" id="c{{.ID}}" style="margin-left: {{mul .Depth 16}}px; padding-left: {{if gt .Depth 0}}8px{{else}}0{{end}};">
+                    <details class="comment-fold" open>
+                        <summary>
+                            <a href="{{$.Subpath}}/comments/{{.ID}}/vote" class="vote{{if .UserVoted}} voted{{end}}">&#x25B2;</a>
+                            <img src="{{$.Subpath}}/avatar/{{.Username}}" class="avatar-small" alt="">
+                            <a href="{{$.Subpath}}/users/{{.Username}}" class="user-link">{{.Username}}</a>
+                            {{if .Hat}}<span class="hat" title="{{.Hat.Organization}}">{{.Hat.Name}}</span>{{end}}
+                            <span class="muted">{{.Score}}pt · <a href="#c{{.ID}}" class="muted" title="{{formatTime .CreatedAt}}">{{timeAgo .CreatedAt}}</a></span>
+                            {{if .IsBlurred}}<span class="blurred-label">blurred</span>{{end}}
+                            {{if $.User}}
+                            <span class="comment-actions">
+                                | <a href="{{$.Subpath}}/comments/{{.ID}}/reply">reply</a>
+                                {{if or (eq $.User.ID .UserID) $.User.IsAdmin $.CanModerate}}
+                                | <a href="{{$.Subpath}}/comments/{{.ID}}/edit">edit</a>
+                                | <a href="{{$.Subpath}}/comments/{{.ID}}/delete" onclick="return confirm('Delete this comment?')">delete</a>
+                                | <a href="{{$.Subpath}}/comments/{{.ID}}/delete-tree" onclick="return confirm('Delete this comment and ALL replies?')">delete tree</a>
+                                {{end}}
+                                {{if or $.User.IsAdmin $.CanModerate}}
+                                {{if .IsBlurred}}
+                                | <a href="{{$.Subpath}}/comments/{{.ID}}/unblur">unblur</a>
+                                {{else}}
+                                | <a href="{{$.Subpath}}/comments/{{.ID}}/blur">blur</a>
+                                {{end}}
+                                {{end}}
+                            </span>
+                            {{end}}
+                        </summary>
+                        <div class="comment{{if .IsBlurred}} blurred{{end}}">
+                            {{if .IsDeleted}}
+                            <div class="comment-body muted">[deleted]</div>
+                            {{else}}
+                            <div class="comment-body">{{.Body}}</div>
+                            {{end}}
+                        </div>
+                    </details>
+                </div>
+                {{end}}
+            </div>
+
+            <div class="comment-toc">
+                <div class="muted" style="margin-bottom: 0.3rem; font-weight: 600;">{{len .Comments}} comments</div>
+                {{range .Comments}}
+                <a href="#c{{.ID}}" class="toc-item{{if .IsBlurred}} blurred{{end}}" style="padding-left: {{mul .Depth 8}}px;">
+                    <span class="toc-user">{{.Username}}</span>
+                    <span class="toc-chars">{{.BodyLen}}c</span>
+                </a>
+                {{end}}
+            </div>
+        </div>
+        {{else}}
+        <p class="muted" style="margin-top: 1rem;">No comments yet. Be the first to comment!</p>
+        {{end}}
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

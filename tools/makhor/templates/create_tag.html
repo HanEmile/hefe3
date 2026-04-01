@@ -1,0 +1,53 @@
+{{define "create_tag.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Create Tag - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Create Tag</h1>
+        {{if .ParentTag}}
+        <p class="muted">Creating subtag of <a href="{{.Subpath}}/tags/{{.ParentTag.Name}}" class="tag">{{.ParentTag.Name}}</a></p>
+        {{else}}
+        <p class="muted">Only site admins can create root-level tags. Tag moderators can create subtags under their tags.</p>
+        {{end}}
+
+        {{if .Errors}}
+        <ul class="errors">
+            {{range .Errors}}
+            <li>{{.}}</li>
+            {{end}}
+        </ul>
+        {{end}}
+
+        <form method="post" action="{{.Subpath}}/tags/new{{if .ParentTag}}?parent={{.ParentTag.Name}}{{end}}">
+            <label for="name">Tag Name</label>
+            {{if .ParentTag}}
+            <input type="hidden" name="parent" value="{{.ParentTag.Name}}">
+            <div style="display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.3rem;">
+                <span class="tag">{{.ParentTag.Name}}::</span>
+                <input type="text" name="name" id="name" value="{{.Name}}" placeholder="subtag-name" style="flex: 1; max-width: 300px;" required>
+            </div>
+            {{else}}
+            <input type="text" name="name" id="name" value="{{.Name}}" placeholder="tag-name" required>
+            {{end}}
+            <small class="muted" style="display: block; margin: 0.2rem 0;">Lowercase letters, numbers, and hyphens only. 2-50 characters.</small>
+
+            <label for="description">Description</label>
+            <input type="text" name="description" id="description" value="{{.Description}}" placeholder="Brief description of this tag">
+            <small class="muted" style="display: block; margin: 0.2rem 0;">Optional. Helps users understand what posts belong here.</small>
+
+            <div style="margin-top: 0.5rem;">
+                <input type="submit" value="Create Tag">
+            </div>
+        </form>
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}

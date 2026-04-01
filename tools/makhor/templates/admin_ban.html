@@ -1,0 +1,49 @@
+{{define "admin_ban.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ban User - makhor</title>
+    {{template "styles"}}
+</head>
+<body>
+    {{template "nav" .}}
+    <main>
+        <h1>Ban User: {{.TargetUser.Username}}</h1>
+
+        {{if .Error}}
+        <p class="error">{{.Error}}</p>
+        {{end}}
+
+        <form method="POST" action="{{.Subpath}}/admin/ban?username={{.TargetUser.Username}}">
+            <div class="form-group">
+                <label for="reason">Reason (optional)</label>
+                <textarea id="reason" name="reason" rows="3" maxlength="500" placeholder="Reason for the ban...">{{.Reason}}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="duration">Duration</label>
+                <select id="duration" name="duration">
+                    <option value="permanent"{{if or (not .Duration) (eq .Duration "permanent")}} selected{{end}}>Permanent</option>
+                    <option value="1"{{if eq .Duration "1"}} selected{{end}}>1 day</option>
+                    <option value="7"{{if eq .Duration "7"}} selected{{end}}>7 days</option>
+                    <option value="14"{{if eq .Duration "14"}} selected{{end}}>14 days</option>
+                    <option value="30"{{if eq .Duration "30"}} selected{{end}}>30 days</option>
+                    <option value="90"{{if eq .Duration "90"}} selected{{end}}>90 days</option>
+                    <option value="365"{{if eq .Duration "365"}} selected{{end}}>1 year</option>
+                </select>
+                <p class="muted" style="margin-top: 0.3rem;">Or enter custom days:</p>
+                <input type="number" name="duration" min="1" placeholder="Custom days" style="width: 120px;">
+            </div>
+
+            <div class="form-group">
+                <button type="submit" style="background: var(--error); border-color: var(--error);">Ban User</button>
+                <a href="{{.Subpath}}/users/{{.TargetUser.Username}}" style="margin-left: 1rem;">Cancel</a>
+            </div>
+        </form>
+    </main>
+    {{template "footer"}}
+</body>
+</html>
+{{end}}
