@@ -64,9 +64,10 @@ in
 
     firewall = {
       enable = true;
-      # Tailscale: HTTP for vhosts on the overlay, plus node-exporter for the
-      # dashboard/prometheus scrape.
+      # node-exporter on :9100 reachable from both tailscale and the bridge IP
+      # so the medano-hosted status-board can scrape every VM uniformly.
       interfaces."tailscale0".allowedTCPPorts = [ 80 443 9100 ];
+      interfaces."enp1s0".allowedTCPPorts = [ 9100 ];
       allowedTCPPorts = [ ];
       allowedUDPPorts = [ ];
     };

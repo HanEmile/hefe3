@@ -28,6 +28,7 @@ in
 
     (mod "ports.nix")
     ../../../vms/x86/modules/healthProbes.nix
+    (hefe.tools.status-board.module { inherit hefe; })
 
     (vm "naraj") # general nginx router
     (vm "rou") # route VPN traffic
