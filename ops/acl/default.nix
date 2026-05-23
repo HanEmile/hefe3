@@ -19,7 +19,6 @@ let
     arr = withDefault { };
     auth = withDefault { };
     md = withDefault { };
-    irc = withDefault { };
     git = withDefault { };
     photo = withDefault { };
     social = withDefault { };
@@ -46,7 +45,6 @@ let
     data = withDefault { };
     amalthea = withDefault { };
     late = withDefault { };
-    dev1 = withDefault { };
     demo01 = withDefault { };
   };
 in

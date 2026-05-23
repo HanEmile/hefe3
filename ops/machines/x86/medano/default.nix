@@ -35,7 +35,6 @@ in
     (vm "arr") # media
     (vm "auth") # sso
     (vm "md") # hedgedoc
-    # (vm "irc") # irc
     (vm "git") # git
     (vm "data") # data
     (vm "miki") # md wiki
@@ -45,11 +44,9 @@ in
     (vm "tmp") # tmpfile host
     (vm "amalthea") # astrophotography
     (vm "late") # community
-    (vm "dev1") # dev host
     (vm "demo01") # image-bootstrap demo VM
 
     # ctf
-    (vm "ctf") # capture the flag foo
 
     # syzkaller fuzzing VM pool
     # (import (hefe.path.origSrc + "/ops/vms/x86/fuzz/libvirt.nix") {
@@ -266,11 +263,6 @@ in
             tlsify {
               locations."/".proxyPass = "http://${host}:${toString port}";
             };
-
-          # Just to get the crt and key, store it in an age secret an pass it to
-          # the `irc` VM~
-          # TODO(emile): automate this... ...somehow
-          "irc.medano.emile.space" = tlsify { };
 
           "auth.medano.emile.space" =
             let

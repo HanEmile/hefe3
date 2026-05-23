@@ -22,7 +22,6 @@ let
   rou = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID5T9VI4Xj/DcRgU3zBroA0HkFAKvKzdBundjrUNI+as root@rou";
   auth = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID1zv4CBYJEktBzq7FOA5BIeWCSzC5kROnV3dbv1t81L root@auth";
   md = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICK0p/XZiMN8Q64+8lYE1x3I/Q069YLwL4mZAGPwHkCg root@md";
-  irc = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICEYrtW4BEquFgD76uKTiUOo47P3CdVkNPJvKczaSrxG root@irc";
   data = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIABD8kIqLF0oTNKsRDSaK6FYigOrwpUtlePjxwtme+zg root@data";
   photo = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIITS9LszO4+ASdxvys9I5R58+3uwLzb1RwDopLU7JLlI root@photo";
   amalthea = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID5EeR1ZbLxodwNhUKP9hARMZjf5MH3OuTZ+zGToO3ZH root@amalthea";
@@ -69,10 +68,6 @@ in
 
   # === md ===
   "hedgedoc_environment_variables.age" = for [ md ];
-
-  # === irc ===
-  "irc_tls_crt.age" = for [ irc ];
-  "irc_tls_key.age" = for [ irc ];
 
   # === data ===
   "data.pinto-pike.ts.net.key.age" = for [ data ];

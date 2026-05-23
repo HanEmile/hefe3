@@ -32,7 +32,6 @@ let
         [ "ops" "vms" "x86" "auth" ]
         [ "ops" "vms" "x86" "naraj" ]
         [ "ops" "vms" "x86" "rou" ]
-        [ "ops" "vms" "x86" "irc" ]
         [ "ops" "vms" "x86" "git" ]
         [ "ops" "vms" "x86" "data" ]
         [ "ops" "vms" "x86" "miki" ]
@@ -42,7 +41,6 @@ let
         [ "ops" "vms" "x86" "tmp" ]
         [ "ops" "vms" "x86" "amalthea" ]
         [ "ops" "vms" "x86" "late" ]
-        [ "ops" "vms" "x86" "dev1" ]
         [ "ops" "vms" "x86" "demo01" ]
     ];
   };
