@@ -144,6 +144,37 @@ root. Then comment out `install_vol`, redeploy, and copy the generated
 `ops/vms/x86/newvm/hardware-configuration.nix` (instead of importing
 `../hardware-image.nix`).
 
+
+## Tailscale authentication (manual step after first boot)
+
+Image-bootstrapped VMs enable `tailscaled` (via `vm-base.nix`) but **do not**
+embed an auth key, so a freshly-booted VM is **not yet on the tailnet**. This
+is a one-time manual step per VM:
+
+```sh
+ssh -J medano root@<vm-ip> 'tailscale up --ssh'
+```
+
+The command prints a URL like `https://login.tailscale.com/a/<token>`. Open
+it in a browser logged into your tailnet and authorise the device. Once
+approved, the VM's tailscale interface gets its 100.x address.
+
+**If your VM has services that bind on the tailscale IP**, you must:
+
+1. Note the actual 100.x address (`ssh -J medano root@<vm-ip> tailscale ip`).
+2. Update `ops/ipam/default.nix` under `tailscale.<vm>.v4` if it differs from
+   the previously-allocated address.
+3. Redeploy the VM: `nix-build -A ops.nixos.<vm>.deploy && ./result/bin/deploy`.
+
+Tailscale assigns the 100.x address itself, so the IPAM entry is just a
+record of what was assigned — not a constraint. The `systemd.services.<svc>`
+config in vm-base.nix waits for `tailscaled.service` + `network-online.target`
+so services that bind on the tailscale IP will not fail at boot.
+
+To automate this for future VMs, generate a reusable + pre-approved auth key
+in the Tailscale admin (Settings → Keys) and we can embed it via agenix in
+`vm-base.nix`. Ask the operator for one when you reach that point.
+
 ## Files referenced
 
 - `ops/lib/mkVmImage.nix` — wraps `<nixpkgs>/nixos/lib/make-disk-image.nix`
