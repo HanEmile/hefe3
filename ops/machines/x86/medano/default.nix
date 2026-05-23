@@ -272,6 +272,24 @@ in
               locations."/".proxyPass = "http://${host}:${toString port}";
             };
 
+          "social.medano.emile.space" =
+            let
+              host = hefe.ops.ipam.default.social.v4;
+            in
+            tlsify {
+              locations."/" = {
+                proxyPass = "http://${host}:3004";
+                proxyWebsockets = true;
+                extraConfig = ''
+                  client_max_body_size 40M;
+                '';
+              };
+            };
+
+          # gotosocial federation/wellknown: when emile.space DNS is on
+          # medano (post-cutover), redirect well-known requests to
+          # social.medano.emile.space (or eventually social.emile.space).
+
           "auth.medano.emile.space" =
             let
               proxyPass = "http://192.168.75.3:9091";
@@ -412,6 +430,7 @@ in
     { name = "photo";            url = "https://photo.medano.emile.space/api/server/ping"; }
     { name = "amalthea";         url = "https://amaltheea.medano.emile.space/"; expectedStatus = 502; }
     { name = "tmp";              url = "https://tmp.medano.emile.space/"; }
+    { name = "social";           url = "https://social.medano.emile.space/api/v1/instance"; }
   ];
 
   # Prometheus node-exporter for medano itself. Bind on tailscale + localhost

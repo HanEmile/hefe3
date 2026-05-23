@@ -35,6 +35,14 @@ let
   tmp      = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICrSItCIigpmQLpRForEznBHJprcx82BQeeweRmtQ7Pt root@tmp";
   late     = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJVF84a4bUbSEzdUe/6E+3QarQtekMt9Od8QfVU5h9tb root@nixos";
   demo01   = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIuR2E3bQYK6nszaVZ5zgIXjnTj3vH56W6tIbFGtEPOS root@demo01";
+
+  # new VMs added 2026-05-24
+  sb1       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKphV2m4+5F2hCMTv121SXQHKxdsnP0O1BNwRCKAfhAe root@sb1";
+  sb2       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAxChO5pLFc2UGDig8cDIFQXf4mA3kUjhKczSK60xFwL root@sb2";
+  sb3       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFwfwmEcMog5xCGBsVSe84y8DBXWVYvRmP8QGh+qkN0p root@sb3";
+  minecraft = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA/0Vc34WKHLyJYcZ2KF98PX7A+L5BC0JqLz/5doKDe1 root@minecraft";
+  factorio  = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBuAa/baIxfJoSCyptxyrhvsINa1XjZxKYmwgReBBUVe root@factorio";
+  r2wars    = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExKIrQADDElPIh3jARxGrRtEsjUlXcWyhCk/bkT47nC root@r2wars";
   # allHosts = [ medano arr ];
 
   # convinience function: the hosts themselves and all admins should be able to access the host
@@ -98,11 +106,11 @@ in
 
 
   # === backups ===
-  "storagebox_bx11_restic_password.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea late ];
+  "storagebox_bx11_restic_password.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea late sb1 sb2 sb3 minecraft factorio r2wars ];
 
   # The config bx11 connection config contains this:
   # username=u331921
   # domain=u331921.your-storagebox.de
   # password=...
-  "storagebox_bx11_connection_config.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea late ];
+  "storagebox_bx11_connection_config.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea late sb1 sb2 sb3 minecraft factorio r2wars ];
 }
