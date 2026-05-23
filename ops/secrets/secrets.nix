@@ -77,6 +77,10 @@ in
   # === photo ===
   "photo_immich_secrets_file.age" = for [ photo ];
 
+  # === social ===
+  "gotosocial_environment_file.age" = for [ social ];
+  "gotosocial_oidc_client_secret.age" = for [ auth social ];
+
   # === amalthea ===
   "amalthea_oidc_client_password.age" = for [ amalthea ];
   "amalthea_immich_api_key.age" = for [ amalthea ];
