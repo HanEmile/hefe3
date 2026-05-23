@@ -97,7 +97,7 @@ in
       interfaces = {
         "eno1" = {
           allowedTCPPorts = [
-            22 # ssh
+            22 2222 # ssh
             80 # http
             443 # https
             ircBouncerPort # irc

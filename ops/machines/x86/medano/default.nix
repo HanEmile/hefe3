@@ -41,11 +41,42 @@ in
     (vm "rss") # rss feed
     (vm "social") # gotosocial
     (vm "tmp") # tmpfile host
+    (vm "amalthea") # astrophotography
+    (vm "late") # community
+    (vm "dev1") # dev host
 
     # ctf
     (vm "ctf") # capture the flag foo
-    # (vm "win1") # Windows 11 25H2
+
+    # syzkaller fuzzing VM pool
+    # (import (hefe.path.origSrc + "/ops/vms/x86/fuzz/libvirt.nix") {
+    #   inherit nixvirt;
+    #   pool = [
+    #     # Example: uncomment and set kernel paths to activate fuzz VMs
+    #     # {
+    #     #   name = "fuzz-mainline";
+    #     #   kernel = /keep/kernel/bzImage-mainline;
+    #     # }
+    #     # {
+    #     #   name = "fuzz-patched";
+    #     #   kernel = /keep/kernel/bzImage-patched;
+    #     #   initrd = /keep/kernel/initrd-patched.img;
+    #     #   memory = 4;
+    #     #   vcpu_count = 4;
+    #     #   extra_cmdline = "ksan.fault=panic";
+    #     # }
+    #   ];
+    # })
   ];
+
+  age.secrets = {
+    storagebox_bx11_restic_password = {
+      file = hefe.ops.secrets."storagebox_bx11_restic_password.age";
+    };
+    storagebox_bx11_connection_config = {
+      file = hefe.ops.secrets."storagebox_bx11_connection_config.age";
+    };
+  };
 
   fileSystems = {
     "/proc" = {
@@ -59,6 +90,18 @@ in
         # mount -o remount,hidepid=2 /proc
         "hidepid=2" # this makes sure users can only see their own processes
       ];
+    };
+
+    "/mnt/storagebox-bx11" = {
+      device = "//u331921.your-storagebox.de/backup";
+      fsType = "cifs";
+      options =
+        let
+          conn_config = config.age.secrets."storagebox_bx11_connection_config".path;
+        in
+        [
+          "_netdev,x-systemd.automount,noauto,x-systemd.idle-timeout=60s,x-systemd.device-timeout=5s,x-systemd.mount-timeout=5s,credentials=${conn_config}"
+        ];
     };
   };
 
@@ -83,6 +126,7 @@ in
   environment.systemPackages = with pkgs; [
     vim
     libgbm
+    cifs-utils
 
     # for the networkd-dispatcher service used by tailscale
     ethtool
@@ -96,25 +140,30 @@ in
     "@wheel"
   ];
 
+  programs = {
+    mosh.enable = true;
+  };
 
   services = {
-
     openssh = {
       enable = true;
-      ports = [ 2222 ];
+      ports = [
+        22
+        2222
+      ];
       settings.PasswordAuthentication = false;
     };
 
     tailscale = {
       enable = true;
       extraUpFlags = [ "--ssh --advertise-exit-node" ];
-      interfaceName = "eno1";
+      # interfaceName = "enp0s31f6";
     };
 
     networkd-dispatcher = {
       enable = true;
       rules."50-tailscale" = {
-        onState = ["routable"];
+        onState = [ "routable" ];
         script = ''
           "${pkgs.ethtool}/sbin/ethtool" -K "${config.services.tailscale.interfaceName}" rx-udp-gro-forwarding on rx-gro-list off
         '';
@@ -148,6 +197,11 @@ in
       default = "${hefe.ops.ipam.default.naraj.v4}:22";
     };
 
+    # TODO: figure out what zfs datasets to backup
+    # sanoid = {
+    #   enable = true;
+    # };
+
     nginx = {
       enable = true;
       enableReload = true;
@@ -159,163 +213,190 @@ in
       recommendedGzipSettings = true;
       recommendedBrotliSettings = true;
 
-      virtualHosts = let
-        tlsify = content: content // {
-          forceSSL = true;
-          enableACME = true;
-        };
-      in {
-        "photo.medano.emile.space" =
-          let
-            host = hefe.ops.ipam.default.photo.v4;
-            port = hefe.ops.ipam.default.photo.ports.immich;
-          in
-          tlsify {
-            locations."/".proxyPass = "http://${host}:${toString port}";
-          };
+      virtualHosts =
+        let
+          tlsify =
+            content:
+            content
+            // {
+              forceSSL = true;
+              enableACME = true;
+            };
+        in
+        {
+          "amaltheea.medano.emile.space" =
+            let
+              amalthea = hefe.ops.ipam.default.amalthea;
+              host = amalthea.v4;
+              port = amalthea.ports.backend;
+            in
+            tlsify {
+               locations."/" = {
+                 proxyPass = "http://${host}:${toString port}";
+                 proxyWebsockets = true;
+               };
+            };
 
-        "md.medano.emile.space" =
-          let
-            host = hefe.ops.ipam.default.md.v4;
-            port = hefe.ops.ipam.default.md.ports.hedgedoc;
-          in
-          tlsify {
-            locations."/".proxyPass = "http://${host}:${toString port}";
-          };
+          "photo.medano.emile.space" =
+            let
+              host = hefe.ops.ipam.default.photo.v4;
+              port = hefe.ops.ipam.default.photo.ports.immich;
+            in
+            tlsify {
+              locations."/" = {
+                proxyPass = "http://${host}:${toString port}";
+                proxyWebsockets = true;
+                extraConfig = ''
+                  client_max_body_size 50000M;
+                  proxy_read_timeout   600s;
+                  proxy_send_timeout   600s;
+                  send_timeout         600s;
+                '';
+              };
+            };
 
-        # Just to get the crt and key, store it in an age secret an pass it to
-        # the `irc` VM~
-        # TODO(emile): automate this... ...somehow
-        "irc.medano.emile.space" = tlsify { };
+          "md.medano.emile.space" =
+            let
+              host = hefe.ops.ipam.default.md.v4;
+              port = hefe.ops.ipam.default.md.ports.hedgedoc;
+            in
+            tlsify {
+              locations."/".proxyPass = "http://${host}:${toString port}";
+            };
 
-        "auth.medano.emile.space" =
-          let
-            proxyPass = "http://192.168.75.3:9091";
-          in
-          tlsify {
+          # Just to get the crt and key, store it in an age secret an pass it to
+          # the `irc` VM~
+          # TODO(emile): automate this... ...somehow
+          "irc.medano.emile.space" = tlsify { };
+
+          "auth.medano.emile.space" =
+            let
+              proxyPass = "http://192.168.75.3:9091";
+            in
+            tlsify {
+              locations = {
+                "/" = {
+                  inherit proxyPass;
+
+                  extraConfig = ''
+                    ## Headers
+                    # proxy_set_header Host $host;
+                    # proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
+                    # proxy_set_header X-Forwarded-Proto $scheme;
+                    # proxy_set_header X-Forwarded-Host $http_host;
+                    # proxy_set_header X-Forwarded-URI $request_uri;
+                    # proxy_set_header X-Forwarded-Ssl on;
+                    # proxy_set_header X-Forwarded-For $remote_addr;
+                    # proxy_set_header X-Real-IP $remote_addr;
+
+                    ## Basic Proxy Configuration
+                    # client_body_buffer_size 128k;
+                    # proxy_next_upstream error timeout invalid_header http_500 http_502 http_503; ## Timeout if the real server is dead.
+                    # proxy_redirect  http://  $scheme://;
+                    # proxy_http_version 1.1;
+                    # proxy_cache_bypass $cookie_session;
+                    # proxy_no_cache $cookie_session;
+                    # proxy_buffers 64 256k;
+
+                    ## Trusted Proxies Configuration
+                    ## Please read the following documentation before configuring this:
+                    ##     https://www.authelia.com/integration/proxies/nginx/#trusted-proxies
+                    # set_real_ip_from 10.0.0.0/8;
+                    # set_real_ip_from 172.16.0.0/12;
+                    # set_real_ip_from 192.168.0.0/16;
+                    # set_real_ip_from fc00::/7;
+                    # set_real_ip_from 127.0.0.1/32;
+                    # real_ip_header X-Forwarded-For;
+                    # real_ip_recursive on;
+
+                    ## Advanced Proxy Configuration
+                    # send_timeout 5m;
+                    # proxy_read_timeout 360;
+                    # proxy_send_timeout 360;
+                    # proxy_connect_timeout 360;
+                  '';
+                };
+
+                "/api/verify" = {
+                  inherit proxyPass;
+                };
+
+                "/api/authz/" = {
+                  inherit proxyPass;
+                };
+              };
+            };
+
+          "medano.emile.space" = tlsify {
             locations = {
               "/" = {
-                inherit proxyPass;
-
+                root = "/keep/www/emile.space";
                 extraConfig = ''
-                  ## Headers
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
-                  proxy_set_header X-Forwarded-Proto $scheme;
-                  proxy_set_header X-Forwarded-Host $http_host;
-                  proxy_set_header X-Forwarded-URI $request_uri;
-                  proxy_set_header X-Forwarded-Ssl on;
-                  proxy_set_header X-Forwarded-For $remote_addr;
-                  proxy_set_header X-Real-IP $remote_addr;
-
-                  ## Basic Proxy Configuration
-                  client_body_buffer_size 128k;
-                  proxy_next_upstream error timeout invalid_header http_500 http_502 http_503; ## Timeout if the real server is dead.
-                  proxy_redirect  http://  $scheme://;
-                  proxy_http_version 1.1;
-                  proxy_cache_bypass $cookie_session;
-                  proxy_no_cache $cookie_session;
-                  proxy_buffers 64 256k;
-
-                  ## Trusted Proxies Configuration
-                  ## Please read the following documentation before configuring this:
-                  ##     https://www.authelia.com/integration/proxies/nginx/#trusted-proxies
-                  # set_real_ip_from 10.0.0.0/8;
-                  # set_real_ip_from 172.16.0.0/12;
-                  # set_real_ip_from 192.168.0.0/16;
-                  # set_real_ip_from fc00::/7;
-                  set_real_ip_from 127.0.0.1/32;
-                  real_ip_header X-Forwarded-For;
-                  real_ip_recursive on;
-
-                  ## Advanced Proxy Configuration
-                  send_timeout 5m;
-                  proxy_read_timeout 360;
-                  proxy_send_timeout 360;
-                  proxy_connect_timeout 360;
+                  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
                 '';
               };
 
-              "/api/verify" = {
-                inherit proxyPass;
+              # "/info/" = {
+              #   extraConfig =
+              #     let
+              #       acl = hefe.ops.acl;
+              #       hosts = builtins.attrNames acl.host;
+              #       usersForHost = x: acl.usersForHost acl.host."${x}";
+              #       a = builtins.toJSON (map usersForHost hosts);
+              #       filePath = pkgs.writeText "usersforhost.json" a;
+              #     in
+              #     ''
+              #       add_header Content-Type application/json;
+              #       alias ${filePath};
+              #     '';
+              # };
+
+              "/guacamole" = {
+                proxyPass = "http://127.0.0.1:8080";
+                extraConfig = ''
+                  proxy_buffering off;
+                  proxy_http_version 1.1;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection $http_connection;
+                  access_log off;
+                '';
               };
 
-              "/api/authz/" = {
-                inherit proxyPass;
-              };
+              # As the social.emile.space server actually uses redirects from emile.space, they have to be
+              # setup somewhere. Well... this is that place
+              "/@hanemile".extraConfig = ''
+                return 301 https://social.emile.space/@hanemile;
+              '';
+
+              #"/.well-known" = {
+              #  root = "/var/www/emile.space";
+              #  extraConfig = ''
+              #    autoindex on;
+              #  '';
+              #};
+
+              ## I ran a matrix homeserver for some time, then stopped, but the other
+              ## homeserver don't know and don't stop sending me requests (5e5 a day or
+              ## so).
+              #"/.well-known/matrix/server".extraConfig = ''
+              #  return 410;
+              #'';
             };
           };
 
-        "medano.emile.space" = tlsify {
-          locations = {
-            "/" = {
-              root = "/keep/www/emile.space";
-              extraConfig = ''
-                add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-              '';
-            };
-
-            # "/info/" = {
-            #   extraConfig =
-            #     let
-            #       acl = hefe.ops.acl;
-            #       hosts = builtins.attrNames acl.host;
-            #       usersForHost = x: acl.usersForHost acl.host."${x}";
-            #       a = builtins.toJSON (map usersForHost hosts);
-            #       filePath = pkgs.writeText "usersforhost.json" a;
-            #     in
-            #     ''
-            #       add_header Content-Type application/json;
-            #       alias ${filePath};
-            #     '';
-            # };
-
-            "/guacamole" = {
-              proxyPass = "http://127.0.0.1:8080";
-              extraConfig = ''
-                proxy_buffering off;
-                proxy_http_version 1.1;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header Upgrade $http_upgrade;
-                proxy_set_header Connection $http_connection;
-                access_log off;
-              '';
-            };
-
-            # As the social.emile.space server actually uses redirects from emile.space, they have to be
-            # setup somewhere. Well... this is that place
-            "/@hanemile".extraConfig = ''
-              return 301 https://social.emile.space/@hanemile;
-            '';
-
-            #"/.well-known" = {
-            #  root = "/var/www/emile.space";
-            #  extraConfig = ''
-            #    autoindex on;
-            #  '';
-            #};
-
-            ## I ran a matrix homeserver for some time, then stopped, but the other
-            ## homeserver don't know and don't stop sending me requests (5e5 a day or
-            ## so).
-            #"/.well-known/matrix/server".extraConfig = ''
-            #  return 410;
-            #'';
-          };
-        };
-
-        "tmp.medano.emile.space" = tlsify {
-          locations = {
-            "/" = {
-              root = "/keep/www/tmp.medano.emile.space";
-              extraConfig = ''
-                add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-                autoindex on;
-              '';
+          "tmp.medano.emile.space" = tlsify {
+            locations = {
+              "/" = {
+                root = "/keep/www/tmp.medano.emile.space";
+                extraConfig = ''
+                  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+                  autoindex on;
+                '';
+              };
             };
           };
         };
-      };
     };
   };
 
