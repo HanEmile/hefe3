@@ -45,6 +45,7 @@ let
     amalthea = withDefault { };
     late = withDefault { };
     dev1 = withDefault { };
+    demo01 = withDefault { };
   };
 in
 {

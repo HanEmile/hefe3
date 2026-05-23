@@ -44,6 +44,7 @@ in
     (vm "amalthea") # astrophotography
     (vm "late") # community
     (vm "dev1") # dev host
+    (vm "demo01") # image-bootstrap demo VM
 
     # ctf
     (vm "ctf") # capture the flag foo

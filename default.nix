@@ -41,6 +41,9 @@ let
         [ "ops" "vms" "x86" "social" ]
         [ "ops" "vms" "x86" "tmp" ]
         [ "ops" "vms" "x86" "amalthea" ]
+        [ "ops" "vms" "x86" "late" ]
+        [ "ops" "vms" "x86" "dev1" ]
+        [ "ops" "vms" "x86" "demo01" ]
     ];
   };
 
