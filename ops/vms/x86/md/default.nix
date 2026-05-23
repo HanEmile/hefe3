@@ -9,6 +9,8 @@
   imports = [
     ./hardware-configuration.nix
     (import ../vm-base.nix { vmhost="medano"; } { inherit hefe pkgs; })
+    (import ../modules/backups.nix { inherit hefe; })
+    ../modules/healthProbes.nix
   ];
 
   networking.hostName = "md";
@@ -71,4 +73,13 @@
       ];
     };
   };
+
+  vmBackups.paths = [
+    "/var/lib/hedgedoc"
+  ];
+
+  services.healthProbes.probes = [
+    { name = "self"; url = "http://${hefe.ops.ipam.default.md.v4}:${toString hefe.ops.ipam.default.md.ports.hedgedoc}/status"; }
+    { name = "public"; url = "https://md.medano.emile.space/status"; }
+  ];
 }

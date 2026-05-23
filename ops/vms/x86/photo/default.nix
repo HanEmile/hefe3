@@ -9,6 +9,8 @@
   imports = [
     ./hardware-configuration.nix
     (import ../vm-base.nix { vmhost = "medano"; } { inherit hefe pkgs; })
+    (import ../modules/backups.nix { inherit hefe; })
+    ../modules/healthProbes.nix
   ];
 
   fileSystems."/data" = {
@@ -68,4 +70,22 @@
   };
 
   system.stateVersion = "25.05";
+
+  # Backup immich DB + config. NOT the photo library (that lives on the NFS
+  # /grave/photos dataset which is backed up via medano's restic to storagebox).
+  vmBackups = {
+    paths = [
+      "/var/lib/immich"
+      "/var/lib/postgresql"
+    ];
+    excludePatterns = [
+      "/var/lib/immich/thumbs"   # regenerable
+      "/var/lib/immich/encoded-video"
+    ];
+  };
+
+  services.healthProbes.probes = [
+    { name = "self"; url = "http://${hefe.ops.ipam.default.photo.v4}:${toString hefe.ops.ipam.default.photo.ports.immich}/api/server/ping"; }
+    { name = "public"; url = "https://photo.medano.emile.space/api/server/ping"; }
+  ];
 }

@@ -12,6 +12,8 @@ in
   imports = [
     ./hardware-configuration.nix
     (import ../vm-base.nix { vmhost="medano"; } {inherit hefe pkgs;})
+    (import ../modules/backups.nix { inherit hefe; })
+    ../modules/healthProbes.nix
   ];
 
   environment.systemPackages = with pkgs; [ nfs-utils ];
@@ -131,4 +133,14 @@ in
       };
     };
   };
+
+  # Backup sftpgo state. The user data is on the NFS /grave/data dataset
+  # (backed up by medano's restic).
+  vmBackups.paths = [
+    "/var/lib/sftpgo"
+  ];
+
+  services.healthProbes.probes = [
+    { name = "self"; url = "http://${hefe.ops.ipam.default.data.v4}:${toString hefe.ops.ipam.default.data.ports.sftpgo.web}/healthz"; }
+  ];
 }
