@@ -1,3 +1,0 @@
-# CTF
-
-A CTF VM
