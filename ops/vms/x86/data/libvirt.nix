@@ -3,7 +3,7 @@
 import ../libvirt-base.nix { inherit nixvirt; } {
   name = "data";
   uuid = "1DA269B9-6EE5-4814-BF3B-7E6140137B1C";
-  memory = 4;
+  memory = 2;
   interfaces = [ "virbr0" ];
 
   # comment out after first install

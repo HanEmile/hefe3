@@ -4,7 +4,7 @@
 import ../libvirt-base.nix { inherit nixvirt; } {
   name = "rou";
   uuid = "12E40ADD-2BCA-4393-B027-C241632A88F3";
-  memory = 4;
+  memory = 1;
   interfaces = [ "virbr1" "virbr2" ];
 
   # comment out after first install

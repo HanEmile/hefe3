@@ -4,7 +4,7 @@ import ../libvirt-base.nix { inherit nixvirt; } {
   name = "ctf";
   uuid = "D813CDA4-B5C6-4761-8D0A-D921083DA7CD";
   vcpu_count = 10;
-  memory = 32;
+  memory = 8;
   interfaces = [ "virbr0" ];
 
   # comment out after first install

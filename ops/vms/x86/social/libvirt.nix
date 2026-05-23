@@ -3,7 +3,7 @@
 import ../libvirt-base.nix { inherit nixvirt; } {
   name = "social";
   uuid = "6ACA1D5F-3CCF-4A47-BC91-59798ECDB125";
-  memory = 2; # GB
+  memory = 1; # GB
   interfaces = [ "virbr0" ];
 
   # comment out after first install
