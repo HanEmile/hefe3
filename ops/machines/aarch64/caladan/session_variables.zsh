@@ -4,7 +4,7 @@ export PROMPT="; "		# minimal prompt
 # - path
 # - time of last command executed
 #export RPROMPT="%F{green}%/%F{reset}"
-export RPROMPT="%F{green}%/%F{reset} %D{%K:%M:%S}"
+export RPROMPT='${SSH_CONNECTION:+%m } %F{green}%/%F{reset} %D{%K:%M:%S}'
 
 # Reset the prompt, so we get the time the command was executed
 # in the rprompt. A single second was to much, as it also breaks all the
