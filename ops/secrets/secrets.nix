@@ -25,6 +25,7 @@ let
   irc = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICEYrtW4BEquFgD76uKTiUOo47P3CdVkNPJvKczaSrxG root@irc";
   data = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIABD8kIqLF0oTNKsRDSaK6FYigOrwpUtlePjxwtme+zg root@data";
   photo = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIITS9LszO4+ASdxvys9I5R58+3uwLzb1RwDopLU7JLlI root@photo";
+  amalthea = "";
   # allHosts = [ medano arr ];
 
   # convinience function: the hosts themselves and all admins should be able to access the host
@@ -53,6 +54,8 @@ in
   # oidc client secrets
   "hedgedoc_oidc_client_secret.age" = for [ auth ];
   "sftpgo_oidc_client_secret.age" = for [ auth ];
+  "photo_immich_oidc_client_secret.age" = for [ auth ];
+  "amalthea_oidc_client_secret.age" = for [ auth ];
 
   # === md ===
   "hedgedoc_environment_variables.age" = for [ md ];
@@ -69,6 +72,10 @@ in
   # === photo ===
   "photo_immich_secrets_file.age" = for [ photo ];
 
+  # === amalthea ===
+  "amalthea_oidc_client_password.age" = for [ amalthea ];
+  "amalthea_immich_api_key.age" = for [ amalthea ];
+
   # === lampadas ===
   "immich_secrets_file.age" = for [ lampadas ];
   "lampadas_pinto_pike_ts_net_crt.age" = for [ lampadas ];
@@ -77,11 +84,11 @@ in
 
 
   # === backups ===
-  "storagebox_bx11_restic_password.age" = for [ mail lampadas ];
+  "storagebox_bx11_restic_password.age" = for [ medano mail lampadas ];
 
   # The config bx11 connection config contains this:
   # username=u331921
   # domain=u331921.your-storagebox.de
   # password=...
-  "storagebox_bx11_connection_config.age" = for [ mail lampadas ];
+  "storagebox_bx11_connection_config.age" = for [ medano mail lampadas ];
 }
