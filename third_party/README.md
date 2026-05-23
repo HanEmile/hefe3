@@ -3,7 +3,7 @@
 ```bash
 $ npins show
 $ npins add ...
-$ npins add git https://github.com/oxalica/rust-overlay
+$ npins add git https://github.com/oxalica/rust-overlay -b main
 ```
 
 ```nix

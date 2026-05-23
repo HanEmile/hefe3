@@ -129,6 +129,12 @@ To share a ZFS dataset via NFS, you can use `zfs set sharenfs`:
 zfs set sharenfs='rw=@192.168.33.3,rw' grave/media
 ```
 
+List all (`bpool/*`, `grave/*`, `rpool/*`) with all sharenfs values (allows viewing which VM can access which dataset).
+
+```
+zfs get sharenfs
+```
+
 ## Networking
 
 The networking for the virtual machines is managed by `libvirt`.

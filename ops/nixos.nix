@@ -18,8 +18,31 @@ let
         config.allowUnfree = true;
         overlays = [
           (final: prev: {
-            makhor = final.callPackage hefe.ops.pkgs.makhor { inherit pkgs; };
+            makhor = final.callPackage hefe.ops.pkgs.makhor {
+              inherit pkgs;
+            };
           })
+          (
+            final: prev:
+            let
+              lateShSrc = sources."late-sh".outPath + "/default.nix";
+              rustMinimalPlatform =
+                let
+                  platform = pkgs.rust-bin.stable.latest.minimal;
+                in
+                pkgs.makeRustPlatform {
+                  rustc = platform;
+                  cargo = platform;
+                };
+            in
+            {
+              late-sh = pkgs.callPackage lateShSrc {
+                rustPlatform = rustMinimalPlatform;
+                gitRev = "main";
+              };
+            }
+          )
+          (import (sources."rust-overlay"))
         ];
       };
 
@@ -49,6 +72,7 @@ let
         nixVirtModule # virtualisation
         agenix # secrets
         { nixpkgs.pkgs = pkgs; }
+        (import ./modules/late-sh.nix)
       ];
     };
 
@@ -72,7 +96,8 @@ let
     '';
 
   deployScriptFor =
-    hostname:
+    hostname: # e.g. "medano"
+    host_suffix: # e.g. ".pinto-pike.ts.net" (mind the leading dot!)
     pkgs.writeShellScriptBin "deploy" ''
       set -ue
 
@@ -81,18 +106,20 @@ let
 
       echo "[STEP 2/4]: Copying build result to host"
       nix-copy-closure \
-        --to root@${hostname} \
+        --to root@${hostname}${host_suffix} \
         --use-substitutes \
+        --verbose \
+        --gzip \
         ./result
 
       echo "[STEP 3/4]: Setting the profile"
-      ssh root@${hostname} \
+      ssh root@${hostname}${host_suffix} \
         nix-env \
           -p /nix/var/nix/profiles/system \
           --set $(readlink ./result)
 
       echo "[STEP 4/4]: Switching to configuration"
-      ssh root@${hostname} \
+      ssh root@${hostname}${host_suffix} \
         /nix/var/nix/profiles/system/bin/switch-to-configuration switch
     '';
 
@@ -102,22 +129,25 @@ let
       config = (nixosFor hefe.ops."${type}".x86."${name}").config;
       toplevel = (nixosFor hefe.ops."${type}".x86."${name}").config.system.build.toplevel;
       build = buildScriptFor "${name}";
-      deploy = deployScriptFor "${name}";
+      deploy = deployScriptFor "${name}" "";
+      deploy_ts = deployScriptFor "${name}" ".pinto-pike.ts.net";
     };
   };
 
   machine = name: conf name "machines";
   vm = name: conf name "vms";
 
-  abc = func: dir: lib.attrsets.mergeAttrsList (
-    lib.attrsets.attrValues (
-      lib.attrsets.mergeAttrsList (
-        builtins.map (x: { "${x}" = (func "${x}"); }) (
-          builtins.attrNames (lib.attrsets.filterAttrs (k: v: v == "directory") (builtins.readDir dir))
+  abc =
+    func: dir:
+    lib.attrsets.mergeAttrsList (
+      lib.attrsets.attrValues (
+        lib.attrsets.mergeAttrsList (
+          builtins.map (x: { "${x}" = (func "${x}"); }) (
+            builtins.attrNames (lib.attrsets.filterAttrs (k: v: v == "directory") (builtins.readDir dir))
+          )
         )
       )
-    )
-  );
+    );
 
   machines = abc machine ./machines/x86;
   vms = abc vm ./vms/x86;
