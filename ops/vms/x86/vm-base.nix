@@ -64,7 +64,9 @@ in
 
     firewall = {
       enable = true;
-      interfaces."tailscale0".allowedTCPPorts = [ 80 443 ];
+      # Tailscale: HTTP for vhosts on the overlay, plus node-exporter for the
+      # dashboard/prometheus scrape.
+      interfaces."tailscale0".allowedTCPPorts = [ 80 443 9100 ];
       allowedTCPPorts = [ ];
       allowedUDPPorts = [ ];
     };
@@ -86,6 +88,15 @@ in
     };
 
     vnstat.enable = true;
+
+    # Prometheus node-exporter — base metrics for every VM, scraped from
+    # medano over tailscale.
+    prometheus.exporters.node = {
+      enable = true;
+      listenAddress = "0.0.0.0";
+      port = 9100;
+      enabledCollectors = [ "systemd" "logind" "processes" ];
+    };
   };
 
   nix = {

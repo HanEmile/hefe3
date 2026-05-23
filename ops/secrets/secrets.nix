@@ -84,11 +84,11 @@ in
 
 
   # === backups ===
-  "storagebox_bx11_restic_password.age" = for [ medano mail lampadas ];
+  "storagebox_bx11_restic_password.age" = for [ medano mail lampadas auth md photo data ];
 
   # The config bx11 connection config contains this:
   # username=u331921
   # domain=u331921.your-storagebox.de
   # password=...
-  "storagebox_bx11_connection_config.age" = for [ medano mail lampadas ];
+  "storagebox_bx11_connection_config.age" = for [ medano mail lampadas auth md photo data ];
 }
