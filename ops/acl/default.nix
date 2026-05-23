@@ -7,7 +7,13 @@ let
     medano = withDefault {
 
       # the nas currently syncs backups of photos to the grave on medano via rsync
-      lampadas = [ [ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIARD1yc+6LpvGg5JcFc2jDFBv3kKRLXeNYqqFnCmAHkZ root@lampadas" ] ];
+      lampadas = [ [
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIARD1yc+6LpvGg5JcFc2jDFBv3kKRLXeNYqqFnCmAHkZ root@lampadas"
+      ] ];
+
+      corrino = [ [
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGHcyg+yw1fwTfpbN1meNluaTXNcl6w1LIL0kz5Kan8I root@corrino"
+      ] ];
     };
     naraj = withDefault { };
     arr = withDefault { };
@@ -36,6 +42,9 @@ let
           ]
         );
     data = withDefault { };
+    amalthea = withDefault { };
+    late = withDefault { };
+    dev1 = withDefault { };
   };
 in
 {
