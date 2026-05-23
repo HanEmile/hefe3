@@ -13,6 +13,7 @@
   imports = [
     ./hardware-configuration.nix
     (import ../vm-base.nix { vmhost = "medano"; } { inherit hefe pkgs; })
+    ../modules/healthProbes.nix
   ];
 
   # systemd.services.amalthea-backend = {
@@ -54,4 +55,8 @@
 
   networking.hostName = "amalthea";
   system.stateVersion = "25.05";
+
+  services.healthProbes.probes = [
+    { name = "self"; url = "http://${hefe.ops.ipam.default.amalthea.v4}:9100/metrics"; }
+  ];
 }

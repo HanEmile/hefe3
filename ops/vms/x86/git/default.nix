@@ -5,6 +5,7 @@
   imports = [
     ./hardware-configuration.nix
     (import ../vm-base.nix { vmhost="medano"; } { inherit hefe pkgs; })
+    ../modules/healthProbes.nix
   ];
 
 
@@ -27,4 +28,9 @@
 
   networking.hostName = "git";
   system.stateVersion = "25.05";
+
+  services.healthProbes.probes = [
+    { name = "self"; url = "http://127.0.0.1:8080/"; expectedStatus = 401; }
+    { name = "node-exporter"; url = "http://${hefe.ops.ipam.default.git.v4}:9100/metrics"; }
+  ];
 }

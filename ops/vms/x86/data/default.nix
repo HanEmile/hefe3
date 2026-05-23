@@ -58,6 +58,12 @@ in
     ];
   };
 
+  # sftpgo binds on the tailscale IP, wait for the interface to come up.
+  systemd.services.sftpgo = {
+    after = [ "tailscaled.service" "network-online.target" ];
+    wants = [ "tailscaled.service" "network-online.target" ];
+  };
+
   services = {
     openssh = {
       enable = true;
