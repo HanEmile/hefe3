@@ -89,22 +89,8 @@
       # cat /etc/nix/machines
       # root@corrino  x86_64-linux      /home/nix/.ssh/id_ed25519        8 1     kvm,benchmark
 
-      {
-        hostName = "corrino.emile.space";
-        system = "x86_64-linux";
-        maxJobs = 10;
-        speedFactor = 2;
-
-        supportedFeatures = [
-          "nixos-test"
-          "benchmark"
-          "big-parallel"
-          "kvm"
-        ];
-        mandatoryFeatures = [ ];
-      }
       # {
-      #   hostName = "medano.emile.space";
+      #   hostName = "corrino.emile.space";
       #   system = "x86_64-linux";
       #   maxJobs = 10;
       #   speedFactor = 2;
@@ -117,6 +103,20 @@
       #   ];
       #   mandatoryFeatures = [ ];
       # }
+      {
+        hostName = "medano.emile.space";
+        system = "x86_64-linux";
+        maxJobs = 10;
+        speedFactor = 2;
+
+        supportedFeatures = [
+          "nixos-test"
+          "benchmark"
+          "big-parallel"
+          "kvm"
+        ];
+        mandatoryFeatures = [ ];
+      }
     ];
   };
 

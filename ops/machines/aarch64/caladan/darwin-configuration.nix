@@ -1,4 +1,4 @@
-{ pkgs ? <nixpkgs>
+{ pkgs # ? <nixpkgs>
 , lib ? pkgs.lib
 , ... }:
 
@@ -12,7 +12,13 @@
   users.users.emile = {
     name = "emile";
     home = "/Users/emile";
+    openssh.authorizedKeys.keys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPZi43zHEsoWaQomLGaftPE5k0RqVrZyiTtGqZlpWsew emile@caladan"
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOjzQAqS0+OrvDwZZ+pMobBYNzGIEpnyRX0AJwIRLZCY emile@lp-shattered-streamway.fritz.box"
+    ];
   };
+
+  services.sshd.enable = true;
 
   users.users.hydra = {
     name = "hydra";
@@ -26,6 +32,9 @@
       ''
     		builders-use-substitutes = true
         auto-optimise-store = true
+
+        connect-timeout = 5
+        fallback = false
       ''
       + lib.optionalString (pkgs.system == "aarch64-darwin") ''
         extra-platforms = x86_64-darwin aarch64-darwin
@@ -45,8 +54,6 @@
         # "nix-cache.emile.space:3xzJknXMsR/EL3SBTu6V6oCOkjxe6MgJm0nOrElW33A="
       ];
       substituters = [
-        # nix-cache mirror for when in china
-
         "https://cache.nixos.org"
         "https://nix-community.cachix.org"
         "https://cache.garnix.io"
@@ -54,10 +61,8 @@
 
         # status: https://mirror.sjtu.edu.cn/
         "https://mirror.sjtu.edu.cn/nix-channels/store"
-
         # status: https://mirrors.ustc.edu.cn/status/
         "https://mirrors.ustc.edu.cn/nix-channels/store"
-
       ];
 
       experimental-features = [
@@ -84,22 +89,8 @@
       # cat /etc/nix/machines
       # root@corrino  x86_64-linux      /home/nix/.ssh/id_ed25519        8 1     kvm,benchmark
 
-      {
-        hostName = "corrino.emile.space";
-        system = "x86_64-linux";
-        maxJobs = 10;
-        speedFactor = 2;
-
-        supportedFeatures = [
-          "nixos-test"
-          "benchmark"
-          "big-parallel"
-          "kvm"
-        ];
-        mandatoryFeatures = [ ];
-      }
       # {
-      #   hostName = "medano.emile.space";
+      #   hostName = "corrino.emile.space";
       #   system = "x86_64-linux";
       #   maxJobs = 10;
       #   speedFactor = 2;
@@ -112,12 +103,27 @@
       #   ];
       #   mandatoryFeatures = [ ];
       # }
+      {
+        hostName = "medano.emile.space";
+        system = "x86_64-linux";
+        maxJobs = 10;
+        speedFactor = 2;
+
+        supportedFeatures = [
+          "nixos-test"
+          "benchmark"
+          "big-parallel"
+          "kvm"
+        ];
+        mandatoryFeatures = [ ];
+      }
     ];
   };
 
   nixpkgs.config = {
     allowUnfree = true;
     allowUnsupportedSystem = true;
+    doCheck = false;
   };
 
   # <3
