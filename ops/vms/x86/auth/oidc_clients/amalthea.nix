@@ -32,7 +32,7 @@
       response_modes = [
       	"form_post"
       	"query"
-      	"fragement"
+      	"fragment"
       ];
       token_endpoint_auth_method = "client_secret_post";
     }
