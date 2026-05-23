@@ -62,7 +62,8 @@ let
       agenix = (sources."agenix".outPath + "/modules/age.nix");
     in
     import (nixos + "/nixos/lib/eval-config.nix") {
-      inherit lib system;
+      inherit lib;
+      system = "x86_64-linux";
       specialArgs = {
         inherit args sources;
         nixvirt = nixVirtLib;

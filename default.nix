@@ -45,6 +45,9 @@ let
         [ "ops" "vms" "x86" "sb1" ]
         [ "ops" "vms" "x86" "sb2" ]
         [ "ops" "vms" "x86" "sb3" ]
+        [ "ops" "vms" "x86" "minecraft" ]
+        [ "ops" "vms" "x86" "factorio" ]
+        [ "ops" "vms" "x86" "r2wars" ]
     ];
   };
 

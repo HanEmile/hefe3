@@ -49,6 +49,9 @@ let
     sb1 = withDefault { };
     sb2 = withDefault { };
     sb3 = withDefault { };
+    minecraft = withDefault { };
+    factorio = withDefault { };
+    r2wars = withDefault { };
   };
 in
 {

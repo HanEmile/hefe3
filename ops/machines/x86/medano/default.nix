@@ -48,6 +48,9 @@ in
     (vm "sb1") # standby linux vm
     (vm "sb2") # standby linux vm
     (vm "sb3") # standby linux vm
+    (vm "minecraft") # minecraft world (NFS /grave/games/minecraft)
+    (vm "factorio") # factorio (NFS /grave/games/factorio)
+    (vm "r2wars") # radare2 workspace
 
     # ctf
 
@@ -178,8 +181,10 @@ in
     nfs.server = {
       enable = true;
       exports = ''
-        /grave/data  192.168.75.7/32(rw,async,no_root_squash,no_subtree_check)
-        /grave/media 192.168.33.3/32(rw,async,no_root_squash,no_subtree_check)
+        /grave/data            192.168.75.7/32(rw,async,no_root_squash,no_subtree_check)
+        /grave/media           192.168.33.3/32(rw,async,no_root_squash,no_subtree_check)
+        /grave/games/minecraft 192.168.75.20/32(rw,async,no_root_squash,no_subtree_check)
+        /grave/games/factorio  192.168.75.21/32(rw,async,no_root_squash,no_subtree_check)
       '';
       lockdPort = 4001;
       mountdPort = 4002;
