@@ -27,6 +27,7 @@ in
     hefe.tools.sshrouter.module
 
     (mod "ports.nix")
+    ../../../vms/x86/modules/healthProbes.nix
 
     (vm "naraj") # general nginx router
     (vm "rou") # route VPN traffic
@@ -402,4 +403,25 @@ in
   };
 
   system.stateVersion = "25.05";
+
+  # External health probes for every public service medano fronts.
+  services.healthProbes.probes = [
+    { name = "medano-root";      url = "https://medano.emile.space/"; }
+    { name = "auth";             url = "https://auth.medano.emile.space/api/health"; }
+    { name = "md";               url = "https://md.medano.emile.space/status"; }
+    { name = "photo";            url = "https://photo.medano.emile.space/api/server/ping"; }
+    { name = "amalthea";         url = "https://amaltheea.medano.emile.space/"; expectedStatus = 502; }
+    { name = "tmp";              url = "https://tmp.medano.emile.space/"; }
+  ];
+
+  # Prometheus node-exporter for medano itself. Bind on tailscale + localhost
+  # only so the host's :9100 is not publicly reachable.
+  services.prometheus.exporters.node = {
+    enable = true;
+    listenAddress = "0.0.0.0";
+    port = 9100;
+    enabledCollectors = [ "systemd" "logind" "processes" ];
+  };
+
+  networking.firewall.interfaces."tailscale0".allowedTCPPorts = [ 9100 ];
 }
