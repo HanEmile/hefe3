@@ -333,7 +333,7 @@ in
           "medano.emile.space" = tlsify {
             locations = {
               "/" = {
-                root = "/keep/www/emile.space";
+                proxyPass = "http://${hefe.ops.ipam.default.naraj.v4}";
                 extraConfig = ''
                   add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
                 '';
@@ -391,10 +391,9 @@ in
           "tmp.medano.emile.space" = tlsify {
             locations = {
               "/" = {
-                root = "/keep/www/tmp.medano.emile.space";
+                proxyPass = "http://${hefe.ops.ipam.default.tmp.v4}";
                 extraConfig = ''
                   add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-                  autoindex on;
                 '';
               };
             };

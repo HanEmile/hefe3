@@ -52,8 +52,6 @@ let
         locations."/" = {
           proxyPass = "http://127.0.0.1:8090";
           extraConfig = ''
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
             proxy_read_timeout 30s;
           '';
         };
