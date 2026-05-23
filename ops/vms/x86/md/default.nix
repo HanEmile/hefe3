@@ -12,7 +12,9 @@
   ];
 
   networking.hostName = "md";
-  networking.firewall.allowedTCPPorts = [ hefe.ops.ipam.default.md.ports.hedgedoc ];
+  networking.firewall.allowedTCPPorts = [
+    hefe.ops.ipam.default.md.ports.hedgedoc
+  ];
 
   system.stateVersion = "25.05";
 

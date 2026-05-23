@@ -12,6 +12,8 @@
     # https://discourse.nixos.org/t/passing-parameters-into-import/34082/4
     (import ./oidc_clients/hedgedoc.nix args)
     (import ./oidc_clients/sftpgo.nix args)
+    (import ./oidc_clients/immich.nix args)
+    (import ./oidc_clients/amalthea.nix args)
   ];
 
   users.users."authelia-main" = {

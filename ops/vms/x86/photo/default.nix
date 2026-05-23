@@ -12,14 +12,22 @@
   ];
 
   fileSystems."/data" = {
-    device = "192.168.75.1:/grave/photo";
+    device = "192.168.75.1:/grave/photos";
     fsType = "nfs";
     options = [
       "nolock"
-      "netdev"
+      "_netdev"
       "nconnect=16"
+      "noauto"            # Don't mount automatically at boot
+      "x-systemd.automount" # Mount on first access instead
+      "x-systemd.idle-timeout=600"
     ];
   };
+
+  # pin the immich user uid so we can set it on the "outside" for access to the nfs share
+  users.users.immich.isSystemUser = true;
+  users.users.immich.uid = 994;
+  users.groups.immich.gid = 992;
 
   age = {
     secrets = {
@@ -33,7 +41,10 @@
     ];
   };
 
-  environment.systemPackages = with pkgs; [ nfs-utils ];
+  environment.systemPackages = with pkgs; [
+    nfs-utils
+    ripgrep
+  ];
 
   services.immich = {
     enable = true;
@@ -43,9 +54,18 @@
 
     secretsFile = config.age.secrets.photo_immich_secrets_file.path;
     accelerationDevices = null;
-    mediaLocation = "/data/immich";
+    mediaLocation = "/data/immich2";
   };
 
-  networking.hostName = "photo";
+  networking = {
+    hostName = "photo";
+    firewall = {
+      enable = true;
+        interfaces."enp1s0" = {
+        allowedTCPPorts = [ config.services.immich.port ];
+      };
+    };
+  };
+
   system.stateVersion = "25.05";
 }

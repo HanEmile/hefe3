@@ -7,6 +7,7 @@
   vmdisk,
   interfaces ? [ "virbr0" ],
   vcpu_count ? 4,
+  graphics ? null,
 }:
 {
   virtualisation.libvirt.connections."qemu:///system" = {
@@ -34,7 +35,7 @@
                 console.target.port = 0;
 
                 channel = null;
-                graphics = null;
+                inherit graphics;
 
                 video.model.type = "virtio";
                 video.model.vram = 32768;
