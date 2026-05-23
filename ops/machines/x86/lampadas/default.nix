@@ -1,4 +1,9 @@
-{ hefe, pkgs, lib, ... }:
+{
+  hefe,
+  pkgs,
+  lib,
+  ...
+}:
 { config, ... }:
 
 let
@@ -7,6 +12,7 @@ let
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPZi43zHEsoWaQomLGaftPE5k0RqVrZyiTtGqZlpWsew emile@caladan"
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEzLZ56SEgwZZ0OusTdSDDhpMlxSg1zPNdRLuxKOfrR5 emile@chusuk"
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMoHWyC9r0LVk6UlkhBWAJph0F6KHYHh83EI5U9wtfq2 shortcuts@ginaz"
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINF0ZzsWifXi/LimRmT+0PVWXXtrXHqW59vmliTUKJHw root@Dream-Machine-Professional"
   ];
 in
 {
@@ -36,6 +42,8 @@ in
   };
 
   boot = {
+
+
     loader = {
       systemd-boot.enable = true;
       efi.canTouchEfiVariables = true;
@@ -46,6 +54,14 @@ in
       "coretemp"
       "nct6775"
     ];
+
+    # network fix, for
+    # [3370602.456686] r8169 0000:02:00.0 enp2s0: NETDEV WATCHDOG: CPU: 1: transmit queue 0 timed out 5008 ms
+    # [3370602.469156] r8169 0000:02:00.0 enp2s0: rtl_txcfg_empty_cond == 0 (loop: 42, delay: 100).
+    # [3370602.479155] r8169 0000:02:00.0 enp2s0: rtl_rxtx_empty_cond == 0 (loop: 42, delay: 100).
+    # extraModulePackages = [ config.boot.kernelPackages.r8168 ];
+    # blacklistedKernelModules = [ "r8169" ];
+
     initrd = {
       availableKernelModules = [ "r8169" ];
       systemd.users.root.shell = "/bin/cryptsetup-askpass";
@@ -89,13 +105,23 @@ in
       8080 # filebrowser web
 
       # for NFSv3; view with `rpcinfo -p`
-      111 2049 4000 4001 4002 20048 # nfs
+      111
+      2049
+      4000
+      4001
+      4002
+      20048 # nfs
     ];
     firewall.allowedUDPPorts = [
       5201 # iperf
 
       # for NFSv3; view with `rpcinfo -p`
-      111 2049 4000 4001  4002 20048 # nfs
+      111
+      2049
+      4000
+      4001
+      4002
+      20048 # nfs
     ];
 
     nameservers = [
@@ -153,17 +179,18 @@ in
     "d /data/time_machine 0755 emile users"
   ];
 
-  environment.systemPackages = with pkgs; [
-    vim
-    tailscale
-    git
-    unzip
-    tmux
-    htop
-    immich-go
-    dust
-    dmidecode
-  ];
+  environment = {
+    systemPackages = with pkgs; [
+      vim git unzip
+      tmux htop dust
+      tailscale
+      immich-go
+      dmidecode
+    ];
+    variables = {
+      "REDIS_HOSTNAME" = "immich_redis";
+    };
+  };
 
   programs.mosh.enable = true;
 
@@ -171,11 +198,6 @@ in
     secrets = {
       immich_secrets_file = {
         file = hefe.ops.secrets."immich_secrets_file.age";
-      };
-      lampadas_grafana_admin_password = {
-        file = hefe.ops.secrets."lampadas_grafana_admin_password.age";
-        owner = "grafana";
-        group = "grafana";
       };
       lampadas_pinto_pike_ts_net_crt = {
         file = hefe.ops.secrets."lampadas_pinto_pike_ts_net_crt.age";
@@ -293,21 +315,6 @@ in
                   send_timeout         600s;
                 '';
               };
-            locations."/grafana" =
-              let
-                host = config.services.grafana.settings.server.http_addr;
-                port = config.services.grafana.settings.server.http_port;
-              in
-              {
-                proxyPass = "http://${host}:${toString port}";
-                proxyWebsockets = true;
-                extraConfig = ''
-                  client_max_body_size 50000M;
-                  proxy_read_timeout   600s;
-                  proxy_send_timeout   600s;
-                  send_timeout         600s;
-                '';
-              };
             locations."/makhor" =
               let
                 host = config.services.makhor.address;
@@ -372,7 +379,7 @@ in
 
     tailscale = {
       enable = true;
-      extraUpFlags = [ "--ssh" ];
+      extraUpFlags = [ "--ssh --advertise-exit-node" ];
     };
 
     btrfs.autoScrub = {
@@ -383,204 +390,8 @@ in
     prometheus = {
       enable = true;
       port = 9090;
+      retentionTime = "365d";
       listenAddress = hefe.ops.ipam."tailscale".lampadas.v4;
-      scrapeConfigs = [
-        {
-          job_name = "node";
-          static_configs = [
-            {
-              targets = [
-                "localhost:${toString config.services.prometheus.exporters.node.port}"
-              ];
-            }
-          ];
-        }
-        {
-          job_name = "systemd";
-          static_configs = [
-            {
-              targets = [
-                "localhost:${toString config.services.prometheus.exporters.systemd.port}"
-              ];
-            }
-          ];
-        }
-        {
-          job_name = "smartctl";
-          static_configs = [
-            {
-              targets = [
-                "localhost:${toString config.services.prometheus.exporters.smartctl.port}"
-              ];
-            }
-          ];
-        }
-
-        # collect blackbox exporter's operational metrics.
-        {
-          job_name = "blackbox_exporter";
-          static_configs = [
-            {
-              targets = let
-                blackbox = config.services.prometheus.exporters.blackbox;
-                host = blackbox.listenAddress;
-                port = toString blackbox.port;
-              in [
-                "${host}:${port}"
-              ];
-            }
-          ];
-        }
-
-        # blackbox http/s probes
-        {
-          job_name = "blackbox";
-          scheme = "http";
-          metrics_path = "/probe";
-          params = {
-            module = [ "http_2xx" "tls_connect" ];
-          };
-          static_configs = [
-            {
-              targets = [
-                "http://emile.space"
-                "https://emile.space"
-                "https://git.emile.space"
-                "https://md.emile.space"
-                "https://photo.emile.space"
-                "https://social.emile.space"
-                "https://sso.emile.space"
-                "https://tmp.emile.space"
-              ];
-              labels = {
-                connectivity = "external";
-              };
-            }
-          ];
-
-          relabel_configs = [
-            {
-              source_labels = [ "__address__" ];
-              target_label = "__param_target";
-            }
-            {
-              source_labels = [ "__param_target" ];
-              target_label = "instance";
-            }
-            {
-              target_label = "__address__";
-              replacement = let
-                blackbox = config.services.prometheus.exporters.blackbox;
-                host = blackbox.listenAddress;
-                port = toString blackbox.port;
-              in "${host}:${port}";
-            }
-          ];
-        }
-      ];
-      exporters = {
-        node = {
-          enable = true; # port 9100
-          listenAddress = "127.0.0.1";
-        };
-        systemd = {
-          enable = true; # port 9558
-          listenAddress = "127.0.0.1";
-        };
-        smartctl = {
-          enable = true; # port 9633
-          listenAddress = "127.0.0.1";
-        };
-
-        blackbox = {
-          # port 9374
-          enable = true;
-          listenAddress = "127.0.0.1";
-          configFile = (pkgs.formats.yaml { }).generate "blackboxConfig.yml" {
-            modules = {
-              http_2xx = {
-                prober = "http";
-                timeout = "5s";
-                http = {
-                  valid_http_versions = [
-                    "HTTP/1.1"
-                    "HTTP/2.0"
-                  ];
-                  valid_status_codes = [ ]; # Defaults to 2xx
-                  method = "GET";
-                  follow_redirects = true;
-                  fail_if_ssl = false;
-                  fail_if_not_ssl = true;
-                  tls_config = {
-                    insecure_skip_verify = false;
-                  };
-                  preferred_ip_protocol = "ip4"; # defaults to "ip6"
-                  ip_protocol_fallback = false; # no fallback to "ip6"
-                };
-              };
-
-              tls_connect = {
-                prober = "tcp";
-                timeout = "5s";
-                tcp = {
-                  tls = true;
-                };
-              };
-            };
-          };
-        };
-      };
-    };
-
-    grafana = {
-      enable = true;
-      settings = {
-        server =
-          let
-            crt = config.age.secrets."lampadas_pinto_pike_ts_net_crt".path;
-            key = config.age.secrets."lampadas_pinto_pike_ts_net_key".path;
-          in
-          {
-            serve_from_sub_path = true;
-            protocol = "http";
-            domain = "lampadas.pinto-pike.ts.net";
-            http_port = 3000;
-            http_addr = "127.0.0.1";
-            root_url = "%(protocol)s://%(domain)s:%(http_port)s/grafana";
-            enable_gzip = true;
-
-            cert_file = crt;
-            cert_key = key;
-          };
-
-        security =
-          let
-            path = config.age.secrets."lampadas_grafana_admin_password".path;
-          in
-          {
-            admin_user = "admin";
-            admin_password = "$__file{${path}}";
-          };
-      };
-
-      provision = {
-        enable = true;
-
-        datasources.settings.datasources = [
-          # Provisioning a built-in data source
-          {
-            name = "Prometheus";
-            type = "prometheus";
-            url = "http://${config.services.prometheus.listenAddress}:${toString config.services.prometheus.port}";
-            isDefault = true;
-            editable = false;
-          }
-        ];
-
-        # Note: removing attributes from the above `datasources.settings.datasources` is not currently enough for them to be deleted;
-        # One needs to use the following option:
-        # datasources.settings.deleteDatasources = [ { name = "foo"; orgId = 1; } { name = "bar"; orgId = 1; } ];
-      };
     };
 
     avahi = {
@@ -637,7 +448,7 @@ in
       # passwordFile = "/etc/nixos/keys/restic_password";
       passwordFile = config.age.secrets."storagebox_bx11_restic_password".path;
 
-      paths = [ "/var/vmail" ];
+      paths = [ "/var/lib/immich" ];
       pruneOpts = [
         "--keep-daily 7"
         "--keep-weekly 5"
@@ -645,7 +456,6 @@ in
         "--keep-yearly 75"
       ];
     };
-
 
     # shares
     #
@@ -663,7 +473,7 @@ in
       settings = {
         global = {
           ## Browsing/Identification ###
-          "workgroup" = "Pacific";
+          "workgroup" = "WORKGROUP";
           "server string" = "lampadas";
           "disable netbios" = "yes";
 
@@ -742,6 +552,8 @@ in
           # make SMB work faster when being accessed from macos
           "file_ids_off" = "yes";
           "signing_required" = "no";
+          "protocol_vers_map" = "6";
+          "port445" = "no_netbios";
 
           # macOS / iOS config, adaption from https://wiki.samba.org/index.php/Configure_Samba_to_Work_Better_with_Mac_OS_X
           "fruit:metadata" = "stream";
@@ -769,6 +581,13 @@ in
             "fruit"
             "streams_xattr"
           ];
+
+          # other additions
+          "strict sync" = "no";
+          "sync always" = "no";
+          "oplocks" = "yes";
+          "kernel oplocks" = "no";
+          "read ahead factor" = "4";
         };
 
         private = {
@@ -813,11 +632,13 @@ in
   fileSystems."/mnt/storagebox-bx11" = {
     device = "//u331921.your-storagebox.de/backup";
     fsType = "cifs";
-    options = let
-      conn_config = config.age.secrets."storagebox_bx11_connection_config".path;
-    in [
-      "_netdev,x-systemd.automount,noauto,x-systemd.idle-timeout=60s,x-systemd.device-timeout=5s,x-systemd.mount-timeout=5s,credentials=${conn_config}"
-    ];
+    options =
+      let
+        conn_config = config.age.secrets."storagebox_bx11_connection_config".path;
+      in
+      [
+        "_netdev,x-systemd.automount,noauto,x-systemd.idle-timeout=60s,x-systemd.device-timeout=5s,x-systemd.mount-timeout=5s,credentials=${conn_config}"
+      ];
   };
 
   system = {
