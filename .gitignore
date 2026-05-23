@@ -3,3 +3,15 @@ result-*
 system
 system-*
 .DS_Store
+
+# rust / build outputs
+target/
+
+# emacs backups/locks
+*~
+\#*\#
+.\#*
+
+# IDA-Pro project state
+*.gpr
+*.rep/
