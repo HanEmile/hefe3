@@ -45,6 +45,9 @@ in
     (vm "amalthea") # astrophotography
     (vm "late") # community
     (vm "demo01") # image-bootstrap demo VM
+    (vm "sb1") # standby linux vm
+    (vm "sb2") # standby linux vm
+    (vm "sb3") # standby linux vm
 
     # ctf
 

@@ -260,112 +260,417 @@ func collectAll() ([]VMStat, map[string]VirshInfo) {
 
 // --------- SVG network flow ----------
 
+// flowEntry describes one DNS-fronted (or tailscale-fronted, or VM-only)
+// path through the medano network. Hard-coded because the mappings live in
+// medano's nginx vhost configs and would otherwise need scraping.
+type flowEntry struct {
+	DNS     string // public DNS name, "" for VM-only
+	PubIP   string // public IP / tailscale IP, "" if N/A
+	Iface   string // eno1, tailscale0, internal
+	TLS     bool   // https terminated at medano nginx?
+	Nginx   bool   // does this path traverse the medano nginx?
+	Bridge  string // virbr0/virbr1/virbr2, or "" for host-local
+	VM      string // VM name (must match a VMStat.Name) or "" if host-local
+	Service string // backend service name
+	Port    string // backend port (with /proto if useful)
+	Notes   string // small annotation, optional
+}
+
 func buildSVG(vms []VMStat) template.HTML {
-	byBridge := map[string][]VMStat{}
-	for _, vm := range vms {
-		byBridge[vm.Bridge] = append(byBridge[vm.Bridge], vm)
-	}
-	bridges := make([]string, 0, len(byBridge))
-	for k := range byBridge {
-		bridges = append(bridges, k)
-	}
-	sort.Strings(bridges)
-	for _, b := range bridges {
-		sort.Slice(byBridge[b], func(i, j int) bool { return byBridge[b][i].Name < byBridge[b][j].Name })
+	// ---- hard-coded medano flow table ----
+	flows := []flowEntry{
+		{DNS: "medano.emile.space", PubIP: "95.217.35.60", Iface: "eno1", TLS: true, Nginx: true, Bridge: "virbr0", VM: "naraj", Service: "nginx", Port: "80", Notes: "static"},
+		{DNS: "tmp.medano.emile.space", PubIP: "95.217.35.60", Iface: "eno1", TLS: true, Nginx: true, Bridge: "virbr0", VM: "tmp", Service: "nginx", Port: "80", Notes: "autoindex"},
+		{DNS: "md.medano.emile.space", PubIP: "95.217.35.60", Iface: "eno1", TLS: true, Nginx: true, Bridge: "virbr0", VM: "md", Service: "hedgedoc", Port: "9091"},
+		{DNS: "auth.medano.emile.space", PubIP: "95.217.35.60", Iface: "eno1", TLS: true, Nginx: true, Bridge: "virbr0", VM: "auth", Service: "authelia", Port: "9091"},
+		{DNS: "photo.medano.emile.space", PubIP: "95.217.35.60", Iface: "eno1", TLS: true, Nginx: true, Bridge: "virbr0", VM: "photo", Service: "immich", Port: "9091"},
+		{DNS: "amaltheea.medano.emile.space", PubIP: "95.217.35.60", Iface: "eno1", TLS: true, Nginx: true, Bridge: "virbr0", VM: "amalthea", Service: "backend", Port: "8080"},
+		{DNS: "status.medano.emile.space", PubIP: "95.217.35.60", Iface: "eno1", TLS: true, Nginx: true, Bridge: "", VM: "", Service: "status-board", Port: "8090", Notes: "127.0.0.1"},
+		{DNS: "rss.pinto-pike.ts.net", PubIP: "100.x", Iface: "tailscale0", TLS: false, Nginx: false, Bridge: "virbr0", VM: "rss", Service: "miniflux", Port: "8080"},
+		{DNS: "data.pinto-pike.ts.net", PubIP: "100.x", Iface: "tailscale0", TLS: false, Nginx: false, Bridge: "virbr0", VM: "data", Service: "sftpgo", Port: "8080/22"},
+		{DNS: "arr (no DNS)", PubIP: "wg0", Iface: "wg0", TLS: false, Nginx: false, Bridge: "virbr1", VM: "arr", Service: "jellyfin", Port: "8096", Notes: "via rou"},
 	}
 
-	const W = 1100
-	const LH = 60
-	const PAD = 20
-	maxPer := 1
-	for _, b := range byBridge {
-		if len(b) > maxPer {
-			maxPer = len(b)
+	// VM-only entries (no DNS hostname). These appear as VM-layer boxes
+	// with a small "internal" tag, dangling off their bridge.
+	internalOnly := map[string]bool{
+		"miki": true, "late": true, "social": true,
+		"demo01": true, "sb1": true, "sb2": true, "sb3": true,
+	}
+
+	// Index VMStat by name so we can colour the VM boxes.
+	vmByName := map[string]VMStat{}
+	bridgeOf := map[string]string{}
+	for _, v := range vms {
+		vmByName[v.Name] = v
+		if v.Bridge != "" {
+			bridgeOf[v.Name] = "virbr" + v.Bridge
 		}
 	}
-	H := 240 + maxPer*LH + 40
+
+	vmCls := func(name string) string {
+		v, ok := vmByName[name]
+		if !ok {
+			return "box-vm-warn"
+		}
+		if len(v.Probes) > 0 {
+			allUp := true
+			for _, p := range v.Probes {
+				if !p.Up {
+					allUp = false
+					break
+				}
+			}
+			if allUp {
+				return "box-vm-ok"
+			}
+			return "box-vm-bad"
+		}
+		if v.Reachable {
+			return "box-vm-warn"
+		}
+		return "box-vm-bad"
+	}
+
+	// ---- collect layer items ----
+	// Layer 1: DNS hostnames (from flows where DNS != "")
+	// Layer 2: public IPs / tailscale IPs (distinct)
+	// Layer 3: interfaces (eno1, tailscale0, wg0, internal)
+	// Layer 4: nginx vhost markers (one per flow that goes through nginx) + bypass marker
+	// Layer 5: bridges (virbr0, virbr1, virbr2) + "host" pseudo-bridge
+	// Layer 6: VMs (from flows + internal-only)
+	// Layer 7 (tucked next to VM): service:port
+
+	// We'll collapse layer 7 into the VM box (two lines: name/IP + service:port)
+	// so we still have six logical layers as requested.
+
+	// Distinct values per layer in stable order:
+	type strset struct {
+		order []string
+		seen  map[string]bool
+	}
+	add := func(s *strset, v string) {
+		if v == "" || s.seen[v] {
+			return
+		}
+		if s.seen == nil {
+			s.seen = map[string]bool{}
+		}
+		s.seen[v] = true
+		s.order = append(s.order, v)
+	}
+
+	var dnsSet, pubIPSet, ifaceSet, vhostSet, bridgeSet, vmSet strset
+	for _, f := range flows {
+		add(&dnsSet, f.DNS)
+		add(&pubIPSet, f.PubIP)
+		add(&ifaceSet, f.Iface)
+		if f.Nginx {
+			add(&vhostSet, f.DNS) // one nginx vhost node per flow
+		}
+		if f.Bridge != "" {
+			add(&bridgeSet, f.Bridge)
+		} else {
+			add(&bridgeSet, "host")
+		}
+		if f.VM != "" {
+			add(&vmSet, f.VM)
+		} else {
+			add(&vmSet, "(host) "+f.Service)
+		}
+	}
+	// add internal-only VMs to the VM layer
+	for _, v := range vms {
+		if internalOnly[v.Name] {
+			add(&vmSet, v.Name)
+			b := "virbr" + v.Bridge
+			if v.Bridge == "" {
+				b = "host"
+			}
+			add(&bridgeSet, b)
+		}
+	}
+	// also include "bypass" marker in vhost layer for non-nginx flows so the
+	// layer isn't empty for tailscale paths.
+	hasBypass := false
+	for _, f := range flows {
+		if !f.Nginx {
+			hasBypass = true
+			break
+		}
+	}
+	if hasBypass {
+		add(&vhostSet, "(bypass nginx)")
+	}
+
+	// ---- layout ----
+	const (
+		layerCount = 6
+		colW       = 220 // width of each layer column
+		colGap     = 30  // gap between columns
+		boxW       = 190
+		boxH       = 38
+		vboxH      = 50 // taller for VM boxes (two lines + service)
+		rowH       = 18 // vertical spacing between rows within a layer
+		topPad     = 70
+		leftPad    = 30
+		bottomPad  = 30
+	)
+	layerNames := []string{"DNS hostname", "public IP", "interface", "vhost / bypass", "bridge", "VM + service"}
+	layerSets := []*strset{&dnsSet, &pubIPSet, &ifaceSet, &vhostSet, &bridgeSet, &vmSet}
+
+	// compute row heights so each layer is vertically distributed
+	maxRows := 1
+	for _, s := range layerSets {
+		if len(s.order) > maxRows {
+			maxRows = len(s.order)
+		}
+	}
+	// Use a fixed slot height; each layer centers its items vertically.
+	const slotH = 56
+	innerH := maxRows * slotH
+	if innerH < 240 {
+		innerH = 240
+	}
+	if innerH > 900 {
+		innerH = 900
+	}
+	totalH := topPad + innerH + bottomPad
+	totalW := leftPad + layerCount*colW + (layerCount-1)*colGap + leftPad
+
+	// position helpers
+	colX := func(layer int) int {
+		return leftPad + layer*(colW+colGap)
+	}
+	rowY := func(layer, idx int) int {
+		n := len(layerSets[layer].order)
+		if n == 0 {
+			return topPad + innerH/2
+		}
+		// distribute n items across innerH
+		step := innerH / (n + 1)
+		return topPad + (idx+1)*step
+	}
+
+	// box renderer
+	esc := html.EscapeString
 
 	var sb strings.Builder
-	fmt.Fprintf(&sb, `<svg viewBox="0 0 %d %d" width="100%%" height="%d" xmlns="http://www.w3.org/2000/svg">`, W, H, H)
+	fmt.Fprintf(&sb, `<svg viewBox="0 0 %d %d" width="%d" height="%d" xmlns="http://www.w3.org/2000/svg" style="min-width:%dpx">`, totalW, totalH, totalW, totalH, totalW)
 	sb.WriteString(`<defs><style>
-text { font-family: -apple-system, sans-serif; font-size: 12px; fill: #eee; }
+text { font-family: -apple-system, system-ui, sans-serif; font-size: 12px; fill: #eee; }
+text.mono { font-family: ui-monospace, Menlo, monospace; }
 .dim { fill: #888; font-size: 10px; }
+.layer-title { fill: #6aa9ff; font-size: 11px; letter-spacing: .5px; text-transform: uppercase; }
 .box-host { fill: #1f3d5a; stroke: #4d9fff; stroke-width: 1; }
-.box-bridge { fill: #2a2a2a; stroke: #666; stroke-width: 1; }
+.box-iface { fill: #1a2c45; stroke: #6aa9ff; stroke-width: 1; }
+.box-dns { fill: #20283a; stroke: #88a; stroke-width: 1; }
+.box-vhost { fill: #2a2138; stroke: #b07cff; stroke-width: 1; }
+.box-vhost-bypass { fill: #2a2a2a; stroke: #888; stroke-dasharray: 3 2; stroke-width: 1; }
+.box-bridge { fill: #2a2a2a; stroke: #888; stroke-width: 1; }
 .box-vm-ok { fill: #182b1c; stroke: #2ea043; stroke-width: 1; }
 .box-vm-bad { fill: #2b1818; stroke: #f85149; stroke-width: 1; }
 .box-vm-warn { fill: #2a2418; stroke: #d29922; stroke-width: 1; }
-.edge { stroke: #555; stroke-width: 1; fill: none; }
-.edge-active { stroke: #4d9fff; stroke-width: 1.5; fill: none; }
-.label-link { fill: #888; font-size: 9px; }
+.box-host-svc { fill: #182233; stroke: #4d9fff; stroke-dasharray: 3 2; stroke-width: 1; }
+.edge { stroke: #444; stroke-width: 1; fill: none; }
+.edge-tls { stroke: #6aa9ff; stroke-width: 1.2; fill: none; }
+.edge-bypass { stroke: #b07cff; stroke-width: 1.2; stroke-dasharray: 4 2; fill: none; }
+.tag { font-size: 9px; fill: #b07cff; }
+.tag-tls { font-size: 9px; fill: #2ea043; }
+.tag-int { font-size: 9px; fill: #d29922; }
+.legend-bg { fill: #181818; stroke: #333; }
 </style>
 <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-  <path d="M0,0 L10,5 L0,10 z" fill="#555"/>
+  <path d="M0,0 L10,5 L0,10 z" fill="#444"/>
+</marker>
+<marker id="arrow-tls" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+  <path d="M0,0 L10,5 L0,10 z" fill="#6aa9ff"/>
+</marker>
+<marker id="arrow-bypass" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+  <path d="M0,0 L10,5 L0,10 z" fill="#b07cff"/>
 </marker>
 </defs>`)
-	cx := W / 2
-	// internet
-	fmt.Fprintf(&sb, `<rect x="%d" y="10" width="180" height="36" rx="4" class="box-host"/>`, cx-90)
-	fmt.Fprintf(&sb, `<text x="%d" y="33" text-anchor="middle">internet</text>`, cx)
-	// arrow down
-	fmt.Fprintf(&sb, `<line x1="%d" y1="46" x2="%d" y2="70" class="edge-active" marker-end="url(#arrow)"/>`, cx, cx)
-	fmt.Fprintf(&sb, `<text class="label-link" x="%d" y="60">443/tcp</text>`, cx+5)
-	// medano
-	fmt.Fprintf(&sb, `<rect x="%d" y="74" width="240" height="40" rx="4" class="box-host"/>`, cx-120)
-	fmt.Fprintf(&sb, `<text x="%d" y="92" text-anchor="middle">medano (eno1)</text>`, cx)
-	fmt.Fprintf(&sb, `<text x="%d" y="106" text-anchor="middle" class="dim">95.217.35.60 — nginx + virsh + nfs</text>`, cx)
 
-	nB := len(bridges)
-	bridgeW := 200
-	bridgeXs := map[string]int{}
-	bridgeY := 150
-	for i, b := range bridges {
-		var x int
-		if nB > 1 {
-			spacing := (W - PAD*2 - bridgeW*nB) / (nB - 1)
-			x = PAD + i*(bridgeW+spacing)
-		} else {
-			x = (W - bridgeW) / 2
-		}
-		bridgeXs[b] = x + bridgeW/2
-		fmt.Fprintf(&sb, `<line x1="%d" y1="114" x2="%d" y2="%d" class="edge" marker-end="url(#arrow)"/>`, cx, x+bridgeW/2, bridgeY)
-		fmt.Fprintf(&sb, `<rect x="%d" y="%d" width="%d" height="36" rx="4" class="box-bridge"/>`, x, bridgeY, bridgeW)
-		fmt.Fprintf(&sb, `<text x="%d" y="%d" text-anchor="middle">virbr %s</text>`, x+bridgeW/2, bridgeY+22, html.EscapeString(b))
+	// background
+	fmt.Fprintf(&sb, `<rect x="0" y="0" width="%d" height="%d" fill="#141414"/>`, totalW, totalH)
+
+	// layer headers
+	for i, name := range layerNames {
+		x := colX(i) + boxW/2
+		fmt.Fprintf(&sb, `<text class="layer-title" x="%d" y="%d" text-anchor="middle">%d. %s</text>`, x, 30, i+1, esc(name))
+		// faint column divider
+		fmt.Fprintf(&sb, `<line x1="%d" y1="40" x2="%d" y2="%d" stroke="#1f1f1f" stroke-width="1"/>`, x, x, totalH-bottomPad+10)
 	}
 
-	vmTop := bridgeY + 60
-	boxW := 130
-	boxH := 32
-	for _, b := range bridges {
-		bx := bridgeXs[b]
-		for i, vm := range byBridge[b] {
-			y := vmTop + i*LH
-			x := bx - boxW/2
-			cls := "box-vm-warn"
-			if len(vm.Probes) > 0 {
-				allUp := true
-				for _, p := range vm.Probes {
-					if !p.Up {
-						allUp = false
-						break
-					}
-				}
-				if allUp {
-					cls = "box-vm-ok"
-				} else {
-					cls = "box-vm-bad"
-				}
-			} else if vm.Reachable {
-				cls = "box-vm-warn"
-			} else {
-				cls = "box-vm-bad"
+	// position lookups
+	pos := make([]map[string]struct{ x, y int }, layerCount)
+	for li := 0; li < layerCount; li++ {
+		pos[li] = map[string]struct{ x, y int }{}
+		for i, item := range layerSets[li].order {
+			pos[li][item] = struct{ x, y int }{colX(li), rowY(li, i)}
+		}
+	}
+
+	// draw boxes
+	drawBox := func(li int, item string) {
+		p := pos[li][item]
+		x, y := p.x, p.y-boxH/2
+		h := boxH
+		switch li {
+		case 0: // DNS
+			fmt.Fprintf(&sb, `<rect x="%d" y="%d" width="%d" height="%d" rx="4" class="box-dns"/>`, x, y, boxW, h)
+			fmt.Fprintf(&sb, `<text class="mono" x="%d" y="%d" text-anchor="middle">%s</text>`, x+boxW/2, y+22, esc(item))
+		case 1: // pub IP
+			fmt.Fprintf(&sb, `<rect x="%d" y="%d" width="%d" height="%d" rx="4" class="box-host"/>`, x, y, boxW, h)
+			fmt.Fprintf(&sb, `<text class="mono" x="%d" y="%d" text-anchor="middle">%s</text>`, x+boxW/2, y+22, esc(item))
+		case 2: // iface
+			fmt.Fprintf(&sb, `<rect x="%d" y="%d" width="%d" height="%d" rx="4" class="box-iface"/>`, x, y, boxW, h)
+			fmt.Fprintf(&sb, `<text x="%d" y="%d" text-anchor="middle">%s</text>`, x+boxW/2, y+22, esc(item))
+		case 3: // vhost
+			cls := "box-vhost"
+			if item == "(bypass nginx)" {
+				cls = "box-vhost-bypass"
 			}
-			fmt.Fprintf(&sb, `<line x1="%d" y1="%d" x2="%d" y2="%d" class="edge"/>`, bx, bridgeY+36, bx, y)
-			fmt.Fprintf(&sb, `<rect x="%d" y="%d" width="%d" height="%d" rx="3" class="%s"/>`, x, y, boxW, boxH, cls)
-			fmt.Fprintf(&sb, `<text x="%d" y="%d" text-anchor="middle">%s</text>`, bx, y+13, html.EscapeString(vm.Name))
-			fmt.Fprintf(&sb, `<text x="%d" y="%d" text-anchor="middle" class="dim">%s</text>`, bx, y+26, html.EscapeString(vm.IP))
+			fmt.Fprintf(&sb, `<rect x="%d" y="%d" width="%d" height="%d" rx="4" class="%s"/>`, x, y, boxW, h, cls)
+			label := item
+			if item != "(bypass nginx)" {
+				label = "nginx: " + item
+			}
+			fmt.Fprintf(&sb, `<text class="mono" x="%d" y="%d" text-anchor="middle">%s</text>`, x+boxW/2, y+16, esc(label))
+			if item != "(bypass nginx)" {
+				fmt.Fprintf(&sb, `<text class="tag-tls" x="%d" y="%d" text-anchor="middle">TLS</text>`, x+boxW/2, y+30)
+			}
+		case 4: // bridge
+			fmt.Fprintf(&sb, `<rect x="%d" y="%d" width="%d" height="%d" rx="4" class="box-bridge"/>`, x, y, boxW, h)
+			fmt.Fprintf(&sb, `<text x="%d" y="%d" text-anchor="middle">%s</text>`, x+boxW/2, y+22, esc(item))
+		case 5: // VM + service
+			// look up the flow(s) for this VM to pull service:port
+			var svc, port, ip string
+			isHost := strings.HasPrefix(item, "(host) ")
+			for _, f := range flows {
+				if f.VM == item || (isHost && f.VM == "" && "(host) "+f.Service == item) {
+					svc = f.Service
+					port = f.Port
+				}
+			}
+			if v, ok := vmByName[item]; ok {
+				ip = v.IP
+			}
+			cls := vmCls(item)
+			if isHost {
+				cls = "box-host-svc"
+			}
+			h = vboxH
+			y = p.y - h/2
+			fmt.Fprintf(&sb, `<rect x="%d" y="%d" width="%d" height="%d" rx="4" class="%s"/>`, x, y, boxW, h, cls)
+			fmt.Fprintf(&sb, `<text x="%d" y="%d" text-anchor="middle">%s</text>`, x+boxW/2, y+14, esc(strings.TrimPrefix(item, "(host) ")))
+			if ip != "" {
+				fmt.Fprintf(&sb, `<text class="mono dim" x="%d" y="%d" text-anchor="middle">%s</text>`, x+boxW/2, y+28, esc(ip))
+			}
+			if svc != "" {
+				fmt.Fprintf(&sb, `<text class="mono" x="%d" y="%d" text-anchor="middle" style="font-size:10px;fill:#aac">%s:%s</text>`, x+boxW/2, y+42, esc(svc), esc(port))
+			} else if internalOnly[item] {
+				fmt.Fprintf(&sb, `<text class="tag-int" x="%d" y="%d" text-anchor="middle">internal</text>`, x+boxW/2, y+42)
+			}
 		}
 	}
+
+	for li := 0; li < layerCount; li++ {
+		for _, item := range layerSets[li].order {
+			drawBox(li, item)
+		}
+	}
+
+	// draw edges by walking each flow through the six layers
+	edge := func(li int, from, to string, style string) {
+		pf, ok1 := pos[li][from]
+		pt, ok2 := pos[li+1][to]
+		if !ok1 || !ok2 {
+			return
+		}
+		x1 := pf.x + boxW
+		y1 := pf.y
+		x2 := pt.x
+		y2 := pt.y
+		// cubic bezier between layers for a clean fan-out
+		c1x := x1 + (x2-x1)/2
+		c2x := x2 - (x2-x1)/2
+		cls := "edge"
+		marker := "arrow"
+		switch style {
+		case "tls":
+			cls = "edge-tls"
+			marker = "arrow-tls"
+		case "bypass":
+			cls = "edge-bypass"
+			marker = "arrow-bypass"
+		}
+		fmt.Fprintf(&sb, `<path d="M%d,%d C%d,%d %d,%d %d,%d" class="%s" marker-end="url(#%s)"/>`, x1, y1, c1x, y1, c2x, y2, x2, y2, cls, marker)
+	}
+
+	for _, f := range flows {
+		style := "default"
+		if f.TLS {
+			style = "tls"
+		}
+		if !f.Nginx {
+			style = "bypass"
+		}
+		// layer 0->1
+		edge(0, f.DNS, f.PubIP, style)
+		// layer 1->2
+		edge(1, f.PubIP, f.Iface, style)
+		// layer 2->3
+		var vh string
+		if f.Nginx {
+			vh = f.DNS
+		} else {
+			vh = "(bypass nginx)"
+		}
+		edge(2, f.Iface, vh, style)
+		// layer 3->4
+		br := f.Bridge
+		if br == "" {
+			br = "host"
+		}
+		edge(3, vh, br, style)
+		// layer 4->5
+		vm := f.VM
+		if vm == "" {
+			vm = "(host) " + f.Service
+		}
+		edge(4, br, vm, style)
+	}
+	// internal-only VMs: draw a single edge from their bridge so they don't float
+	for _, v := range vms {
+		if !internalOnly[v.Name] {
+			continue
+		}
+		br := "virbr" + v.Bridge
+		if v.Bridge == "" {
+			br = "host"
+		}
+		edge(4, br, v.Name, "default")
+	}
+
+	// ---- legend ----
+	lx := totalW - 220
+	ly := totalH - 110
+	fmt.Fprintf(&sb, `<rect x="%d" y="%d" width="200" height="92" rx="4" class="legend-bg"/>`, lx, ly)
+	fmt.Fprintf(&sb, `<text x="%d" y="%d" class="layer-title">legend</text>`, lx+10, ly+16)
+	// VM colour swatches
+	fmt.Fprintf(&sb, `<rect x="%d" y="%d" width="14" height="10" class="box-vm-ok"/>`, lx+10, ly+24)
+	fmt.Fprintf(&sb, `<text x="%d" y="%d">all probes up</text>`, lx+30, ly+33)
+	fmt.Fprintf(&sb, `<rect x="%d" y="%d" width="14" height="10" class="box-vm-warn"/>`, lx+10, ly+38)
+	fmt.Fprintf(&sb, `<text x="%d" y="%d">reachable, no probes</text>`, lx+30, ly+47)
+	fmt.Fprintf(&sb, `<rect x="%d" y="%d" width="14" height="10" class="box-vm-bad"/>`, lx+10, ly+52)
+	fmt.Fprintf(&sb, `<text x="%d" y="%d">unreachable / probe fail</text>`, lx+30, ly+61)
+	// edge styles
+	fmt.Fprintf(&sb, `<line x1="%d" y1="%d" x2="%d" y2="%d" class="edge-tls"/>`, lx+10, ly+72, lx+24, ly+72)
+	fmt.Fprintf(&sb, `<text x="%d" y="%d">TLS via medano nginx</text>`, lx+30, ly+75)
+	fmt.Fprintf(&sb, `<line x1="%d" y1="%d" x2="%d" y2="%d" class="edge-bypass"/>`, lx+10, ly+84, lx+24, ly+84)
+	fmt.Fprintf(&sb, `<text x="%d" y="%d">tailscale / bypass</text>`, lx+30, ly+87)
+
 	sb.WriteString(`</svg>`)
 	return template.HTML(sb.String())
 }
