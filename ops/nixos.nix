@@ -95,33 +95,70 @@ let
       ${build hostname}
     '';
 
-  deployScriptFor =
-    hostname: # e.g. "medano"
-    host_suffix: # e.g. ".pinto-pike.ts.net" (mind the leading dot!)
+  # If sshTarget is set, deploy talks to that address directly. Otherwise
+  # uses the bare hostname (relies on ~/.ssh/config aliases).
+  # sshJump (optional): a host alias to ProxyJump through (e.g. "medano" for
+  # VMs that are only reachable via the hypervisor).
+  deployScriptForOpts =
+    { hostname,
+      host_suffix ? "",
+      sshTarget ? null,
+      sshJump ? null,
+    }:
+    let
+      target = if sshTarget != null then sshTarget else "${hostname}${host_suffix}";
+      sshOpts = if sshJump != null
+                then "-o ProxyJump=root@${sshJump} -o StrictHostKeyChecking=accept-new"
+                else "";
+    in
     pkgs.writeShellScriptBin "deploy" ''
       set -ue
 
       echo "[STEP 1/4]: Building host ${hostname}"
       ${build hostname}
 
-      echo "[STEP 2/4]: Copying build result to host"
-      nix-copy-closure \
-        --to root@${hostname}${host_suffix} \
+      echo "[STEP 2/4]: Copying build result to host (target=${target})"
+      NIX_SSHOPTS="${sshOpts}" nix-copy-closure \
+        --to root@${target} \
         --use-substitutes \
         --verbose \
         --gzip \
         ./result
 
       echo "[STEP 3/4]: Setting the profile"
-      ssh root@${hostname}${host_suffix} \
+      ssh ${sshOpts} root@${target} \
         nix-env \
           -p /nix/var/nix/profiles/system \
           --set $(readlink ./result)
 
       echo "[STEP 4/4]: Switching to configuration"
-      ssh root@${hostname}${host_suffix} \
+      ssh ${sshOpts} root@${target} \
         /nix/var/nix/profiles/system/bin/switch-to-configuration switch
     '';
+
+  deployScriptFor =
+    hostname:
+    host_suffix:
+    deployScriptForOpts { inherit hostname host_suffix; };
+
+  # VMs: pull primary IP from IPAM (default bridge first, then private bridge),
+  # and use medano as the ProxyJump.
+  deployVmScriptFor =
+    name:
+    let
+      ipam =
+        hefe.ops.ipam.default."${name}" or
+        hefe.ops.ipam.private."${name}" or
+        null;
+      target =
+        if ipam != null then ipam.v4
+        else throw "deployVmScriptFor: no IPAM entry for ${name}";
+    in
+    deployScriptForOpts {
+      hostname = name;
+      sshTarget = target;
+      sshJump = "medano";
+    };
 
   # Build a bootable qcow2 image from a VM's NixOS config.
   imageFor =
@@ -192,8 +229,13 @@ let
         config = (nixosFor hefe.ops."${type}".x86."${name}").config;
         toplevel = (nixosFor hefe.ops."${type}".x86."${name}").config.system.build.toplevel;
         build = buildScriptFor "${name}";
-        deploy = deployScriptFor "${name}" "";
-        deploy_ts = deployScriptFor "${name}" ".pinto-pike.ts.net";
+        # machines (bare-metal hosts): just hostname or hostname + .pinto-pike.ts.net
+        # vms: route through medano with the IPAM IP
+        deploy =
+          if type == "vms"
+          then deployVmScriptFor name
+          else deployScriptFor name "";
+        deploy_ts = deployScriptFor name ".pinto-pike.ts.net";
       }
       // (lib.optionalAttrs (type == "vms") {
         image = imageFor name;

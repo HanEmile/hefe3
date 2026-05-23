@@ -25,7 +25,17 @@ let
   irc = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICEYrtW4BEquFgD76uKTiUOo47P3CdVkNPJvKczaSrxG root@irc";
   data = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIABD8kIqLF0oTNKsRDSaK6FYigOrwpUtlePjxwtme+zg root@data";
   photo = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIITS9LszO4+ASdxvys9I5R58+3uwLzb1RwDopLU7JLlI root@photo";
-  amalthea = "";
+  amalthea = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID5EeR1ZbLxodwNhUKP9hARMZjf5MH3OuTZ+zGToO3ZH root@amalthea";
+
+  # new VM host keys (bootstrapped via image-flow)
+  naraj    = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJawJxofA1dSc9vuc3Phv4rmRcZ2QYe21AqvmQHYXJYd root@naraj";
+  git      = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDpPrG4aH7MRlTlctbEDl9Om7kd71S3s5mPYf8XkPRrf root@git";
+  miki     = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOysZe9m8ERyTTtoIRx5IPOPM8VXX3FoN+I4kanzNtdy root@miki";
+  social   = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDnX+fYOAQSoMxkH6W+JeP81kSdKhsf+BZnBU9XsfCHg root@social";
+  rss      = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAB1LLVc5yi7M9Tmf3iYkweNWf6Rhcmz1BihmAqt+n1s root@rss";
+  tmp      = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICrSItCIigpmQLpRForEznBHJprcx82BQeeweRmtQ7Pt root@tmp";
+  late     = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJVF84a4bUbSEzdUe/6E+3QarQtekMt9Od8QfVU5h9tb root@nixos";
+  demo01   = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIuR2E3bQYK6nszaVZ5zgIXjnTj3vH56W6tIbFGtEPOS root@demo01";
   # allHosts = [ medano arr ];
 
   # convinience function: the hosts themselves and all admins should be able to access the host
@@ -83,12 +93,17 @@ in
   "lampadas_grafana_admin_password.age" = for [ lampadas ];
 
 
+  # === rss ===
+  "miniflux_admin_creds.age" = for [ rss ];
+  "miniflux_oidc_client_secret.age" = for [ rss auth ];
+
+
   # === backups ===
-  "storagebox_bx11_restic_password.age" = for [ medano mail lampadas auth md photo data ];
+  "storagebox_bx11_restic_password.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea late ];
 
   # The config bx11 connection config contains this:
   # username=u331921
   # domain=u331921.your-storagebox.de
   # password=...
-  "storagebox_bx11_connection_config.age" = for [ medano mail lampadas auth md photo data ];
+  "storagebox_bx11_connection_config.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea late ];
 }

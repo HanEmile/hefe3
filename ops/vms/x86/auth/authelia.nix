@@ -14,6 +14,7 @@
     (import ./oidc_clients/sftpgo.nix args)
     (import ./oidc_clients/immich.nix args)
     (import ./oidc_clients/amalthea.nix args)
+    (import ./oidc_clients/miniflux.nix args)
   ];
 
   users.users."authelia-main" = {
