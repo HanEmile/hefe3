@@ -7,7 +7,7 @@
 
 {
   imports = [
-    ./hardware-configuration.nix
+    ../hardware-image.nix
     (import ../vm-base.nix { vmhost="medano"; } { inherit hefe pkgs; })
   ];
 

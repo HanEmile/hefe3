@@ -7,7 +7,7 @@ import ../libvirt-base.nix { inherit nixvirt; } {
   interfaces = [ "virbr0" ];
 
   # comment out after first install
-  install_vol = "/keep/pools/isopool/latest-nixos-minimal-x86_64-linux.iso";
+  # install_vol = "/keep/pools/isopool/latest-nixos-minimal-x86_64-linux.iso";
 
   # the main vm disk
   # cd /keep/pools/vmpool && qemu-img create -f qcow2 rss.qcow2 40G

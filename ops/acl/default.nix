@@ -23,6 +23,8 @@ let
     git = withDefault { };
     photo = withDefault { };
     social = withDefault { };
+    rss = withDefault { };
+    tmp = withDefault { };
 
     miki = withDefault { }
       //
