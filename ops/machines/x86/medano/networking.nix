@@ -205,6 +205,7 @@ in
             allowedTCPPorts = ports ++ [
               80
               443
+              8090 # status-board listens on 192.168.75.1:8090 for naraj
             ];
             allowedUDPPorts = ports;
           };

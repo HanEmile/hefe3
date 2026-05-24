@@ -14,7 +14,7 @@
       client_id = "miniflux";
       client_secret = "{{ secret \"${config.age.secrets.miniflux_oidc_client_secret.path}\" }}";
       public = false;
-      authorization_policy = "two_factor";
+      authorization_policy = "one_factor";
       redirect_uris = [
         "https://rss.pinto-pike.ts.net/oauth2/oidc/callback"
       ];

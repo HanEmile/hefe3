@@ -15,7 +15,7 @@
       # ; nix run nixpkgs#authelia -- crypto hash generate pbkdf2 --variant sha512 --random --random.length 72 --random.charset rfc3986
       client_secret = "{{ secret \"${config.age.secrets.amalthea_oidc_client_secret.path}\" }}";
       public = false;
-      authorization_policy = "two_factor";
+      authorization_policy = "one_factor";
       redirect_uris = [
       	"https://amalthea.medano.emile.space/auth/callback"
       	"http://127.0.0.1:19284/callback" # native app fixed port

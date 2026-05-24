@@ -14,7 +14,7 @@
       client_id = "gotosocial";
       client_secret = "{{ secret \"${config.age.secrets.gotosocial_oidc_client_secret.path}\" }}";
       public = false;
-      authorization_policy = "two_factor";
+      authorization_policy = "one_factor";
       redirect_uris = [ "https://social.emile.space/auth/callback" ];
       scopes = [
         "openid"

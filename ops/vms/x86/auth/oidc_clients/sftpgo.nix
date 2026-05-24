@@ -15,7 +15,7 @@
       # ; nix run nixpkgs#authelia -- crypto hash generate pbkdf2 --variant sha512 --random --random.length 72 --random.charset rfc3986
       client_secret = "{{ secret \"${config.age.secrets.sftpgo_oidc_client_secret.path}\" }}";
       public = false;
-      authorization_policy = "two_factor";
+      authorization_policy = "one_factor";
       redirect_uris = [ "https://data.pinto-pike.ts.net/*" ];
       scopes = [
         "openid"
