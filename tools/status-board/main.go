@@ -43,6 +43,7 @@ type Probe struct {
 }
 
 type Restic struct {
+	Configured  bool     // is vmBackups.enable true in nix for this VM?
 	Exists      string
 	Snapshots   int
 	AgeHours    float64  // hours since most recent snapshot
@@ -57,6 +58,15 @@ type Storagebox struct {
 	Used      int64
 	Avail     int64
 	UsedPct   float64
+}
+
+// Zpool holds one ZFS pool's capacity stats (read via `zpool list -Hp`).
+type Zpool struct {
+	Name    string
+	Total   int64
+	Alloc   int64
+	Free    int64
+	UsedPct float64
 }
 
 type Capacity struct {
@@ -95,6 +105,8 @@ type VMStat struct {
 
 var (
 	inventory     []VM
+	backupsEnabled = map[string]bool{}
+	zfsPoolNames   []string
 	listenAddr    = "127.0.0.1:8090"
 	storageboxDir = "/mnt/storagebox-bx11"
 	storageboxBackupDir = "/mnt/storagebox-bx11/backup"
@@ -297,7 +309,7 @@ func virshState() map[string]VirshInfo {
 
 func resticFor(vm string) Restic {
 	repo := filepath.Join(storageboxBackupDir, vm)
-	r := Restic{Exists: "no", RepoPath: repo}
+	r := Restic{Configured: backupsEnabled[vm], Exists: "no", RepoPath: repo}
 	if _, err := os.Stat(repo); err != nil {
 		return r
 	}
@@ -338,9 +350,43 @@ func resticFor(vm string) Restic {
 	return r
 }
 
+// zpoolsStatus reads `zpool list -Hp` for the configured zpools and
+// returns capacity/usage. Pools listed in zfsPoolNames but missing on
+// the host are silently skipped (no-op).
+func zpoolsStatus() []Zpool {
+	if len(zfsPoolNames) == 0 {
+		return nil
+	}
+	args := append([]string{"list", "-Hp", "-o", "name,size,alloc,free"}, zfsPoolNames...)
+	out, err := exec.Command("zpool", args...).Output()
+	if err != nil {
+		return nil
+	}
+	var pools []Zpool
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 4 {
+			continue
+		}
+		p := Zpool{Name: fields[0]}
+		p.Total, _ = strconv.ParseInt(fields[1], 10, 64)
+		p.Alloc, _ = strconv.ParseInt(fields[2], 10, 64)
+		p.Free, _ = strconv.ParseInt(fields[3], 10, 64)
+		if p.Total > 0 {
+			p.UsedPct = float64(p.Alloc) / float64(p.Total) * 100
+		}
+		pools = append(pools, p)
+	}
+	return pools
+}
+
 // Storagebox-wide free space probe (df on the CIFS mount).
+// The mount is autofs; if nothing has touched the path recently the
+// kernel hasn't actually mounted it yet, so df returns the parent fs.
+// A simple readdir forces autofs to mount before we measure.
 func storageboxStatus() Storagebox {
 	sb := Storagebox{}
+	_, _ = os.ReadDir(storageboxDir) // wake autofs
 	out, err := exec.Command("df", "-B1", "--output=size,used,avail,pcent", storageboxDir).Output()
 	if err != nil {
 		return sb
@@ -903,6 +949,9 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
 		return fmt.Sprintf("%.1fy", d/365)
 	},
 	"resticCls": func(r Restic) string {
+		if !r.Configured {
+			return "off"
+		}
 		if r.Exists == "no" {
 			return "bad"
 		}
@@ -975,6 +1024,7 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
   td.restic.ok   { border-left: 3px solid var(--ok);   padding-left: 8px; }
   td.restic.warn { border-left: 3px solid var(--warn); padding-left: 8px; }
   td.restic.bad  { border-left: 3px solid var(--bad);  padding-left: 8px; }
+  td.restic.off  { border-left: 3px solid #444;        padding-left: 8px; color: #666; }
   td.restic .repo { color: #666; font-size: 10px; }
   /* progress bar inside table cells (memory / disk) */
   .bar { position: relative; height: 6px; background: #222; border-radius: 3px; overflow: hidden; margin-top: 3px; width: 120px; }
@@ -1015,14 +1065,23 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
   {{- if .Reachable }}
   <div class="sb-banner">
     <span class="label">storagebox bx11:</span>
-    <span>{{ printf "%.1f TiB used" (tb .Used) }} / {{ printf "%.1f TiB total" (tb .Total) }}</span>
+    <span>{{ printf "%.1f GiB used" (gb .Used) }} / {{ printf "%.1f GiB total" (gb .Total) }}</span>
     <span class="bar {{ capCls .UsedPct }}"><span style="width:{{ barPct .UsedPct }}%"></span></span>
     <span class="{{ capCls .UsedPct }}">{{ printf "%.1f%% used" .UsedPct }}</span>
-    <span style="color:#666;">{{ printf "%.0f GiB free" (gb .Avail) }}</span>
+    <span style="color:#666;">{{ printf "%.1f GiB free" (gb .Avail) }}</span>
   </div>
   {{- else }}
   <div class="sb-banner bad">storagebox bx11 unreachable (CIFS mount down?)</div>
   {{- end }}
+  {{ end }}
+  {{ range .ZPools }}
+  <div class="sb-banner">
+    <span class="label">zpool {{ .Name }}:</span>
+    <span>{{ printf "%.1f GiB used" (gb .Alloc) }} / {{ printf "%.1f GiB total" (gb .Total) }}</span>
+    <span class="bar {{ capCls .UsedPct }}"><span style="width:{{ barPct .UsedPct }}%"></span></span>
+    <span class="{{ capCls .UsedPct }}">{{ printf "%.1f%% used" .UsedPct }}</span>
+    <span style="color:#666;">{{ printf "%.1f GiB free" (gb .Free) }}</span>
+  </div>
   {{ end }}
 
   <h2>NAT topology</h2>
@@ -1075,8 +1134,10 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
           {{- end -}}
         </td>
         <td class="restic {{ resticCls .Restic }}">
-          {{- if eq .Restic.Exists "no" -}}
-            no repo
+          {{- if not .Restic.Configured -}}
+            backups not configured
+          {{- else if eq .Restic.Exists "no" -}}
+            no repo yet
             <div class="repo">{{ .Restic.RepoPath }}</div>
           {{- else if eq .Restic.Snapshots 0 -}}
             repo exists, no snapshots yet
@@ -1106,21 +1167,24 @@ func handle(w http.ResponseWriter, r *http.Request) {
 	}
 	vms, _ := collectAll()
 	sb := storageboxStatus()
+	zp := zpoolsStatus()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	page.Execute(w, struct {
-		Now string
+		Now        string
 		SVG        template.HTML
 		NATSVG     template.HTML
 		ForceGraph template.HTML
-		VMs []VMStat
-		SB  Storagebox
+		VMs        []VMStat
+		SB         Storagebox
+		ZPools     []Zpool
 	}{
-		Now: time.Now().Format("2006-01-02 15:04:05"),
+		Now:        time.Now().Format("2006-01-02 15:04:05"),
 		SVG:        buildSVG(vms),
 		NATSVG:     buildNATSVG(),
 		ForceGraph: buildForceGraph(vms),
-		VMs: vms,
-		SB:  sb,
+		VMs:        vms,
+		SB:         sb,
+		ZPools:     zp,
 	})
 }
 
@@ -1135,7 +1199,15 @@ func main() {
 	if err := loadInventory(); err != nil {
 		log.Fatalf("inventory: %v", err)
 	}
-	log.Printf("status-board listening on %s (inventory: %d VMs)", listenAddr, len(inventory))
+	if g, err := loadGraphData(); err == nil {
+		for _, v := range g.VMs {
+			backupsEnabled[v.Name] = v.BackupsEnabled
+		}
+		zfsPoolNames = g.Zpools
+	} else {
+		log.Printf("graph data not loaded: %v (backups/zfs gauges will be limited)", err)
+	}
+	log.Printf("status-board listening on %s (inventory: %d VMs, %d zpools, %d backups configured)", listenAddr, len(inventory), len(zfsPoolNames), len(backupsEnabled))
 	http.HandleFunc("/", handle)
 	log.Fatal(http.ListenAndServe(listenAddr, nil))
 }

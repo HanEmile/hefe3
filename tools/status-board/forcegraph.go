@@ -24,10 +24,11 @@ import (
 )
 
 type vmEntry struct {
-	Name   string `json:"name"`
-	IP     string `json:"ip"`
-	Bridge string `json:"bridge"`
-	Ports  []int  `json:"ports"`
+	Name           string `json:"name"`
+	IP             string `json:"ip"`
+	Bridge         string `json:"bridge"`
+	Ports          []int  `json:"ports"`
+	BackupsEnabled bool   `json:"backupsEnabled"`
 }
 type relEntry struct {
 	From string `json:"from"`
@@ -47,6 +48,7 @@ type graphPayload struct {
 	Relationships []relEntry     `json:"relationships"`
 	Ingress       []ingressEntry `json:"ingress"`
 	ExternalIp    string         `json:"externalIp"`
+	Zpools        []string       `json:"zpools"`
 }
 
 func loadGraphData() (*graphPayload, error) {

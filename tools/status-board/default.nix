@@ -44,6 +44,11 @@ let
                  then fw.interfaces.tailscale0.allowedTCPPorts else [];
         in lib.unique (generic ++ enp1 ++ tail);
 
+      backupsEnabledForVM = name:
+        let n = hefe.ops.nixos."${name}" or null;
+        in if n == null then false
+           else (n.config.vmBackups.enable or false);
+
       # Hand-edited cross-VM relationships. We can't reliably derive these
       # from per-VM evaluation because they cross OIDC, NFS, restic, etc.
       # Keep the list small and meaningful. Edges show up as labeled
@@ -97,7 +102,10 @@ let
           ip = (ipamLookup n).v4;
           bridge = if ipam.default ? "${n}" then "virbr0" else "virbr1";
           ports = portsForVM n;
+          backupsEnabled = backupsEnabledForVM n;
         }) allVms;
+        # Static list of ZFS pools to scrape via `zpool list -Hp` at runtime.
+        zpools = [ "bpool" "rpool" "grave" ];
         inherit relationships;
         ingress = ingressList;
         externalIp = "95.217.35.60";
@@ -112,7 +120,7 @@ let
         description = "Internal medano fleet dashboard";
         wantedBy = [ "multi-user.target" ];
         after = [ "network.target" "libvirtd.service" ];
-        path = [ pkgs.libvirt pkgs.coreutils ];
+        path = [ pkgs.libvirt pkgs.coreutils pkgs.zfs ];
         environment = {
           STATUS_BOARD_INVENTORY = "${vmInventory}";
           STATUS_BOARD_GRAPH = "/etc/status-board-graph.json";
