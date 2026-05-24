@@ -251,6 +251,7 @@ in
               port = hefe.ops.ipam.default.photo.ports.immich;
             in
             tlsify {
+              serverAliases = [ "photo.emile.space" ];
               locations."/" = {
                 proxyPass = "http://${host}:${toString port}";
                 proxyWebsockets = true;
@@ -269,6 +270,7 @@ in
               port = hefe.ops.ipam.default.md.ports.hedgedoc;
             in
             tlsify {
+              serverAliases = [ "md.emile.space" ];
               locations."/".proxyPass = "http://${host}:${toString port}";
             };
 
@@ -277,6 +279,7 @@ in
               host = hefe.ops.ipam.default.social.v4;
             in
             tlsify {
+              serverAliases = [ "social.emile.space" ];
               locations."/" = {
                 proxyPass = "http://${host}:3004";
                 proxyWebsockets = true;
@@ -295,6 +298,7 @@ in
               proxyPass = "http://192.168.75.3:9091";
             in
             tlsify {
+              serverAliases = [ "auth.emile.space" "sso.emile.space" ];
               locations = {
                 "/" = {
                   inherit proxyPass;
@@ -349,6 +353,8 @@ in
             };
 
           "medano.emile.space" = tlsify {
+            # Post-DNS-cutover: emile.space + www.emile.space land here too.
+            serverAliases = [ "emile.space" "www.emile.space" ];
             locations = {
               "/" = {
                 proxyPass = "http://${hefe.ops.ipam.default.naraj.v4}";
@@ -407,6 +413,7 @@ in
           };
 
           "tmp.medano.emile.space" = tlsify {
+            serverAliases = [ "tmp.emile.space" ];
             locations = {
               "/" = {
                 proxyPass = "http://${hefe.ops.ipam.default.tmp.v4}";

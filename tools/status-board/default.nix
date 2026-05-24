@@ -49,6 +49,7 @@ let
       services.nginx.virtualHosts."status.medano.emile.space" = {
         enableACME = true;
         forceSSL = true;
+        serverAliases = [ "status.emile.space" ];
 
         # Forward-auth: every request is gated by authelia. Unauthenticated
         # requests are redirected to the authelia portal, which after a
