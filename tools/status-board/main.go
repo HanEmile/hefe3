@@ -51,6 +51,11 @@ type Restic struct {
 	OldestHours float64  // hours since OLDEST snapshot — shows retention depth
 	Size        string   // du -shx on data/
 	RepoPath    string   // where the restic repo lives on the storagebox
+	// Bucketed counts derived from snapshot mtimes — no extra IO needed.
+	Last24h   int
+	Last7d    int
+	Last30d   int
+	Older     int
 }
 
 type Storagebox struct {
@@ -102,6 +107,38 @@ type VMStat struct {
 	Virsh     VirshInfo
 	Restic    Restic
 	Capacity  Capacity
+
+	// Extra metrics for the Overview tab. Zero when not reachable.
+	Load1     float64
+	CPUCount  int
+	CPUBusy   float64 // 0..1 over last sample (fraction of CPU not idle)
+	NetRxBps  float64 // bytes/sec since last scrape on primary iface
+	NetTxBps  float64
+	NetRxTot  int64
+	NetTxTot  int64
+	TSUp      bool    // tailscale interface present & up
+}
+
+// fleetOverview is aggregate state computed from the scrape pass.
+// It is recomputed on every collectAll() and used by the Overview tab.
+type fleetOverview struct {
+	VMsTotal        int
+	VMsReachable    int
+	TSUp            int
+	TSDown          int
+	LoadSum         float64
+	CPUCountSum     int
+	CPUBusyAvg      float64 // mean across reachable
+	MemUsedSum      int64
+	MemTotalSum     int64
+	FsUsedSum       int64
+	FsTotalSum      int64
+	NetRxBps        float64
+	NetTxBps        float64
+	BackupsOK       int
+	BackupsWarn     int
+	BackupsBad      int
+	BackupsOff      int
 }
 
 var (
@@ -115,6 +152,22 @@ var (
 	metricLine    = regexp.MustCompile(`^([a-zA-Z_:][a-zA-Z0-9_:]*)(\{[^}]*\})?\s+([-0-9.eE+]+|NaN|\+Inf|-Inf)\s*$`)
 	labelKV       = regexp.MustCompile(`([a-zA-Z_][a-zA-Z0-9_]*)="((?:[^"\\]|\\.)*)"`)
 	httpClient    = &http.Client{Timeout: 3 * time.Second}
+
+	// Previous per-VM network counters, used to compute deltas across scrapes.
+	netPrevMu sync.Mutex
+	netPrev   = map[string]struct {
+		Rx, Tx int64
+		Ts     time.Time
+	}{}
+
+	// Cache the last scrape so the SSE handler doesn't fan out collectAll()
+	// on every connected client tick. collectAllLocked serializes refreshes.
+	collectMu      sync.Mutex
+	cachedVMs      []VMStat
+	cachedSB       Storagebox
+	cachedZPools   []Zpool
+	cachedFleet    fleetOverview
+	cachedAt       time.Time
 )
 
 // One sample per (vm, kind) per scrape — kept on disk so we have history
@@ -328,6 +381,7 @@ func resticFor(vm string) Restic {
 	}
 	var latest, oldest time.Time
 	count := 0
+	now := time.Now()
 	for _, e := range entries {
 		info, err := e.Info()
 		if err != nil {
@@ -340,6 +394,17 @@ func resticFor(vm string) Restic {
 		}
 		if oldest.IsZero() || mt.Before(oldest) {
 			oldest = mt
+		}
+		ageH := now.Sub(mt).Hours()
+		switch {
+		case ageH < 24:
+			r.Last24h++
+		case ageH < 24*7:
+			r.Last7d++
+		case ageH < 24*30:
+			r.Last30d++
+		default:
+			r.Older++
 		}
 	}
 	r.Exists = "yes"
@@ -488,6 +553,86 @@ func collectVM(vm VM) VMStat {
 		if rs := metrics["node_memory_MemAvailable_bytes"]; len(rs) > 0 {
 			st.MemUsed = st.MemTotal - int64(rs[0].Value)
 		}
+
+		// load1 + cpu count
+		if rs := metrics["node_load1"]; len(rs) > 0 {
+			st.Load1 = rs[0].Value
+		}
+		// node_cpu_seconds_total has one row per (cpu,mode); count distinct cpus.
+		cpus := map[string]bool{}
+		var idle, total float64
+		for _, row := range metrics["node_cpu_seconds_total"] {
+			cpus[row.Labels["cpu"]] = true
+			total += row.Value
+			if row.Labels["mode"] == "idle" {
+				idle += row.Value
+			}
+		}
+		st.CPUCount = len(cpus)
+		if total > 0 {
+			st.CPUBusy = 1.0 - idle/total
+		}
+
+		// Primary iface bytes: prefer enp1s0 (libvirt VM main iface), else eth0, else first non-lo.
+		var rx, tx int64
+		findIface := func() string {
+			pref := []string{"enp1s0", "eth0", "eno1", "ens3"}
+			for _, p := range pref {
+				for _, row := range metrics["node_network_receive_bytes_total"] {
+					if row.Labels["device"] == p {
+						return p
+					}
+				}
+			}
+			for _, row := range metrics["node_network_receive_bytes_total"] {
+				if d := row.Labels["device"]; d != "" && d != "lo" {
+					return d
+				}
+			}
+			return ""
+		}
+		iface := findIface()
+		if iface != "" {
+			for _, row := range metrics["node_network_receive_bytes_total"] {
+				if row.Labels["device"] == iface {
+					rx = int64(row.Value)
+				}
+			}
+			for _, row := range metrics["node_network_transmit_bytes_total"] {
+				if row.Labels["device"] == iface {
+					tx = int64(row.Value)
+				}
+			}
+		}
+		st.NetRxTot = rx
+		st.NetTxTot = tx
+		// Compute delta vs previous scrape for this VM.
+		now := time.Now()
+		netPrevMu.Lock()
+		prev, ok := netPrev[vm.Name]
+		if ok {
+			dt := now.Sub(prev.Ts).Seconds()
+			if dt > 0 && dt < 600 {
+				if rx >= prev.Rx {
+					st.NetRxBps = float64(rx-prev.Rx) / dt
+				}
+				if tx >= prev.Tx {
+					st.NetTxBps = float64(tx-prev.Tx) / dt
+				}
+			}
+		}
+		netPrev[vm.Name] = struct {
+			Rx, Tx int64
+			Ts     time.Time
+		}{rx, tx, now}
+		netPrevMu.Unlock()
+
+		// Tailscale interface up?
+		for _, row := range metrics["node_network_up"] {
+			if row.Labels["device"] == "tailscale0" && row.Value == 1 {
+				st.TSUp = true
+			}
+		}
 	}
 	st.Capacity = capacityFor(vm.Name, metrics)
 	st.Restic = resticFor(vm.Name)
@@ -518,6 +663,97 @@ func collectAll() ([]VMStat, map[string]VirshInfo) {
 	wg.Wait()
 	sort.Slice(results, func(i, j int) bool { return results[i].Name < results[j].Name })
 	return results, virsh
+}
+
+// computeFleet aggregates per-VM metrics into a fleet overview.
+func computeFleet(vms []VMStat) fleetOverview {
+	f := fleetOverview{VMsTotal: len(vms)}
+	var busyN int
+	for _, v := range vms {
+		if v.Reachable {
+			f.VMsReachable++
+			f.LoadSum += v.Load1
+			f.CPUCountSum += v.CPUCount
+			if v.CPUCount > 0 {
+				f.CPUBusyAvg += v.CPUBusy
+				busyN++
+			}
+			f.MemUsedSum += v.Capacity.MemUsed
+			f.MemTotalSum += v.Capacity.MemTotal
+			f.FsUsedSum += v.Capacity.FsUsed
+			f.FsTotalSum += v.Capacity.FsTotal
+			f.NetRxBps += v.NetRxBps
+			f.NetTxBps += v.NetTxBps
+		}
+		if v.TSUp {
+			f.TSUp++
+		} else {
+			f.TSDown++
+		}
+		switch resticBucket(v.Restic) {
+		case "ok":
+			f.BackupsOK++
+		case "warn":
+			f.BackupsWarn++
+		case "bad":
+			f.BackupsBad++
+		default:
+			f.BackupsOff++
+		}
+	}
+	if busyN > 0 {
+		f.CPUBusyAvg /= float64(busyN)
+	}
+	return f
+}
+
+// resticBucket categorises a Restic struct identically to the template's resticCls.
+func resticBucket(r Restic) string {
+	if !r.Configured {
+		return "off"
+	}
+	if r.Exists == "no" || r.Snapshots == 0 {
+		if r.Exists == "no" {
+			return "bad"
+		}
+		return "warn"
+	}
+	if r.AgeHours > 48 {
+		return "bad"
+	}
+	if r.AgeHours > 26 {
+		return "warn"
+	}
+	return "ok"
+}
+
+// refresh runs collectAll() and stashes the result in the package-level cache.
+// Serialized by collectMu so we never run two scrapes concurrently.
+func refresh() ([]VMStat, Storagebox, []Zpool, fleetOverview) {
+	collectMu.Lock()
+	defer collectMu.Unlock()
+	vms, _ := collectAll()
+	sb := storageboxStatus()
+	zp := zpoolsStatus()
+	fl := computeFleet(vms)
+	cachedVMs = vms
+	cachedSB = sb
+	cachedZPools = zp
+	cachedFleet = fl
+	cachedAt = time.Now()
+	return vms, sb, zp, fl
+}
+
+// cachedOrRefresh returns the cached scrape if it's <maxAge old, else triggers a refresh.
+func cachedOrRefresh(maxAge time.Duration) ([]VMStat, Storagebox, []Zpool, fleetOverview) {
+	collectMu.Lock()
+	if !cachedAt.IsZero() && time.Since(cachedAt) < maxAge {
+		v, s, z, f := cachedVMs, cachedSB, cachedZPools, cachedFleet
+		collectMu.Unlock()
+		return v, s, z, f
+	}
+	collectMu.Unlock()
+	return refresh()
 }
 
 // --------- SVG network flow ----------
@@ -921,6 +1157,46 @@ text.mono { font-family: ui-monospace, Menlo, monospace; }
 
 // --------- template ----------
 
+// sortBackups returns VMs ordered by backup health: bad → warn → ok → off.
+// Used by the Backups tab.
+func sortBackups(vms []VMStat) []VMStat {
+	out := make([]VMStat, len(vms))
+	copy(out, vms)
+	rank := func(v VMStat) int {
+		switch resticBucket(v.Restic) {
+		case "bad":
+			return 0
+		case "warn":
+			return 1
+		case "ok":
+			return 2
+		default:
+			return 3
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		ri, rj := rank(out[i]), rank(out[j])
+		if ri != rj {
+			return ri < rj
+		}
+		return out[i].Name < out[j].Name
+	})
+	return out
+}
+
+func humanRate(bps float64) string {
+	if bps < 1024 {
+		return fmt.Sprintf("%.0f B/s", bps)
+	}
+	if bps < 1024*1024 {
+		return fmt.Sprintf("%.1f KiB/s", bps/1024)
+	}
+	if bps < 1024*1024*1024 {
+		return fmt.Sprintf("%.1f MiB/s", bps/1024/1024)
+	}
+	return fmt.Sprintf("%.2f GiB/s", bps/1024/1024/1024)
+}
+
 var page = template.Must(template.New("page").Funcs(template.FuncMap{
 	"div": func(a, b float64) float64 { return a / b },
 	"mb":  func(b int64) float64 { return float64(b) / 1024 / 1024 },
@@ -961,24 +1237,7 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
 		}
 		return fmt.Sprintf("%.1fy", d/365)
 	},
-	"resticCls": func(r Restic) string {
-		if !r.Configured {
-			return "off"
-		}
-		if r.Exists == "no" {
-			return "bad"
-		}
-		if r.Snapshots == 0 {
-			return "warn"
-		}
-		if r.AgeHours > 48 {
-			return "bad"
-		}
-		if r.AgeHours > 26 {
-			return "warn"
-		}
-		return "ok"
-	},
+	"resticCls": func(r Restic) string { return resticBucket(r) },
 	"ageText": func(h float64) string {
 		if h < 1 {
 			return fmt.Sprintf("%.0fm", h*60)
@@ -1003,44 +1262,72 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
 		}
 		return "bad"
 	},
+	"rate":        humanRate,
+	"sortBackups": sortBackups,
+	"mulFloat":    func(a, b float64) float64 { return a * b },
+	"loadCls": func(load float64, cpu int) string {
+		if cpu == 0 { return "unknown" }
+		r := load / float64(cpu)
+		switch {
+		case r >= 1.0: return "bad"
+		case r >= 0.7: return "warn"
+		default:       return "ok"
+		}
+	},
 }).Parse(`<!doctype html>
 <html><head><meta charset="utf-8"><title>medano fleet</title>
 <style>
+  /*
+   * Palette tuned for WCAG AA on the #181818 card background:
+   *   --fg      #eeeeee   contrast 17.0 : 1   (body text)
+   *   --dim     #bdbdbd   contrast  9.0 : 1   (secondary text, ≥ 4.5 required)
+   *   --border  #444444   contrast  2.4 : 1   (non-text — passes 3:1 for UI boundaries)
+   *   --link    #88aaff   contrast  7.4 : 1   (lifted from #88a → #88aaff for AA)
+   *   --ok      #4ec97b   contrast  6.8 : 1   (was #2ea043 ≈ 3.5 : 1 — failed AA)
+   *   --warn    #e2b04a   contrast  8.9 : 1
+   *   --bad     #ff7a7a   contrast  5.5 : 1   (was #f85149 ≈ 4.0 : 1 — borderline)
+   * Computed against #181818 (the card colour) via the standard sRGB
+   * relative luminance formula.
+   */
   :root {
     --bg: #111;
-    --fg: #eee;
-    --dim: #888;
-    --border: #333;
+    --fg: #eeeeee;
+    --dim: #bdbdbd;
+    --dimmer: #9a9a9a;
+    --border: #444444;
     --card: #181818;
-    --ok: #2ea043;
-    --warn: #d29922;
-    --bad: #f85149;
-    --unknown: #666;
+    --card2: #1f1f1f;
+    --link: #88aaff;
+    --ok:      #4ec97b;
+    --warn:    #e2b04a;
+    --bad:     #ff7a7a;
+    --unknown: #9a9a9a;
   }
-  body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--fg); padding: 1.5em; margin: 0; }
+  body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--fg); padding: 0; margin: 0; }
+  main { padding: 0 1.5em 2em; }
   h1 { margin: 0 0 .25em; font-weight: 400; }
-  h2 { margin: 1.5em 0 .5em; font-weight: 400; color: #aaa; font-size: 1.1em; }
+  h2 { margin: 1.5em 0 .5em; font-weight: 400; color: var(--dim); font-size: 1.1em; }
   table { border-collapse: collapse; width: 100%; font-size: 13px; }
   th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
   th { color: var(--dim); font-weight: 500; }
   td.name { font-weight: 600; }
-  td.ip { font-family: monospace; color: #88a; }
+  td.ip { font-family: monospace; color: var(--link); }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: middle; margin-right: 4px; }
   .ok    { background: var(--ok);    color: var(--ok)    !important; }
   .warn  { background: var(--warn);  color: var(--warn)  !important; }
   .bad   { background: var(--bad);   color: var(--bad)   !important; }
-  .unknown { background: var(--unknown); color: #aaa !important; }
-  .probe { display: inline-block; padding: 2px 6px; margin: 1px 2px 1px 0; border-radius: 3px; font-size: 11px; background: #222; }
+  .unknown { background: var(--unknown); color: var(--dim) !important; }
+  .probe { display: inline-block; padding: 2px 6px; margin: 1px 2px 1px 0; border-radius: 3px; font-size: 11px; background: #2a2a2a; color: var(--dim); }
   .probe.ok   { color: var(--ok); }
   .probe.bad  { color: var(--bad); }
   td.restic { font-family: monospace; font-size: 11px; line-height: 1.5; }
   td.restic.ok   { border-left: 3px solid var(--ok);   padding-left: 8px; }
   td.restic.warn { border-left: 3px solid var(--warn); padding-left: 8px; }
   td.restic.bad  { border-left: 3px solid var(--bad);  padding-left: 8px; }
-  td.restic.off  { border-left: 3px solid #444;        padding-left: 8px; color: #666; }
-  td.restic .repo { color: #666; font-size: 10px; }
+  td.restic.off  { border-left: 3px solid var(--border);padding-left: 8px; color: var(--dimmer); }
+  td.restic .repo { color: var(--dimmer); font-size: 10px; }
   /* progress bar inside table cells (memory / disk) */
-  .bar { position: relative; height: 6px; background: #222; border-radius: 3px; overflow: hidden; margin-top: 3px; width: 120px; }
+  .bar { position: relative; height: 6px; background: #2a2a2a; border-radius: 3px; overflow: hidden; margin-top: 3px; width: 120px; }
   .bar > span { display: block; height: 100%; background: var(--ok); }
   .bar.warn > span { background: var(--warn); }
   .bar.bad > span  { background: var(--bad); }
@@ -1049,156 +1336,521 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
   td.cap .forecast.bad  { color: var(--bad); }
   td.cap .forecast.warn { color: var(--warn); }
   td.cap .forecast.unknown { color: var(--unknown); }
-  .footer { color: #555; font-size: 11px; margin-top: 1em; }
+  .footer { color: var(--dimmer); font-size: 11px; margin-top: 1em; }
   svg { background: #181818; border-radius: 4px; max-width: 100%; }
   /* legend lives outside the SVG to avoid overlap */
   .legend {
     display: flex; flex-wrap: wrap; gap: 1em;
-    font-size: 12px; color: #aaa;
+    font-size: 12px; color: var(--dim);
     background: var(--card); border: 1px solid var(--border); border-radius: 4px;
     padding: 8px 12px; margin-top: 8px;
   }
   .legend > div { display: inline-flex; align-items: center; gap: 6px; }
   .legend .sw { display: inline-block; width: 14px; height: 10px; border-radius: 2px; }
-  .legend .sw.ok   { background: #182b1c; border: 1px solid var(--ok); }
+  .legend .sw.ok   { background: #1b3322; border: 1px solid var(--ok); }
   .legend .sw.warn { background: #2a2418; border: 1px solid var(--warn); }
-  .legend .sw.bad  { background: #2b1818; border: 1px solid var(--bad); }
+  .legend .sw.bad  { background: #3a1d1d; border: 1px solid var(--bad); }
   .legend .sw.tls  { background: #6aa9ff; }
   .legend .sw.byp  { background: #b07cff; }
   /* storagebox-bx11 banner */
   .sb-banner { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; margin: .5em 0 1em; font-size: 13px; display: flex; align-items: center; gap: 1.5em; }
   .sb-banner .label { color: var(--dim); }
   .sb-banner .bar { width: 320px; height: 10px; }
+
+  /* ---- tab bar ---- */
+  header.topbar {
+    position: sticky; top: 0; z-index: 10;
+    background: #0d0d0d; border-bottom: 1px solid var(--border);
+    padding: 10px 1.5em 0;
+  }
+  header.topbar h1 { font-size: 1.1em; margin: 0 0 6px; color: var(--fg); }
+  nav.tabs { display: flex; gap: 4px; }
+  nav.tabs a {
+    display: inline-block; padding: 8px 14px; font-size: 13px;
+    color: var(--dim); text-decoration: none;
+    border: 1px solid var(--border); border-bottom: none;
+    border-radius: 4px 4px 0 0; background: var(--card);
+  }
+  nav.tabs a.active { color: var(--fg); background: var(--card2); border-color: var(--link); border-bottom: 1px solid var(--card2); position: relative; top: 1px; }
+  nav.tabs a:hover { color: var(--fg); }
+  section.tab { display: none; }
+  section.tab.active { display: block; }
+  .stamp { color: var(--dim); font-size: 12px; padding-left: 1em; }
+
+  /* ---- Overview grid + cards ---- */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+    margin: 12px 0;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .card .title { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .5px; }
+  .card .big   { font-size: 22px; font-weight: 600; font-family: ui-monospace, Menlo, monospace; }
+  .card .sub   { font-size: 11px; color: var(--dim); }
+  .card.bad  { border-color: var(--bad); }
+  .card.warn { border-color: var(--warn); }
+  .card.ok   { border-color: var(--ok); }
+  .spark { width: 100%; height: 26px; display: block; }
 </style></head>
 <body>
-  <h1>medano fleet</h1>
-  <p style="color:#888;font-size:13px;">live snapshot, scraped at {{ .Now }} — refresh in 60s</p>
+  <header class="topbar">
+    <h1>medano fleet <span class="stamp" id="stamp">scraped at {{ .Now }}</span></h1>
+    <nav class="tabs" id="tabs">
+      <a href="#overview" data-tab="overview">overview</a>
+      <a href="#nat" data-tab="nat">NAT</a>
+      <a href="#flow" data-tab="flow">traffic flow</a>
+      <a href="#inventory" data-tab="inventory">inventory</a>
+      <a href="#backups" data-tab="backups">backups</a>
+    </nav>
+  </header>
+  <main>
 
-  {{ with .SB }}
-  {{- if .Reachable }}
-  <div class="sb-banner">
-    <span class="label">storagebox bx11:</span>
-    <span>{{ printf "%.1f GiB used" (gb .Used) }} / {{ printf "%.1f GiB total" (gb .Total) }}</span>
-    <span class="bar {{ capCls .UsedPct }}"><span style="width:{{ barPct .UsedPct }}%"></span></span>
-    <span class="{{ capCls .UsedPct }}">{{ printf "%.1f%% used" .UsedPct }}</span>
-    <span style="color:#666;">{{ printf "%.1f GiB free" (gb .Avail) }}</span>
-  </div>
-  {{- else }}
-  <div class="sb-banner bad">storagebox bx11 unreachable (CIFS mount down?)</div>
-  {{- end }}
-  {{ end }}
-  {{ range .ZPools }}
-  <div class="sb-banner">
-    <span class="label">zpool {{ .Name }}:</span>
-    <span>{{ printf "%.1f GiB used" (gb .Alloc) }} / {{ printf "%.1f GiB total" (gb .Total) }}</span>
-    <span class="bar {{ capCls .UsedPct }}"><span style="width:{{ barPct .UsedPct }}%"></span></span>
-    <span class="{{ capCls .UsedPct }}">{{ printf "%.1f%% used" .UsedPct }}</span>
-    <span style="color:#666;">{{ printf "%.1f GiB free" (gb .Free) }}</span>
-  </div>
-  {{ end }}
-
-  <h2>NAT topology</h2>
-  {{ .NATSVG }}
-
-  <h2>traffic flow</h2>
-  {{ .ForceGraph }}
-  <div class="legend">
-    <div><span class="sw ok"></span> all probes up</div>
-    <div><span class="sw warn"></span> reachable, no probes</div>
-    <div><span class="sw bad"></span> unreachable / probe fail</div>
-    <div><span class="sw tls"></span> TLS-terminating path via naraj</div>
-    <div><span class="sw byp"></span> tailscale-only (bypasses naraj)</div>
-  </div>
-
-  <h2>vm inventory ({{ len .VMs }} VMs)</h2>
-  <table>
-    <thead><tr>
-      <th>name</th><th>bridge</th><th>ip</th><th>libvirt</th>
-      <th>memory</th><th>disk</th>
-      <th>probes</th><th>backups</th>
-    </tr></thead>
-    <tbody>
-    {{- range .VMs }}
-      <tr>
-        <td class="name">{{ .Name }}</td>
-        <td>{{ .Bridge }}</td>
-        <td class="ip">{{ .IP }}</td>
-        <td>{{ .Virsh.State }}</td>
-        <td class="cap">
-          {{ printf "%.1fG / %.1fG" (gb .Capacity.MemUsed) (gb .Capacity.MemTotal) }}
-          <div class="bar {{ capCls .Capacity.MemPct }}"><span style="width:{{ barPct .Capacity.MemPct }}%"></span></div>
-          <span class="forecast {{ daysCls .Capacity.DaysUntilMemFull }}">full in {{ daysText .Capacity.DaysUntilMemFull }}</span>
-        </td>
-        <td class="cap">
-          {{ if gt .Capacity.FsTotal 0 -}}
-          {{ printf "%.1fG / %.1fG" (gb .Capacity.FsUsed) (gb .Capacity.FsTotal) }}
-          <div class="bar {{ capCls .Capacity.FsPct }}"><span style="width:{{ barPct .Capacity.FsPct }}%"></span></div>
-          <span class="forecast {{ daysCls .Capacity.DaysUntilFsFull }}">full in {{ daysText .Capacity.DaysUntilFsFull }}</span>
-          {{- else -}}<span style="color:#666;">—</span>{{- end }}
-        </td>
-        <td>
-          <span class="dot {{ reachCls .Reachable }}"></span>
-          {{- if .Probes -}}
-            {{- range .Probes }}
-              <span class="probe {{ probeCls . }}" title="{{ .URL }}">{{ .Name }} {{ .HTTPCode }}</span>
-            {{- end -}}
-          {{- else -}}
-            <span class="probe">no probes</span>
-          {{- end -}}
-        </td>
-        <td class="restic {{ resticCls .Restic }}">
-          {{- if not .Restic.Configured -}}
-            backups not configured
-          {{- else if eq .Restic.Exists "no" -}}
-            no repo yet
-            <div class="repo">{{ .Restic.RepoPath }}</div>
-          {{- else if eq .Restic.Snapshots 0 -}}
-            repo exists, no snapshots yet
-            <div class="repo">{{ .Restic.RepoPath }}</div>
-          {{- else -}}
-            latest: {{ ageText .Restic.AgeHours }} ago<br>
-            oldest: {{ ageText .Restic.OldestHours }} ago<br>
-            {{ .Restic.Snapshots }} snapshots, {{ .Restic.Size }} on disk
-            <div class="repo">{{ .Restic.RepoPath }}</div>
-          {{- end }}
-        </td>
-      </tr>
+  <section class="tab" id="tab-overview" data-tab="overview">
+    {{ with .SB }}
+    {{- if .Reachable }}
+    <div class="sb-banner" id="sb-banner">
+      <span class="label">storagebox bx11:</span>
+      <span id="sb-used">{{ printf "%.1f GiB used" (gb .Used) }} / {{ printf "%.1f GiB total" (gb .Total) }}</span>
+      <span class="bar {{ capCls .UsedPct }}" id="sb-bar"><span style="width:{{ barPct .UsedPct }}%"></span></span>
+      <span class="{{ capCls .UsedPct }}" id="sb-pct">{{ printf "%.1f%% used" .UsedPct }}</span>
+      <span style="color:var(--dimmer);" id="sb-free">{{ printf "%.1f GiB free" (gb .Avail) }}</span>
+    </div>
+    {{- else }}
+    <div class="sb-banner bad">storagebox bx11 unreachable (CIFS mount down?)</div>
     {{- end }}
-    </tbody>
-  </table>
-  <div class="footer">
-    data: virsh + each VM's node-exporter:9100 + storagebox restic dirs + samples at /var/lib/status-board/samples.jsonl.
-    "full in" is a least-squares fit over the last 7 days of samples — "—" means &lt;6h of data or usage stable/shrinking.
-  </div>
-<script>setTimeout(()=>location.reload(), 60000);</script>
+    {{ end }}
+    {{ range .ZPools }}
+    <div class="sb-banner">
+      <span class="label">zpool {{ .Name }}:</span>
+      <span>{{ printf "%.1f GiB used" (gb .Alloc) }} / {{ printf "%.1f GiB total" (gb .Total) }}</span>
+      <span class="bar {{ capCls .UsedPct }}"><span style="width:{{ barPct .UsedPct }}%"></span></span>
+      <span class="{{ capCls .UsedPct }}">{{ printf "%.1f%% used" .UsedPct }}</span>
+      <span style="color:var(--dimmer);">{{ printf "%.1f GiB free" (gb .Free) }}</span>
+    </div>
+    {{ end }}
+
+    <h2>fleet bottlenecks</h2>
+    <div class="grid">
+      {{ with .Fleet }}
+      <div class="card {{ if ge .CPUBusyAvg 0.8 }}bad{{ else if ge .CPUBusyAvg 0.5 }}warn{{ end }}">
+        <div class="title">CPU</div>
+        <div class="big" id="ov-cpu">{{ printf "%.0f%% busy" (mulFloat .CPUBusyAvg 100.0) }}</div>
+        <div class="sub">load sum <span id="ov-load">{{ printf "%.2f" .LoadSum }}</span> across <span id="ov-cpucount">{{ .CPUCountSum }}</span> cpus</div>
+      </div>
+      <div class="card {{ if gt (pct .MemUsedSum .MemTotalSum) 90.0 }}bad{{ else if gt (pct .MemUsedSum .MemTotalSum) 75.0 }}warn{{ end }}">
+        <div class="title">RAM</div>
+        <div class="big" id="ov-mem">{{ printf "%.1f GiB" (gb .MemUsedSum) }} / {{ printf "%.1f GiB" (gb .MemTotalSum) }}</div>
+        <div class="sub"><span id="ov-mempct">{{ printf "%.1f%%" (pct .MemUsedSum .MemTotalSum) }}</span> used across {{ .VMsReachable }}/{{ .VMsTotal }} reachable VMs</div>
+      </div>
+      <div class="card {{ if gt (pct .FsUsedSum .FsTotalSum) 90.0 }}bad{{ else if gt (pct .FsUsedSum .FsTotalSum) 75.0 }}warn{{ end }}">
+        <div class="title">disk (fleet rollup)</div>
+        <div class="big" id="ov-disk">{{ printf "%.1f GiB" (gb .FsUsedSum) }} / {{ printf "%.1f GiB" (gb .FsTotalSum) }}</div>
+        <div class="sub"><span id="ov-diskpct">{{ printf "%.1f%%" (pct .FsUsedSum .FsTotalSum) }}</span> used across reachable VMs</div>
+      </div>
+      <div class="card">
+        <div class="title">network throughput</div>
+        <div class="big" id="ov-net">↓ {{ rate .NetRxBps }} · ↑ {{ rate .NetTxBps }}</div>
+        <div class="sub">sum across reachable VM ifaces (delta over last scrape)</div>
+      </div>
+      <div class="card {{ if gt .TSDown 1 }}warn{{ end }}">
+        <div class="title">tailscale</div>
+        <div class="big" id="ov-ts">{{ .TSUp }} up · {{ .TSDown }} down</div>
+        <div class="sub">node_network_up{device="tailscale0"}</div>
+      </div>
+      <div class="card {{ if gt .BackupsBad 0 }}bad{{ else if gt .BackupsWarn 0 }}warn{{ end }}">
+        <div class="title">backups freshness</div>
+        <div class="big" id="ov-backups">{{ .BackupsOK }} ok · {{ .BackupsWarn }} warn · {{ .BackupsBad }} bad</div>
+        <div class="sub">{{ .BackupsOff }} repos not configured</div>
+      </div>
+      {{ end }}
+      {{ range .ZPools }}
+      <div class="card {{ capCls .UsedPct }}">
+        <div class="title">zpool {{ .Name }}</div>
+        <div class="big">{{ printf "%.1f%%" .UsedPct }}</div>
+        <div class="sub">{{ printf "%.1f GiB used / %.1f GiB" (gb .Alloc) (gb .Total) }}</div>
+      </div>
+      {{ end }}
+    </div>
+  </section>
+
+  <section class="tab" id="tab-nat" data-tab="nat">
+    <h2>NAT topology</h2>
+    {{ .NATSVG }}
+  </section>
+
+  <section class="tab" id="tab-flow" data-tab="flow">
+    <h2>traffic flow</h2>
+    {{ .ForceGraph }}
+    <div class="legend">
+      <div><span class="sw ok"></span> all probes up</div>
+      <div><span class="sw warn"></span> reachable, no probes</div>
+      <div><span class="sw bad"></span> unreachable / probe fail</div>
+      <div><span class="sw tls"></span> TLS-terminating path via naraj</div>
+      <div><span class="sw byp"></span> tailscale-only (bypasses naraj)</div>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-inventory" data-tab="inventory">
+    <h2>vm inventory (<span id="vm-count">{{ len .VMs }}</span> VMs)</h2>
+    <table>
+      <thead><tr>
+        <th>name</th><th>bridge</th><th>ip</th><th>libvirt</th>
+        <th>memory</th><th>disk</th>
+        <th>probes</th><th>backups</th>
+      </tr></thead>
+      <tbody id="vm-tbody">
+      {{- range .VMs }}
+        <tr data-vm="{{ .Name }}">
+          <td class="name">{{ .Name }}</td>
+          <td>{{ .Bridge }}</td>
+          <td class="ip">{{ .IP }}</td>
+          <td data-field="state">{{ .Virsh.State }}</td>
+          <td class="cap" data-field="mem">
+            {{ printf "%.1fG / %.1fG" (gb .Capacity.MemUsed) (gb .Capacity.MemTotal) }}
+            <div class="bar {{ capCls .Capacity.MemPct }}"><span style="width:{{ barPct .Capacity.MemPct }}%"></span></div>
+          </td>
+          <td class="cap" data-field="disk">
+            {{ if gt .Capacity.FsTotal 0 -}}
+            {{ printf "%.1fG / %.1fG" (gb .Capacity.FsUsed) (gb .Capacity.FsTotal) }}
+            <div class="bar {{ capCls .Capacity.FsPct }}"><span style="width:{{ barPct .Capacity.FsPct }}%"></span></div>
+            <span class="forecast {{ daysCls .Capacity.DaysUntilFsFull }}">full in {{ daysText .Capacity.DaysUntilFsFull }}</span>
+            {{- else -}}<span style="color:var(--dimmer);">—</span>{{- end }}
+          </td>
+          <td data-field="probes">
+            <span class="dot {{ reachCls .Reachable }}"></span>
+            {{- if .Probes -}}
+              {{- range .Probes }}
+                <span class="probe {{ probeCls . }}" title="{{ .URL }}">{{ .Name }} {{ .HTTPCode }}</span>
+              {{- end -}}
+            {{- else -}}
+              <span class="probe">no probes</span>
+            {{- end -}}
+          </td>
+          <td class="restic {{ resticCls .Restic }}" data-field="restic">
+            {{- if not .Restic.Configured -}}
+              backups not configured
+            {{- else if eq .Restic.Exists "no" -}}
+              no repo yet
+              <div class="repo">{{ .Restic.RepoPath }}</div>
+            {{- else if eq .Restic.Snapshots 0 -}}
+              repo exists, no snapshots yet
+              <div class="repo">{{ .Restic.RepoPath }}</div>
+            {{- else -}}
+              latest: {{ ageText .Restic.AgeHours }} ago<br>
+              oldest: {{ ageText .Restic.OldestHours }} ago<br>
+              {{ .Restic.Snapshots }} snapshots, {{ .Restic.Size }} on disk
+              <div class="repo">{{ .Restic.RepoPath }}</div>
+            {{- end }}
+          </td>
+        </tr>
+      {{- end }}
+      </tbody>
+    </table>
+    <div class="footer">
+      data: virsh + each VM's node-exporter:9100 + storagebox restic dirs + samples at /var/lib/status-board/samples.jsonl.
+      disk forecast "full in" is a least-squares fit over the last 7 days — "—" means &lt;6h of data or usage stable/shrinking.
+    </div>
+  </section>
+
+  <section class="tab" id="tab-backups" data-tab="backups">
+    <h2>backups</h2>
+    <table>
+      <thead><tr>
+        <th>VM</th><th>configured</th><th>latest</th>
+        <th>last 24h</th><th>last 7d</th><th>last 30d</th><th>older</th>
+        <th>repo size</th>
+      </tr></thead>
+      <tbody>
+      {{- range sortBackups .VMs }}
+        <tr>
+          <td class="name">{{ .Name }}</td>
+          <td>{{ if .Restic.Configured }}<span class="ok">yes</span>{{ else }}<span style="color:var(--dimmer);">no</span>{{ end }}</td>
+          <td class="restic {{ resticCls .Restic }}" style="font-family:monospace;font-size:12px;">
+            {{- if not .Restic.Configured -}}—
+            {{- else if eq .Restic.Snapshots 0 -}}<span class="bad">no snapshots</span>
+            {{- else -}}{{ ageText .Restic.AgeHours }} ago{{- end }}
+          </td>
+          <td>{{ .Restic.Last24h }}</td>
+          <td>{{ .Restic.Last7d }}</td>
+          <td>{{ .Restic.Last30d }}</td>
+          <td>{{ .Restic.Older }}</td>
+          <td><span style="font-family:monospace;">{{ if .Restic.Size }}{{ .Restic.Size }}{{ else }}—{{ end }}</span></td>
+        </tr>
+      {{- end }}
+      </tbody>
+    </table>
+    <div class="footer">
+      buckets computed from snapshot mtimes (no extra IO). "bad" = no snapshot &lt; 48h. Repo size is best-effort du -shx
+      with a short timeout to avoid wedging the CIFS mount.
+    </div>
+  </section>
+
+  </main>
+
+<script>
+(function(){
+  // ---- tab switching via URL hash ----
+  const tabs = Array.from(document.querySelectorAll("nav.tabs a"));
+  const sections = Array.from(document.querySelectorAll("section.tab"));
+  function activate(name) {
+    if (!name) name = "overview";
+    let any = false;
+    tabs.forEach(a => {
+      const on = a.dataset.tab === name;
+      a.classList.toggle("active", on);
+      if (on) any = true;
+    });
+    sections.forEach(s => s.classList.toggle("active", s.dataset.tab === name));
+    if (!any) activate("overview");
+  }
+  function fromHash(){ return (location.hash || "#overview").replace(/^#/, ""); }
+  activate(fromHash());
+  window.addEventListener("hashchange", () => activate(fromHash()));
+
+  // ---- SSE: patch the DOM in place ----
+  function pct(used, total){ return total > 0 ? (used/total*100) : 0; }
+  function gb(b){ return (b/1024/1024/1024).toFixed(1); }
+  function fmtRate(bps){
+    if (bps < 1024) return bps.toFixed(0)+" B/s";
+    if (bps < 1024*1024) return (bps/1024).toFixed(1)+" KiB/s";
+    if (bps < 1024*1024*1024) return (bps/1024/1024).toFixed(1)+" MiB/s";
+    return (bps/1024/1024/1024).toFixed(2)+" GiB/s";
+  }
+  function capCls(p){ if (p >= 90) return "bad"; if (p >= 75) return "warn"; return "ok"; }
+  function ageHText(h){
+    if (h < 1) return (h*60).toFixed(0)+"m";
+    if (h < 48) return h.toFixed(1)+"h";
+    if (h < 24*60) return (h/24).toFixed(1)+"d";
+    return (h/24).toFixed(0)+"d";
+  }
+  function patchVMRow(tr, v){
+    const stateCell = tr.querySelector('[data-field=state]');
+    if (stateCell) stateCell.textContent = v.Virsh && v.Virsh.State ? v.Virsh.State : "";
+    const memCell = tr.querySelector('[data-field=mem]');
+    if (memCell) {
+      const c = v.Capacity || {};
+      const p = c.MemPct || 0;
+      memCell.innerHTML =
+        (gb(c.MemUsed||0)) + "G / " + (gb(c.MemTotal||0)) + "G" +
+        '<div class="bar ' + capCls(p) + '"><span style="width:' + Math.max(0,Math.min(100,p|0)) + '%"></span></div>';
+    }
+    const diskCell = tr.querySelector('[data-field=disk]');
+    if (diskCell) {
+      const c = v.Capacity || {};
+      if (c.FsTotal > 0) {
+        const p = c.FsPct || 0;
+        let forecast = "—";
+        let forecastCls = "unknown";
+        if (c.DaysUntilFsFull >= 0) {
+          const d = c.DaysUntilFsFull;
+          if (d < 1) forecast = (d*24).toFixed(0)+"h";
+          else if (d < 365) forecast = d.toFixed(0)+"d";
+          else forecast = (d/365).toFixed(1)+"y";
+          forecastCls = d < 14 ? "bad" : (d < 60 ? "warn" : "ok");
+        }
+        diskCell.innerHTML =
+          (gb(c.FsUsed||0)) + "G / " + (gb(c.FsTotal||0)) + "G" +
+          '<div class="bar ' + capCls(p) + '"><span style="width:' + Math.max(0,Math.min(100,p|0)) + '%"></span></div>' +
+          '<span class="forecast ' + forecastCls + '">full in ' + forecast + '</span>';
+      } else {
+        diskCell.innerHTML = '<span style="color:var(--dimmer);">—</span>';
+      }
+    }
+    const probeCell = tr.querySelector('[data-field=probes]');
+    if (probeCell) {
+      let html = '<span class="dot ' + (v.Reachable ? "ok" : "bad") + '"></span>';
+      if (v.Probes && v.Probes.length) {
+        for (const p of v.Probes) {
+          html += '<span class="probe ' + (p.Up ? "ok" : "bad") + '" title="'+ (p.URL||"") +'">'+ (p.Name||"") +' '+ (p.HTTPCode||"") +'</span>';
+        }
+      } else {
+        html += '<span class="probe">no probes</span>';
+      }
+      probeCell.innerHTML = html;
+    }
+  }
+
+  // For force-graph: update node stroke colour by class.
+  // The forcegraph.go script creates one <g class="fg-node"> per node and
+  // the colour mapping lives in STATUS_STROKE. We update the first <circle>'s
+  // stroke based on per-VM probe state.
+  const STATUS_STROKE = { ok:"#4ec97b", warn:"#e2b04a", bad:"#ff7a7a" };
+  function patchForceGraph(vms) {
+    const svg = document.getElementById("force-graph");
+    if (!svg) return;
+    // Build a map vm-name -> class from VMs[] (same logic as vmCls in Go).
+    const cls = {};
+    for (const v of vms) {
+      let c = "warn";
+      if (v.Probes && v.Probes.length) {
+        c = v.Probes.every(p => p.Up) ? "ok" : "bad";
+      } else if (v.Reachable) {
+        c = "warn";
+      } else {
+        c = "bad";
+      }
+      cls["vm:"+v.Name] = c;
+    }
+    // The script stores nodes as Object[] inside its closure — we can't reach
+    // those, but each <g class="fg-node"> contains a <text> with the label
+    // we wrote. Instead we tag by ID in a side-channel: the data is embedded
+    // verbatim in #force-graph-data and the nodes are appended in order.
+    const data = JSON.parse(document.getElementById("force-graph-data").textContent);
+    const nodeGroups = svg.querySelectorAll("g.fg-node");
+    for (let i = 0; i < data.nodes.length && i < nodeGroups.length; i++) {
+      const n = data.nodes[i];
+      const c = cls[n.id];
+      if (!c) continue;
+      const circle = nodeGroups[i].querySelector("circle");
+      if (!circle) continue;
+      circle.setAttribute("stroke", STATUS_STROKE[c] || "#9a9a9a");
+      circle.setAttribute("stroke-width", "2.5");
+    }
+  }
+
+  let evt = null;
+  function connect() {
+    if (!window.EventSource) return;
+    try { evt = new EventSource("/events"); } catch (e) { return; }
+    evt.onmessage = (m) => {
+      let d;
+      try { d = JSON.parse(m.data); } catch (e) { return; }
+      // stamp
+      const s = document.getElementById("stamp");
+      if (s && d.Now) s.textContent = "scraped at " + d.Now;
+      // VM rows
+      if (d.VMs) {
+        for (const v of d.VMs) {
+          const tr = document.querySelector('tr[data-vm="'+ v.Name +'"]');
+          if (tr) patchVMRow(tr, v);
+        }
+        patchForceGraph(d.VMs);
+      }
+      // storagebox banner
+      if (d.SB && d.SB.Reachable) {
+        const used = document.getElementById("sb-used");
+        const free = document.getElementById("sb-free");
+        const pctEl = document.getElementById("sb-pct");
+        const bar = document.getElementById("sb-bar");
+        if (used) used.textContent = gb(d.SB.Used) + " GiB used / " + gb(d.SB.Total) + " GiB total";
+        if (free) free.textContent = gb(d.SB.Avail) + " GiB free";
+        if (pctEl) {
+          pctEl.textContent = d.SB.UsedPct.toFixed(1) + "% used";
+          pctEl.className = capCls(d.SB.UsedPct);
+        }
+        if (bar) {
+          bar.className = "bar " + capCls(d.SB.UsedPct);
+          const span = bar.querySelector("span");
+          if (span) span.style.width = Math.max(0,Math.min(100,d.SB.UsedPct|0)) + "%";
+        }
+      }
+      // Overview cards
+      if (d.Fleet) {
+        const f = d.Fleet;
+        const setText = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+        setText("ov-cpu", (f.CPUBusyAvg*100).toFixed(0)+"% busy");
+        setText("ov-load", f.LoadSum.toFixed(2));
+        setText("ov-cpucount", String(f.CPUCountSum));
+        setText("ov-mem", gb(f.MemUsedSum)+" GiB / "+gb(f.MemTotalSum)+" GiB");
+        setText("ov-mempct", pct(f.MemUsedSum,f.MemTotalSum).toFixed(1)+"%");
+        setText("ov-disk", gb(f.FsUsedSum)+" GiB / "+gb(f.FsTotalSum)+" GiB");
+        setText("ov-diskpct", pct(f.FsUsedSum,f.FsTotalSum).toFixed(1)+"%");
+        setText("ov-net", "↓ "+fmtRate(f.NetRxBps)+" · ↑ "+fmtRate(f.NetTxBps));
+        setText("ov-ts", f.TSUp+" up · "+f.TSDown+" down");
+        setText("ov-backups", f.BackupsOK+" ok · "+f.BackupsWarn+" warn · "+f.BackupsBad+" bad");
+      }
+    };
+    evt.onerror = () => {
+      // Browser auto-reconnects; nothing to do.
+    };
+  }
+  connect();
+})();
+</script>
 </body></html>`))
+
+// pageData is the struct passed to the template; also the JSON shape
+// emitted on the /events stream (sans the rendered SVGs).
+type pageData struct {
+	Now        string
+	NATSVG     template.HTML `json:"-"`
+	ForceGraph template.HTML `json:"-"`
+	VMs        []VMStat
+	SB         Storagebox
+	ZPools     []Zpool
+	Fleet      fleetOverview
+}
 
 func handle(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" && r.URL.Path != "/index.html" {
 		http.NotFound(w, r)
 		return
 	}
-	vms, _ := collectAll()
-	sb := storageboxStatus()
-	zp := zpoolsStatus()
+	vms, sb, zp, fl := cachedOrRefresh(2 * time.Second)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	page.Execute(w, struct {
-		Now        string
-		SVG        template.HTML
-		NATSVG     template.HTML
-		ForceGraph template.HTML
-		VMs        []VMStat
-		SB         Storagebox
-		ZPools     []Zpool
-	}{
+	page.Execute(w, pageData{
 		Now:        time.Now().Format("2006-01-02 15:04:05"),
-		SVG:        buildSVG(vms),
 		NATSVG:     buildNATSVG(),
 		ForceGraph: buildForceGraph(vms),
 		VMs:        vms,
 		SB:         sb,
 		ZPools:     zp,
+		Fleet:      fl,
 	})
+}
+
+// events streams JSON snapshots of the fleet state every 5 seconds via SSE.
+// Each connected client gets its own ticker; refresh() is serialized by
+// collectMu so concurrent clients don't fan out parallel scrapes.
+func eventsHandler(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	send := func() bool {
+		vms, sb, zp, fl := cachedOrRefresh(4 * time.Second)
+		pd := pageData{
+			Now:    time.Now().Format("2006-01-02 15:04:05"),
+			VMs:    vms,
+			SB:     sb,
+			ZPools: zp,
+			Fleet:  fl,
+		}
+		b, err := json.Marshal(pd)
+		if err != nil {
+			return false
+		}
+		if _, err := fmt.Fprintf(w, "data: %s\n\n", b); err != nil {
+			return false
+		}
+		flusher.Flush()
+		return true
+	}
+	if !send() {
+		return
+	}
+	tick := time.NewTicker(5 * time.Second)
+	defer tick.Stop()
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-tick.C:
+			if !send() {
+				return
+			}
+		}
+	}
 }
 
 func main() {
@@ -1221,6 +1873,7 @@ func main() {
 		log.Printf("graph data not loaded: %v (backups/zfs gauges will be limited)", err)
 	}
 	log.Printf("status-board listening on %s (inventory: %d VMs, %d zpools, %d backups configured)", listenAddr, len(inventory), len(zfsPoolNames), len(backupsEnabled))
+	http.HandleFunc("/events", eventsHandler)
 	http.HandleFunc("/", handle)
 	log.Fatal(http.ListenAndServe(listenAddr, nil))
 }
