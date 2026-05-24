@@ -122,8 +122,9 @@ let
 
       echo "[STEP 2/4]: Copying build result to host (target=${target})"
       NIX_SSHOPTS="${sshOpts}" ${pkgs.nix}/bin/nix copy \
-        --to "ssh-ng://root@${target}?compress=zstd" \
+        --to "ssh-ng://root@${target}?compress=true" \
         --substitute-on-destination \
+        --no-check-sigs \
         ./result
 
       echo "[STEP 3/4]: Setting the profile"
