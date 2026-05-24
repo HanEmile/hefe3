@@ -81,8 +81,10 @@ let
     ${pkgs.nix}/bin/nix-build \
       -A ops.nixos.${hostname}.toplevel \
       --system "x86_64-linux" \
-      -j 0 \
+      --max-jobs auto \
       --cores 0 \
+      --keep-going \
+      --builders-use-substitutes \
       --show-trace \
       -v
   '';
