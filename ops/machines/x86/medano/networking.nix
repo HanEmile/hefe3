@@ -72,6 +72,9 @@ in
       ];
 
       forwardPorts = [
+        # Forward external 80/443 to naraj (TLS-terminating ingress VM).
+        { destination = "${narajVMip}:80";  proto = "tcp"; sourcePort = 80; }
+        { destination = "${narajVMip}:443"; proto = "tcp"; sourcePort = 443; }
         # forward irc traffic directed at the host to the `irc` VM
         # {
         #   destination = "${ircVMip}:${toString ircBouncerPort}";
