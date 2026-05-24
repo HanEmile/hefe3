@@ -207,8 +207,11 @@
               ];
             }
             {
+              # Username + password only. 2FA stays configured so users can
+              # opt-in (TOTP / webauthn re-enrollment via the Authelia portal)
+              # but no service mandates it.
               domain = "*.emile.space";
-              policy = "two_factor";
+              policy = "one_factor";
             }
           ];
         };
