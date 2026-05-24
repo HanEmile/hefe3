@@ -92,6 +92,36 @@ in
         # Allow web traffic from VMs to host
         iptables -I INPUT 1 -i virbr0 -p tcp --dport 80 -j ACCEPT
         iptables -I INPUT 1 -i virbr0 -p tcp --dport 443 -j ACCEPT
+
+        # Forward DNAT'd web traffic to naraj (NixOS nat module only adds
+        # the DNAT rule; FORWARD has to be opened explicitly).
+        iptables -I FORWARD 1 -i eno1 -o virbr0 -d ${narajVMip} -p tcp --dport 80  -j ACCEPT
+        iptables -I FORWARD 1 -i eno1 -o virbr0 -d ${narajVMip} -p tcp --dport 443 -j ACCEPT
+        iptables -I FORWARD 1 -i virbr0 -o eno1 -s ${narajVMip} -p tcp --sport 80  -j ACCEPT
+        iptables -I FORWARD 1 -i virbr0 -o eno1 -s ${narajVMip} -p tcp --sport 443 -j ACCEPT
+
+        # SNAT the return packets so external clients see medano's public IP,
+        # not naraj's bridge IP. Without this the reply from naraj has src=
+        # 192.168.75.2 which is unroutable on the public internet.
+        iptables -t nat -I POSTROUTING 1 -o eno1 -s ${narajVMip} -j SNAT --to-source ${pubv4}
+
+        # Hairpin NAT: connections from other VMs (192.168.75.0/24) to
+        # medano's public IP on 80/443 should also DNAT to naraj. Without
+        # this, gotosocial on social VM resolving auth.medano.emile.space
+        # to medano's public IP fails because the regular DNAT only matches
+        # packets coming in on eno1.
+        iptables -t nat -I PREROUTING 1 -s 192.168.75.0/24 -d ${pubv4} -p tcp --dport 80  -j DNAT --to-destination ${narajVMip}:80
+        iptables -t nat -I PREROUTING 1 -s 192.168.75.0/24 -d ${pubv4} -p tcp --dport 443 -j DNAT --to-destination ${narajVMip}:443
+
+        # Allow virbr0->virbr0 forward for hairpin (when source and dest are
+        # both on virbr0 — needs explicit accept on most kernels).
+        iptables -I FORWARD 1 -i virbr0 -o virbr0 -d ${narajVMip} -p tcp --dport 80  -j ACCEPT
+        iptables -I FORWARD 1 -i virbr0 -o virbr0 -d ${narajVMip} -p tcp --dport 443 -j ACCEPT
+
+        # And SNAT so naraj sees the request as coming from medano, not the
+        # originating VM (avoids reply going via wrong path).
+        iptables -t nat -I POSTROUTING 1 -o virbr0 -d ${narajVMip} -p tcp --dport 80  -j MASQUERADE
+        iptables -t nat -I POSTROUTING 1 -o virbr0 -d ${narajVMip} -p tcp --dport 443 -j MASQUERADE
       '';
     };
 
