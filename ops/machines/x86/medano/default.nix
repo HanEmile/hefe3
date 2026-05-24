@@ -274,6 +274,30 @@ in
               locations."/".proxyPass = "http://${host}:${toString port}";
             };
 
+          # sso.emile.space — legacy authelia hostname kept alive for gotosocial.
+          # Authelia's session.cookies is configured with authelia_url =
+          # "https://auth.medano.emile.space", so the upstream sees the Host
+          # header rewritten to auth.medano.emile.space — that way it doesn't
+          # error with "no session cookie configuration matches url".
+          # sso.emile.space — legacy authelia hostname kept for gotosocial.
+          # We replicate the auth.medano.emile.space vhost wholesale but use
+          # the authelia VM as if the request came in via auth.medano.
+          # The trick: don't use recommendedProxySettings on this vhost so we
+          # don't get a duplicate Host header.
+          "sso.emile.space" = tlsify {
+            locations."/" = {
+              proxyPass = "http://192.168.75.3:9091";
+              recommendedProxySettings = false;
+              extraConfig = ''
+                proxy_set_header Host auth.medano.emile.space;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_http_version 1.1;
+              '';
+            };
+          };
+
           "social.medano.emile.space" =
             let
               host = hefe.ops.ipam.default.social.v4;
@@ -298,7 +322,7 @@ in
               proxyPass = "http://192.168.75.3:9091";
             in
             tlsify {
-              serverAliases = [ "auth.emile.space" "sso.emile.space" ];
+              serverAliases = [ "auth.emile.space" ];
               locations = {
                 "/" = {
                   inherit proxyPass;
