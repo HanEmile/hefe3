@@ -1,4 +1,4 @@
-# emile.space static site — build with vokobe, deploy to medano nginx.
+# emile.space static site - build with vokobe, deploy to medano nginx.
 #
 # The site content lives outside the repo (the in/ directory is ~1.2 GB).
 # Set EMILESPACE_IN to point at it; defaults to ~/emile.space/in.

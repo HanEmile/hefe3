@@ -86,7 +86,7 @@ in
     "net.ipv4.ip_forward" = 1;
     "net.ipv6.conf.all.forwarding" = 1;
 
-    # “If DNAT rewrites a packet to an address on a local interface, don’t consume it locally — treat it as routable and forward it.”
+    # “If DNAT rewrites a packet to an address on a local interface, don’t consume it locally - treat it as routable and forward it.”
     "net.ipv4.conf.eno1.route_localnet" = 1;
     "net.ipv4.conf.virbr0.route_localnet" = 1;
   };

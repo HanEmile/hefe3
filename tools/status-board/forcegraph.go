@@ -2,7 +2,7 @@
 //
 // Topology is sourced entirely from /etc/status-board-graph.json (written
 // by tools/status-board/default.nix from per-VM nix evaluation), so adding
-// a VM to ops.ipam — or a relationship to the relationships attrset —
+// a VM to ops.ipam - or a relationship to the relationships attrset - 
 // shows up automatically after a deploy.
 //
 // Layers visualised in one graph:
@@ -253,12 +253,12 @@ func buildForceGraph(vms []VMStat) template.HTML {
   </div>
   <div style="color:#666;font-size:10px;margin-bottom:6px;">
     edges:
-    <span style="color:#6aa9ff">— TLS via naraj</span>
+    <span style="color:#6aa9ff"> - TLS via naraj</span>
     <span style="color:#b07cff">- - bypass (tailscale)</span>
-    <span style="color:#ff8aa0">— oidc</span>
-    <span style="color:#9ad17a">— nfs</span>
-    <span style="color:#d3a44a">— restic</span>
-    <span style="color:#aaa">— forward-auth</span>
+    <span style="color:#ff8aa0"> - oidc</span>
+    <span style="color:#9ad17a"> - nfs</span>
+    <span style="color:#d3a44a"> - restic</span>
+    <span style="color:#aaa"> - forward-auth</span>
   </div>
   <div class="fg-controls" id="fg-controls">
     <span style="color:var(--dim);">show:</span>
@@ -553,7 +553,7 @@ func buildForceGraph(vms []VMStat) template.HTML {
     if (raw) JSON.parse(raw).forEach(id => opened.add(id));
   } catch (e) {}
 
-  // Build directed adjacency (downstream) from the original edge list — the
+  // Build directed adjacency (downstream) from the original edge list - the
   // existing adj is undirected. We treat edges as going source -> target,
   // matching the natural left-to-right flow of the layered layout.
   const downstream = nodes.map(() => new Set());
@@ -597,7 +597,7 @@ func buildForceGraph(vms []VMStat) template.HTML {
     for (const j of downstream[i]) {
       if (hiddenGroups.has(nodes[j].group)) continue;
       // Reveal the neighbour itself. The neighbour is "opened" only when the
-      // user explicitly clicks it (so its grandchildren stay hidden) — but
+      // user explicitly clicks it (so its grandchildren stay hidden) - but
       // we still need it visible. We achieve that by treating any node whose
       // parent is opened as visible too. Simpler: track an extra "revealed"
       // set. To keep state minimal, store the revealed nodes in opened.
@@ -658,7 +658,7 @@ func buildForceGraph(vms []VMStat) template.HTML {
   });
 
   // Hook clicks: in explore mode, single-click expands; double-click collapses.
-  // Single-click expansion is layered on top of the existing focus toggle —
+  // Single-click expansion is layered on top of the existing focus toggle - 
   // we keep the focus-toggle behaviour for non-explore mode.
   const origUp = up;
   up = function(ev) {

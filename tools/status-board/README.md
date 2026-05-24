@@ -9,7 +9,7 @@ Internal dashboard for the medano fleet. One Go binary, no external deps.
 - Calls `virsh list --all` and `virsh dominfo <name>` on medano for libvirt
   state.
 - Walks `/mnt/storagebox-bx11/backup/<vm>/snapshots/` for restic snapshot
-  freshness (no repo password needed — just stat the mtime of the most
+  freshness (no repo password needed - just stat the mtime of the most
   recent snapshot file).
 - Renders an inline SVG showing the traffic flow:
   internet → medano nginx → bridges (default, private, rou) → VMs.

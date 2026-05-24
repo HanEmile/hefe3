@@ -135,8 +135,8 @@ func buildNATSVG() template.HTML {
   </div>
   <div style="color:#666;font-size:10px;margin-bottom:6px;">
     edges:
-    <span style="color:#aaa">— chain</span>
-    <span style="color:#ff8aa0">— DNAT</span>
+    <span style="color:#aaa"> - chain</span>
+    <span style="color:#ff8aa0"> - DNAT</span>
     <span style="color:#c84">- - hairpin (VM-originated)</span>
     <span style="color:#ca6">- - SNAT return</span>
   </div>

@@ -47,7 +47,7 @@ similar.
      memory = 2; # GB
      interfaces = [ "virbr0" ];
      vmdisk = /keep/pools/vmpool/newvm.qcow2;
-     # NB: no install_vol — the disk image is bootable as-is.
+     # NB: no install_vol - the disk image is bootable as-is.
    }
    ```
 
@@ -135,7 +135,7 @@ restarting the VM.
 
 ## Legacy ISO-based flow
 
-If you need a manual install (uncommon — only for non-standard partition
+If you need a manual install (uncommon - only for non-standard partition
 layouts, encryption, or pre-existing data disks), uncomment
 `install_vol` in `libvirt.nix`, deploy medano, attach to the VM with
 `virsh console newvm console1`, and follow `install.sh` in the repo
@@ -167,7 +167,7 @@ approved, the VM's tailscale interface gets its 100.x address.
 3. Redeploy the VM: `nix-build -A ops.nixos.<vm>.deploy && ./result/bin/deploy`.
 
 Tailscale assigns the 100.x address itself, so the IPAM entry is just a
-record of what was assigned — not a constraint. The `systemd.services.<svc>`
+record of what was assigned - not a constraint. The `systemd.services.<svc>`
 config in vm-base.nix waits for `tailscaled.service` + `network-online.target`
 so services that bind on the tailscale IP will not fail at boot.
 
@@ -177,12 +177,12 @@ in the Tailscale admin (Settings → Keys) and we can embed it via agenix in
 
 ## Files referenced
 
-- `ops/lib/mkVmImage.nix` — wraps `<nixpkgs>/nixos/lib/make-disk-image.nix`
+- `ops/lib/mkVmImage.nix` - wraps `<nixpkgs>/nixos/lib/make-disk-image.nix`
   with our partition/format conventions.
-- `ops/vms/x86/hardware-image.nix` — generic hardware-config for
+- `ops/vms/x86/hardware-image.nix` - generic hardware-config for
   image-built VMs.
-- `ops/vms/x86/libvirt-base.nix` — shared libvirt domain template.
-- `ops/vms/x86/vm-base.nix` — shared NixOS config (networking from
+- `ops/vms/x86/libvirt-base.nix` - shared libvirt domain template.
+- `ops/vms/x86/vm-base.nix` - shared NixOS config (networking from
   IPAM, ssh, tailscale, prometheus exporter).
-- `ops/vms/x86/demo01/` — minimal reference VM that bootstraps via the
+- `ops/vms/x86/demo01/` - minimal reference VM that bootstraps via the
   image flow.

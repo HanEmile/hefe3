@@ -16,7 +16,7 @@ in
   system.stateVersion = "25.05";
 
   # r2wars is a radare2 project workspace. State lives in the VM's own qcow2
-  # disk per design — not on /grave — so the workspace is self-contained.
+  # disk per design - not on /grave - so the workspace is self-contained.
   # Source + sqlite DBs land under /var/lib/r2wars after migration from corrino.
   systemd.tmpfiles.rules = [
     "d /var/lib/r2wars 0755 root root - -"

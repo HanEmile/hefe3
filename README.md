@@ -11,27 +11,27 @@ builder.
 
 | Host        | Role                                | Public v4       | Tailscale v4      | Config                                          |
 |-------------|-------------------------------------|-----------------|-------------------|-------------------------------------------------|
-| caladan     | dev/deploy box (macOS, aarch64)     | -               | (tailnet)         | `ops/machines/aarch64/caladan/`                 |
+| caladan     | dev/deploy box (macOS, aarch64)     | - | (tailnet)         | `ops/machines/aarch64/caladan/`                 |
 | medano      | Hetzner hypervisor                  | 95.217.35.60    | (tailnet)         | `ops/machines/x86/medano/`                      |
-| lampadas    | secondary bare-metal (off-site)     | -               | 100.87.209.97     | `ops/machines/x86/lampadas/`                    |
-| mail        | mail host                           | -               | (tailnet)         | `ops/machines/x86/mail/`                        |
+| lampadas    | secondary bare-metal (off-site)     | - | 100.87.209.97     | `ops/machines/x86/lampadas/`                    |
+| mail        | mail host                           | - | (tailnet)         | `ops/machines/x86/mail/`                        |
 | naraj       | TLS-terminating reverse proxy VM    | (DNAT via med.) | (tailnet)         | `ops/vms/x86/naraj/`                            |
-| auth        | Authelia SSO VM                     | -               | (tailnet)         | `ops/vms/x86/auth/`                             |
-| md          | HedgeDoc                            | -               | (tailnet)         | `ops/vms/x86/md/`                               |
-| git         | Forgejo / git hosting               | -               | (tailnet)         | `ops/vms/x86/git/`                              |
-| data        | SFTPGo                              | -               | 100.104.120.80    | `ops/vms/x86/data/`                             |
-| miki        | wiki                                | -               | (tailnet)         | `ops/vms/x86/miki/`                             |
-| photo       | Immich                              | -               | (tailnet)         | `ops/vms/x86/photo/`                            |
-| social      | GoToSocial                          | -               | (tailnet)         | `ops/vms/x86/social/`                           |
-| rss         | Miniflux (tailscale-only)           | -               | 100.70.149.84     | `ops/vms/x86/rss/`                              |
-| tmp         | scratch                             | -               | (tailnet)         | `ops/vms/x86/tmp/`                              |
-| amalthea    | Immich frontend / sync              | -               | (tailnet)         | `ops/vms/x86/amalthea/`                         |
-| late        | `late.sh` paste service             | -               | (tailnet)         | `ops/vms/x86/late/`                             |
-| demo01      | reference / template VM             | -               | (tailnet)         | `ops/vms/x86/demo01/`                           |
-| sb1/sb2/sb3 | standby Linux VMs                   | -               | (tailnet)         | `ops/vms/x86/sb{1,2,3}/`                        |
+| auth        | Authelia SSO VM                     | - | (tailnet)         | `ops/vms/x86/auth/`                             |
+| md          | HedgeDoc                            | - | (tailnet)         | `ops/vms/x86/md/`                               |
+| git         | Forgejo / git hosting               | - | (tailnet)         | `ops/vms/x86/git/`                              |
+| data        | SFTPGo                              | - | 100.104.120.80    | `ops/vms/x86/data/`                             |
+| miki        | wiki                                | - | (tailnet)         | `ops/vms/x86/miki/`                             |
+| photo       | Immich                              | - | (tailnet)         | `ops/vms/x86/photo/`                            |
+| social      | GoToSocial                          | - | (tailnet)         | `ops/vms/x86/social/`                           |
+| rss         | Miniflux (tailscale-only)           | - | 100.70.149.84     | `ops/vms/x86/rss/`                              |
+| tmp         | scratch                             | - | (tailnet)         | `ops/vms/x86/tmp/`                              |
+| amalthea    | Immich frontend / sync              | - | (tailnet)         | `ops/vms/x86/amalthea/`                         |
+| late        | `late.sh` paste service             | - | (tailnet)         | `ops/vms/x86/late/`                             |
+| demo01      | reference / template VM             | - | (tailnet)         | `ops/vms/x86/demo01/`                           |
+| sb1/sb2/sb3 | standby Linux VMs                   | - | (tailnet)         | `ops/vms/x86/sb{1,2,3}/`                        |
 | minecraft   | Minecraft (UDP 25565 forwarded)     | (DNAT via med.) | (tailnet)         | `ops/vms/x86/minecraft/`                        |
 | factorio    | Factorio (UDP 34197 forwarded)      | (DNAT via med.) | (tailnet)         | `ops/vms/x86/factorio/`                         |
-| r2wars      | r2wars site                         | -               | (tailnet)         | `ops/vms/x86/r2wars/`                           |
+| r2wars      | r2wars site                         | - | (tailnet)         | `ops/vms/x86/r2wars/`                           |
 | rou         | VPN exit (private bridge)           | 192.168.33.2    | (tailnet)         | `ops/vms/x86/rou/`                              |
 | arr         | *arr-stack on `rou` private bridge  | 192.168.33.3    | (tailnet)         | `ops/vms/x86/arr/`                              |
 
@@ -127,42 +127,42 @@ Gotchas:
 
 See `ops/vms/x86/README.md` for the long version. Short version:
 
-1. **IPAM** — add to `ops/ipam/default.nix` under `default` (or
+1. **IPAM** - add to `ops/ipam/default.nix` under `default` (or
    `private` for VPN-routed VMs). MAC = `02:` + md5sum prefix:
 
    ```sh
    echo "<vmname>" | md5sum | sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/'
    ```
 
-2. **ACL** — add `<vmname> = withDefault { };` in `ops/acl/default.nix`.
+2. **ACL** - add `<vmname> = withDefault { };` in `ops/acl/default.nix`.
 
-3. **readTree allow-list** — if the VM imports anything from `//users`
+3. **readTree allow-list** - if the VM imports anything from `//users`
    (which `vm-base.nix` does via `acl`), add
    `[ "ops" "vms" "x86" "<vmname>" ]` to the `exceptions` list in the
    root `default.nix`.
 
-4. **VM directory** — `ops/vms/x86/<vmname>/{default.nix,libvirt.nix}`,
+4. **VM directory** - `ops/vms/x86/<vmname>/{default.nix,libvirt.nix}`,
    copying from `demo01/` as the minimal template. (No
    `hardware-configuration.nix`; image-built VMs import
    `../hardware-image.nix`.)
 
-5. **Wire into medano** — add `(vm "<vmname>")` to
+5. **Wire into medano** - add `(vm "<vmname>")` to
    `ops/machines/x86/medano/default.nix`.
 
-6. **First boot** — `nix-build -A ops.nixos.<vmname>.deploy_image &&
+6. **First boot** - `nix-build -A ops.nixos.<vmname>.deploy_image &&
    ./result/bin/deploy-image`. This refuses to overwrite a running
    VM's disk; libvirt will define + start the domain on the next
    medano deploy.
 
-7. **Host key into secrets** — after first boot, grab
+7. **Host key into secrets** - after first boot, grab
    `/etc/ssh/ssh_host_ed25519_key.pub` from the VM, add it to
    `ops/secrets/secrets.nix`, then `cd ops/secrets && ragenix -r`
    so every age secret the VM needs is re-encrypted to its key.
 
-8. **Tailscale (manual)** — `ssh -J medano root@<vm-ip>
+8. **Tailscale (manual)** - `ssh -J medano root@<vm-ip>
    'tailscale up --ssh'`; follow the printed URL.
 
-9. **Subsequent updates** — `nix-build -A ops.nixos.<vmname>.deploy
+9. **Subsequent updates** - `nix-build -A ops.nixos.<vmname>.deploy
    && ./result/bin/deploy`.
 
 ## Secrets (agenix / ragenix)
@@ -280,22 +280,22 @@ vmBackups = {
   `noauto,x-systemd.automount` (idle-unmounts).
 - Required secrets:
   `storagebox_bx11_restic_password.age` and
-  `storagebox_bx11_connection_config.age` — both keyed to every
+  `storagebox_bx11_connection_config.age` - both keyed to every
   VM that backs up.
 - Default retention: `--keep-daily 7 --keep-weekly 5
   --keep-monthly 12 --keep-yearly 15`.
 - Use `backupPrepareCommand` for stateful dumps (postgres on rss,
-  miniflux) — runs before the restic snapshot.
+  miniflux) - runs before the restic snapshot.
 
 ## TLS / certs
 
 Three patterns:
 
-1. **Public `*.emile.space` hosts** — ACME http-01 on `naraj`'s
+1. **Public `*.emile.space` hosts** - ACME http-01 on `naraj`'s
    nginx. naraj is the only thing that gets public 80/443 traffic.
-2. **`tailscale serve`** — used by `rss` for Miniflux. tailscaled
+2. **`tailscale serve`** - used by `rss` for Miniflux. tailscaled
    manages the cert; nothing for us to maintain.
-3. **Self-hosted nginx behind tailscale** — used by `arr`.
+3. **Self-hosted nginx behind tailscale** - used by `arr`.
    `tailscaleCertRenew.hostnames = [ "arr.pinto-pike.ts.net" ];`.
    Module writes certs to `/var/lib/tailscale-certs/<host>.{crt,key}`
    (mode 0640, group `nginx`) and reloads nginx on renewal.
@@ -314,12 +314,12 @@ Three patterns:
 - Walks `/mnt/storagebox-bx11/backup/<vm>/snapshots/` for restic
   freshness (stat-only; no repo password needed).
 - Reads nix-generated drops:
-  - `/etc/status-board-graph.json` (force-graph topology)
-  - `/etc/nat-flows.json` (natFlows from medano networking.nix)
+ - `/etc/status-board-graph.json` (force-graph topology)
+ - `/etc/nat-flows.json` (natFlows from medano networking.nix)
 - Env vars:
-  - `STATUS_BOARD_INVENTORY` — JSON `[{name, ip, bridge}, ...]`
-  - `STATUS_BOARD_LISTEN` (default `127.0.0.1:8090`)
-  - `STATUS_BOARD_STORAGEBOX` (default `/mnt/storagebox-bx11/backup`)
+ - `STATUS_BOARD_INVENTORY` - JSON `[{name, ip, bridge}, ...]`
+ - `STATUS_BOARD_LISTEN` (default `127.0.0.1:8090`)
+ - `STATUS_BOARD_STORAGEBOX` (default `/mnt/storagebox-bx11/backup`)
 
 ## Common gotchas
 
@@ -330,7 +330,7 @@ Three patterns:
   details + container env). Do NOT `git add -f` it. There is a
   matching `private.nix.age` that holds the real secret content;
   see `arr/age-{encrypt,decrypt}.sh` for the wrapper.
-- `nix copy --to ssh-ng://...?compress=true --no-check-sigs` —
+- `nix copy --to ssh-ng://...?compress=true --no-check-sigs` - 
   removing `--no-check-sigs` will break every deploy from caladan
   (store paths aren't signed by anyone medano trusts).
 - `-j 0` in the build helper (`ops/nixos.nix`): do NOT change to
@@ -354,7 +354,7 @@ Three patterns:
   `virsh shutdown <vm>` first, redeploy, `virsh start <vm>`.
 - `MIGRATION.md`, `CORRINO-DECOMMISSION.md`,
   `NAMECHEAP-EMILE-SPACE.md`, `SYZKALLER-PLAN.md` exist for
-  history / one-shot procedures — read them, don't duplicate
+  history / one-shot procedures - read them, don't duplicate
   here.
 - caladan's `/etc/nix/machines` contains exactly one builder line
   pointing at medano. If that breaks (medano down, key rotated)
@@ -372,7 +372,7 @@ Three patterns:
 | Authelia issuer / signing keys             | `ops/secrets/authelia_*.age` (`ragenix --edit`), then rekey              | `cd ops/secrets && ragenix -r`, then redeploy `auth` + every OIDC-client VM        |
 | a VM's backup paths                        | `ops/vms/x86/<vm>/default.nix` (`vmBackups.paths = ...`)                 | redeploy that VM                                                                   |
 | a VM's libvirt domain (RAM, vCPUs, bridge) | `ops/vms/x86/<vm>/libvirt.nix`                                           | redeploy medano                                                                    |
-| add a brand-new VM                         | see "Bootstrapping a new VM" above                                       | -                                                                                  |
+| add a brand-new VM                         | see "Bootstrapping a new VM" above                                       | - |
 | caladan (this Mac)                         | `ops/machines/aarch64/caladan/`, `ops/darwin.nix`                        | `nix-build -A ops.nixos.caladan.deploy && ./result/bin/deploy` (or darwin-rebuild) |
 | status-board scraping / inventory          | `tools/status-board/*.go` + medano module wiring                         | rebuild status-board, redeploy medano                                              |
 | pinned upstream (nixpkgs, nixvirt, agenix) | `npins/sources.json` via `npins update <name>`                           | fleet rebuild as needed                                                            |

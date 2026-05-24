@@ -1438,7 +1438,7 @@ func TestSpecialCharacterStorage(t *testing.T) {
 	tagID := tags[0].ID
 
 	// Test various special characters
-	specialTitle := `Test "quotes" & <html> 'apostrophe' — em-dash • bullet`
+	specialTitle := `Test "quotes" & <html> 'apostrophe' - em-dash • bullet`
 	specialBody := "Line1\nLine2\n\nParagraph\tTab\rCarriage\u0000Null"
 
 	post, err := db.CreatePost(user.ID, specialTitle, "", specialBody, []int64{tagID})

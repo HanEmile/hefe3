@@ -10,7 +10,7 @@
 #
 # The image uses partition table = legacy (MBR), ext4 root labeled "nixos",
 # and grub on /dev/sda. This matches ops/vms/x86/hardware-image.nix, so the
-# image boots straight to the configured NixOS system — no manual nixos-install
+# image boots straight to the configured NixOS system - no manual nixos-install
 # step. Push the qcow2 to medano:/keep/pools/vmpool/<name>.qcow2 and define the
 # domain in libvirt.nix without `install_vol`.
 

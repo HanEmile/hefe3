@@ -48,10 +48,10 @@ type Restic struct {
 	Exists      string
 	Snapshots   int
 	AgeHours    float64  // hours since most recent snapshot
-	OldestHours float64  // hours since OLDEST snapshot — shows retention depth
+	OldestHours float64  // hours since OLDEST snapshot - shows retention depth
 	Size        string   // du -shx on data/
 	RepoPath    string   // where the restic repo lives on the storagebox
-	// Bucketed counts derived from snapshot mtimes — no extra IO needed.
+	// Bucketed counts derived from snapshot mtimes - no extra IO needed.
 	Last24h   int
 	Last7d    int
 	Last30d   int
@@ -207,7 +207,7 @@ var (
 	cachedAt       time.Time
 )
 
-// One sample per (vm, kind) per scrape — kept on disk so we have history
+// One sample per (vm, kind) per scrape - kept on disk so we have history
 // across restarts and can fit trend lines for "days until full".
 type sample struct {
 	Ts    int64  `json:"ts"`
@@ -1360,7 +1360,7 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
 		}
 	},
 	"daysText": func(d float64) string {
-		if d < 0 { return "—" }
+		if d < 0 { return " - " }
 		if d < 1 {
 			return fmt.Sprintf("%.0fh", d*24)
 		}
@@ -1416,7 +1416,7 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
    * which gave 1:1 contrast (illegible).
    *
    * Light-mode palette lives in the @media (prefers-color-scheme: light) block
-   * below; the OS picks one — there is intentionally no in-page toggle.
+   * below; the OS picks one - there is intentionally no in-page toggle.
    */
   :root {
     --bg: #111;
@@ -1723,7 +1723,7 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
             {{ printf "%.1fG / %.1fG" (gb .Capacity.FsUsed) (gb .Capacity.FsTotal) }}
             <div class="bar {{ capCls .Capacity.FsPct }}"><span style="width:{{ barPct .Capacity.FsPct }}%"></span></div>
             <span class="forecast {{ daysCls .Capacity.DaysUntilFsFull }}">full in {{ daysText .Capacity.DaysUntilFsFull }}</span>
-            {{- else -}}<span style="color:var(--dimmer);">—</span>{{- end }}
+            {{- else -}}<span style="color:var(--dimmer);"> - </span>{{- end }}
           </td>
           <td data-field="probes">
             <span class="dot {{ reachCls .Reachable }}"></span>
@@ -1757,7 +1757,7 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
     </table>
     <div class="footer">
       data: virsh + each VM's node-exporter:9100 + storagebox restic dirs + samples at /var/lib/status-board/samples.jsonl.
-      disk forecast "full in" is a least-squares fit over the last 7 days — "—" means &lt;6h of data or usage stable/shrinking.
+      disk forecast "full in" is a least-squares fit over the last 7 days - " - " means &lt;6h of data or usage stable/shrinking.
     </div>
   </section>
 
@@ -1805,7 +1805,7 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
                     <td>{{ .Last7d }}</td>
                     <td>{{ .Last30d }}</td>
                     <td>{{ .Older }}</td>
-                    <td>{{ if .Size }}{{ .Size }}{{ else }}—{{ end }}</td>
+                    <td>{{ if .Size }}{{ .Size }}{{ else }} - {{ end }}</td>
                     <td class="repo-path">{{ .Repo }}</td>
                   </tr>
                 {{- end }}
@@ -1880,7 +1880,7 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
       const c = v.Capacity || {};
       if (c.FsTotal > 0) {
         const p = c.FsPct || 0;
-        let forecast = "—";
+        let forecast = " - ";
         let forecastCls = "unknown";
         if (c.DaysUntilFsFull >= 0) {
           const d = c.DaysUntilFsFull;
@@ -1894,7 +1894,7 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
           '<div class="bar ' + capCls(p) + '"><span style="width:' + Math.max(0,Math.min(100,p|0)) + '%"></span></div>' +
           '<span class="forecast ' + forecastCls + '">full in ' + forecast + '</span>';
       } else {
-        diskCell.innerHTML = '<span style="color:var(--dimmer);">—</span>';
+        diskCell.innerHTML = '<span style="color:var(--dimmer);"> - </span>';
       }
     }
     const probeCell = tr.querySelector('[data-field=probes]');
@@ -1932,7 +1932,7 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
       }
       cls["vm:"+v.Name] = c;
     }
-    // The script stores nodes as Object[] inside its closure — we can't reach
+    // The script stores nodes as Object[] inside its closure - we can't reach
     // those, but each <g class="fg-node"> contains a <text> with the label
     // we wrote. Instead we tag by ID in a side-channel: the data is embedded
     // verbatim in #force-graph-data and the nodes are appended in order.

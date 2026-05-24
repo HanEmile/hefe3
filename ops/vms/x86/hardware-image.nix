@@ -4,7 +4,7 @@
 #
 # Replaces the per-VM hardware-configuration.nix that nixos-generate-config
 # would otherwise produce. By using a label-based mount, every image-built
-# VM uses the same disk layout — no per-VM UUIDs.
+# VM uses the same disk layout - no per-VM UUIDs.
 { config, lib, pkgs, modulesPath, ... }:
 
 {

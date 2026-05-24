@@ -215,7 +215,7 @@ in
 
   system.stateVersion = "25.05";
 
-  # External health probes — TLS terminates on naraj now.
+  # External health probes - TLS terminates on naraj now.
   services.healthProbes.probes = [
     { name = "naraj-root";       url = "http://${hefe.ops.ipam.default.naraj.v4}/"; }
     { name = "emile-space";      url = "https://emile.space/"; }

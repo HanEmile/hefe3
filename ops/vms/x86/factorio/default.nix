@@ -19,7 +19,7 @@ in
   system.stateVersion = "25.05";
 
   # Factorio state lives inside the VM's own disk under /var/lib/factorio
-  # (via the upstream module's DynamicUser StateDirectory). No NFS — there
+  # (via the upstream module's DynamicUser StateDirectory). No NFS - there
   # was no existing factorio data on corrino to migrate. Save files are
   # small; if you want them in /grave, periodically rsync /var/lib/factorio
   # to /grave/games/factorio from the host.

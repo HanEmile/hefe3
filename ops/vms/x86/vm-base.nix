@@ -90,7 +90,7 @@ in
 
     vnstat.enable = true;
 
-    # Prometheus node-exporter — base metrics for every VM, scraped from
+    # Prometheus node-exporter - base metrics for every VM, scraped from
     # medano over tailscale.
     prometheus.exporters.node = {
       enable = true;

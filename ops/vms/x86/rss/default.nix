@@ -92,7 +92,7 @@ in
     };
   };
 
-  # Healthcheck — miniflux's /healthcheck returns 200 when DB is reachable.
+  # Healthcheck - miniflux's /healthcheck returns 200 when DB is reachable.
   services.healthProbes.probes = [
     { name = "self"; url = "http://127.0.0.1:${toString ipam.ports.miniflux}/healthcheck"; }
   ];

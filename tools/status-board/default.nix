@@ -1,4 +1,4 @@
-# status-board — internal dashboard for the medano fleet.
+# status-board - internal dashboard for the medano fleet.
 { pkgs, lib ? pkgs.lib, ... }:
 
 let
@@ -106,7 +106,7 @@ let
         { from = "tmp";    to = "storagebox"; kind = "restic"; via = "cifs"; }
       ];
 
-      # Public-facing ingress mappings — hostnames terminated at naraj.
+      # Public-facing ingress mappings - hostnames terminated at naraj.
       # Kept lean: name + upstream VM + upstream service:port + tls.
       ingressList = [
         { host = "emile.space";       vm = "naraj"; service = "static";       port = 80;   tls = true; }

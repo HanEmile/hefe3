@@ -8,8 +8,8 @@
 # that's actually used together, and prints a table.
 #
 # AA thresholds (WCAG 2.1):
-#   - normal text:  >= 4.5 : 1
-#   - large text:   >= 3.0 : 1   (>= 18px, or >= 14px && font-weight >= 700)
+# - normal text:  >= 4.5 : 1
+# - large text:   >= 3.0 : 1   (>= 18px, or >= 14px && font-weight >= 700)
 #
 # Usage:
 #   bash tools/status-board/check-contrast.sh            # dark (default)
@@ -273,7 +273,7 @@ for p in pairs:
     seen.add(key); uniq.append(p)
 
 # Print table.
-print(f"WCAG AA contrast check — mode={mode}")
+print(f"WCAG AA contrast check - mode={mode}")
 print(f"{'selector':40} {'fg':22} {'bg':22} {'ratio':>7}  thr  status")
 print("-"*110)
 fails = 0
@@ -282,7 +282,7 @@ for sel, fg_val, bg_val, decls, size, weight in uniq:
     fg = resolve(fg_val)
     bg = resolve(bg_val)
     if fg is None or bg is None:
-        # Can't compute — skip silently (e.g. unresolved var, gradients).
+        # Can't compute - skip silently (e.g. unresolved var, gradients).
         continue
     checked += 1
     r = ratio(fg, bg)

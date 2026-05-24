@@ -1,4 +1,4 @@
-# vokobe — minimal static site generator (Rust), built via crane.
+# vokobe - minimal static site generator (Rust), built via crane.
 { pkgs, lib ? pkgs.lib, ... }:
 
 let
