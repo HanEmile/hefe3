@@ -24,11 +24,21 @@ import (
 )
 
 type vmEntry struct {
-	Name           string `json:"name"`
-	IP             string `json:"ip"`
-	Bridge         string `json:"bridge"`
-	Ports          []int  `json:"ports"`
-	BackupsEnabled bool   `json:"backupsEnabled"`
+	Name           string         `json:"name"`
+	IP             string         `json:"ip"`
+	Bridge         string         `json:"bridge"`
+	Ports          []int          `json:"ports"`
+	BackupsEnabled bool           `json:"backupsEnabled"`
+	BackupPaths    []string       `json:"backupPaths"`
+	BackupTargets  []targetEntry  `json:"backupTargets"`
+}
+
+// targetEntry: per-VM backup target. List-shaped to allow adding a second
+// target (e.g. cold archive) without code changes.
+type targetEntry struct {
+	Kind  string `json:"kind"`
+	Label string `json:"label"`
+	Repo  string `json:"repo"`
 }
 type relEntry struct {
 	From string `json:"from"`
@@ -249,6 +259,19 @@ func buildForceGraph(vms []VMStat) template.HTML {
     <span style="color:#9ad17a">— nfs</span>
     <span style="color:#d3a44a">— restic</span>
     <span style="color:#aaa">— forward-auth</span>
+  </div>
+  <div class="fg-controls" id="fg-controls">
+    <span style="color:var(--dim);">show:</span>
+    <label class="node-toggle"><input type="checkbox" data-group="external" checked><span class="sw" style="background:#e2b04a"></span>external</label>
+    <label class="node-toggle"><input type="checkbox" data-group="dns" checked><span class="sw" style="background:#bb88dd"></span>dns</label>
+    <label class="node-toggle"><input type="checkbox" data-group="ip" checked><span class="sw" style="background:#88aadd"></span>ip</label>
+    <label class="node-toggle"><input type="checkbox" data-group="iface" checked><span class="sw" style="background:#88cc99"></span>iface</label>
+    <label class="node-toggle"><input type="checkbox" data-group="proxy" checked><span class="sw" style="background:#ffbb88"></span>proxy</label>
+    <label class="node-toggle"><input type="checkbox" data-group="bridge" checked><span class="sw" style="background:#aaaabb"></span>bridge</label>
+    <label class="node-toggle"><input type="checkbox" data-group="vm" checked><span class="sw" style="background:#ccddaa"></span>vm</label>
+    <label class="node-toggle"><input type="checkbox" data-group="port" checked><span class="sw" style="background:#888"></span>port</label>
+    <span class="sep"></span>
+    <label class="explore" id="explore-toggle"><input type="checkbox" id="exploreMode"> explore mode <span style="color:var(--dimmer);font-size:10px;">(click to expand · dblclick to collapse)</span></label>
   </div>
   <svg id="force-graph" width="100%" height="720" viewBox="0 0 1400 720" preserveAspectRatio="xMidYMid meet" style="cursor:grab;display:block;"></svg>
 </div>
@@ -505,6 +528,172 @@ func buildForceGraph(vms []VMStat) template.HTML {
       applyFocus();
     }
   });
+
+  // ---- Node-group toggles + explore mode ----------------------------------
+  // Hidden groups: user has unchecked them. They participate in layout (so
+  // positions stay stable) but their DOM is display:none and edges to them
+  // are hidden too.
+  // Explore mode: when active, start with only 'external' visible; clicking
+  // a node reveals its direct downstream neighbours; double-clicking collapses
+  // anything that became visible *through* this node and is not still
+  // reachable via another expanded chain. State persisted in localStorage.
+  const LS_HIDDEN  = "status-board.graph.hidden";
+  const LS_EXPLORE = "status-board.graph.exploreMode";
+  const LS_OPENED  = "status-board.graph.exploreOpened";
+  const hiddenGroups = new Set();
+  try {
+    const raw = localStorage.getItem(LS_HIDDEN);
+    if (raw) JSON.parse(raw).forEach(g => hiddenGroups.add(g));
+  } catch (e) {}
+  let exploreMode = false;
+  try { exploreMode = localStorage.getItem(LS_EXPLORE) === "1"; } catch (e) {}
+  const opened = new Set(); // set of node ids that user has expanded in explore mode
+  try {
+    const raw = localStorage.getItem(LS_OPENED);
+    if (raw) JSON.parse(raw).forEach(id => opened.add(id));
+  } catch (e) {}
+
+  // Build directed adjacency (downstream) from the original edge list — the
+  // existing adj is undirected. We treat edges as going source -> target,
+  // matching the natural left-to-right flow of the layered layout.
+  const downstream = nodes.map(() => new Set());
+  for (const e of edges) {
+    downstream[e.source].add(e.target);
+  }
+
+  function persist() {
+    try { localStorage.setItem(LS_HIDDEN, JSON.stringify([...hiddenGroups])); } catch (e) {}
+    try { localStorage.setItem(LS_EXPLORE, exploreMode ? "1" : "0"); } catch (e) {}
+    try { localStorage.setItem(LS_OPENED, JSON.stringify([...opened])); } catch (e) {}
+  }
+
+  function nodeVisible(i) {
+    const n = nodes[i];
+    if (hiddenGroups.has(n.group)) return false;
+    if (!exploreMode) return true;
+    if (n.group === "external") return true;
+    return opened.has(n.id);
+  }
+
+  function applyVisibility() {
+    for (let i = 0; i < nodes.length; i++) {
+      const vis = nodeVisible(i);
+      nodeEls[i].classList.toggle("fg-hidden", !vis);
+    }
+    for (let i = 0; i < edges.length; i++) {
+      const e = edges[i];
+      const vis = nodeVisible(e.source) && nodeVisible(e.target);
+      edgeEls[i].classList.toggle("fg-hidden", !vis);
+    }
+    alpha = Math.max(alpha, 0.2);
+  }
+
+  // In explore mode: clicking a visible node reveals its downstream
+  // neighbours (skipping hidden groups). Double-click on an opened node
+  // collapses everything reachable *only* through it.
+  function expandFrom(i) {
+    const n = nodes[i];
+    opened.add(n.id);
+    for (const j of downstream[i]) {
+      if (hiddenGroups.has(nodes[j].group)) continue;
+      // Reveal the neighbour itself. The neighbour is "opened" only when the
+      // user explicitly clicks it (so its grandchildren stay hidden) — but
+      // we still need it visible. We achieve that by treating any node whose
+      // parent is opened as visible too. Simpler: track an extra "revealed"
+      // set. To keep state minimal, store the revealed nodes in opened.
+      opened.add(nodes[j].id);
+    }
+  }
+  function collapseFrom(i) {
+    // Remove this node from opened, then recompute reachable closure.
+    opened.delete(nodes[i].id);
+    // Anything no longer reachable from any opened external should drop.
+    const reachable = new Set();
+    // Start frontier: opened externals + any explicitly opened node still in opened.
+    const frontier = [];
+    for (let k = 0; k < nodes.length; k++) {
+      if (nodes[k].group === "external") {
+        frontier.push(k);
+        reachable.add(nodes[k].id);
+      }
+    }
+    while (frontier.length) {
+      const k = frontier.shift();
+      if (!opened.has(nodes[k].id) && nodes[k].group !== "external") continue;
+      for (const j of downstream[k]) {
+        if (!opened.has(nodes[j].id)) continue;
+        if (reachable.has(nodes[j].id)) continue;
+        reachable.add(nodes[j].id);
+        frontier.push(j);
+      }
+    }
+    // Drop any opened ids that are not reachable from an external root.
+    for (const id of [...opened]) {
+      if (!reachable.has(id)) opened.delete(id);
+    }
+  }
+
+  // Wire the toggle row.
+  document.querySelectorAll("#fg-controls .node-toggle input").forEach(cb => {
+    const g = cb.dataset.group;
+    cb.checked = !hiddenGroups.has(g);
+    cb.addEventListener("change", () => {
+      if (cb.checked) hiddenGroups.delete(g);
+      else hiddenGroups.add(g);
+      persist();
+      applyVisibility();
+    });
+  });
+  const explCb = document.getElementById("exploreMode");
+  const explLbl = document.getElementById("explore-toggle");
+  function reflectExplore(){
+    explCb.checked = exploreMode;
+    explLbl.classList.toggle("active", exploreMode);
+  }
+  reflectExplore();
+  explCb.addEventListener("change", () => {
+    exploreMode = explCb.checked;
+    if (!exploreMode) opened.clear();
+    persist(); reflectExplore(); applyVisibility();
+  });
+
+  // Hook clicks: in explore mode, single-click expands; double-click collapses.
+  // Single-click expansion is layered on top of the existing focus toggle —
+  // we keep the focus-toggle behaviour for non-explore mode.
+  const origUp = up;
+  up = function(ev) {
+    if (exploreMode && dragIdx >= 0 && !dragMoved) {
+      const i = dragIdx;
+      // expand on click
+      expandFrom(i);
+      persist();
+      applyVisibility();
+      dragIdx = -1; dragStart = null;
+      return;
+    }
+    origUp(ev);
+  };
+  // Re-bind mouseup handlers to use new closure.
+  window.removeEventListener("mouseup", up);
+  window.addEventListener("mouseup", up);
+  window.removeEventListener("touchend", up);
+  window.addEventListener("touchend", up);
+
+  // Double-click: in explore mode collapse; in normal mode existing behaviour
+  // (unpin) remains via the per-node handler. Add a capture-phase handler
+  // that wins in explore mode.
+  nodeEls.forEach((el, i) => {
+    el.addEventListener("dblclick", ev => {
+      if (!exploreMode) return; // let the existing handler unpin
+      ev.stopPropagation();
+      ev.preventDefault();
+      collapseFrom(i);
+      persist();
+      applyVisibility();
+    }, true);
+  });
+
+  applyVisibility();
 })();
 </script>`
 	return template.HTML(html)

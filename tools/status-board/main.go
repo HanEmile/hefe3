@@ -58,6 +58,40 @@ type Restic struct {
 	Older     int
 }
 
+// BackupTarget is one place a path is backed up to (typically a restic repo).
+// Each VM-path-target tuple corresponds to one physical repo today; modelled
+// as a list to allow adding cold archive / second-site targets later without
+// changing this code.
+type BackupTarget struct {
+	Kind     string // "restic"
+	Label    string // human label e.g. "storagebox-bx11"
+	Repo     string // filesystem path of the repo
+
+	// Snapshot stats for this target repo (counts across all paths in the
+	// repo - restic keeps them in one snapshots/ dir per repo).
+	Exists      string // yes | no | no-snaps
+	Snapshots   int
+	AgeHours    float64
+	OldestHours float64
+	Size        string
+	Last24h     int
+	Last7d      int
+	Last30d     int
+	Older       int
+}
+
+// BackupPath is one backed-up directory inside a VM, with one or more targets.
+type BackupPath struct {
+	Path    string
+	Targets []BackupTarget
+}
+
+// BackupView is the per-VM rollup used by the Backups tab.
+type BackupView struct {
+	Configured bool
+	Paths      []BackupPath
+}
+
 type Storagebox struct {
 	Reachable bool
 	Total     int64 // bytes
@@ -106,6 +140,7 @@ type VMStat struct {
 	MemUsed   int64
 	Virsh     VirshInfo
 	Restic    Restic
+	Backups   BackupView
 	Capacity  Capacity
 
 	// Extra metrics for the Overview tab. Zero when not reachable.
@@ -144,6 +179,8 @@ type fleetOverview struct {
 var (
 	inventory     []VM
 	backupsEnabled = map[string]bool{}
+	backupPaths    = map[string][]string{}
+	backupTargets  = map[string][]BackupTarget{}
 	zfsPoolNames   []string
 	listenAddr    = "127.0.0.1:8090"
 	storageboxDir = "/mnt/storagebox-bx11"
@@ -428,6 +465,100 @@ func resticFor(vm string) Restic {
 	return r
 }
 
+// scanTargetRepo populates snapshot stats for one BackupTarget by walking
+// its repo on disk. Mirrors resticFor's per-repo logic so the two stay in
+// sync. Returns target with stats filled in (or Exists="no" / "no-snaps").
+func scanTargetRepo(t BackupTarget) BackupTarget {
+	t.Exists = "no"
+	if t.Repo == "" {
+		return t
+	}
+	if _, err := os.Stat(t.Repo); err != nil {
+		return t
+	}
+	snapsDir := filepath.Join(t.Repo, "snapshots")
+	entries, err := os.ReadDir(snapsDir)
+	if err != nil {
+		t.Exists = "no-snaps"
+		return t
+	}
+	var latest, oldest time.Time
+	count := 0
+	now := time.Now()
+	for _, e := range entries {
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		count++
+		mt := info.ModTime()
+		if mt.After(latest) {
+			latest = mt
+		}
+		if oldest.IsZero() || mt.Before(oldest) {
+			oldest = mt
+		}
+		ageH := now.Sub(mt).Hours()
+		switch {
+		case ageH < 24:
+			t.Last24h++
+		case ageH < 24*7:
+			t.Last7d++
+		case ageH < 24*30:
+			t.Last30d++
+		default:
+			t.Older++
+		}
+	}
+	t.Exists = "yes"
+	t.Snapshots = count
+	if count > 0 {
+		t.AgeHours = time.Since(latest).Hours()
+		t.OldestHours = time.Since(oldest).Hours()
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+	defer cancel()
+	if out, err := exec.CommandContext(ctx, "du", "-shx", filepath.Join(t.Repo, "data")).Output(); err == nil {
+		fields := strings.Fields(string(out))
+		if len(fields) > 0 {
+			t.Size = fields[0]
+		}
+	}
+	return t
+}
+
+// backupViewFor builds the nested per-VM Backups view (paths -> targets).
+// Today every VM has one target (storagebox) and the same target repo holds
+// snapshots for every path within that VM, so we scan each target once and
+// reuse its stats across the VM's paths. When a future config adds a
+// per-path or per-target repo, scanTargetRepo will read it independently.
+func backupViewFor(vm string) BackupView {
+	bv := BackupView{Configured: backupsEnabled[vm]}
+	if !bv.Configured {
+		return bv
+	}
+	paths := backupPaths[vm]
+	rawTargets := backupTargets[vm]
+	scanned := make(map[string]BackupTarget, len(rawTargets))
+	for _, t := range rawTargets {
+		if _, ok := scanned[t.Repo]; ok {
+			continue
+		}
+		scanned[t.Repo] = scanTargetRepo(t)
+	}
+	if len(paths) == 0 {
+		paths = []string{"(no paths declared)"}
+	}
+	for _, path := range paths {
+		bp := BackupPath{Path: path}
+		for _, t := range rawTargets {
+			bp.Targets = append(bp.Targets, scanned[t.Repo])
+		}
+		bv.Paths = append(bv.Paths, bp)
+	}
+	return bv
+}
+
 // zpoolsStatus reads `zpool list -Hp` for the configured zpools and
 // returns capacity/usage. Pools listed in zfsPoolNames but missing on
 // the host are silently skipped (no-op).
@@ -636,6 +767,7 @@ func collectVM(vm VM) VMStat {
 	}
 	st.Capacity = capacityFor(vm.Name, metrics)
 	st.Restic = resticFor(vm.Name)
+	st.Backups = backupViewFor(vm.Name)
 	// best-effort: record this scrape for trend fitting (only if VM is reachable
 	// and we got real numbers).
 	now := time.Now().Unix()
@@ -1428,7 +1560,46 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
   .card.bad  { border-color: var(--bad); }
   .card.warn { border-color: var(--warn); }
   .card.ok   { border-color: var(--ok); }
+  /* --- Backups tab: nested VM -> path -> target --- */
+  .backups-list { display:flex; flex-direction:column; gap:6px; }
+  .backup-vm { border:1px solid var(--border); border-radius:4px; background:var(--card); padding:6px 10px; }
+  .backup-vm.bad  { border-left:3px solid var(--bad); }
+  .backup-vm.warn { border-left:3px solid var(--warn); }
+  .backup-vm.ok   { border-left:3px solid var(--ok); }
+  .backup-vm.off  { border-left:3px solid var(--dimmer); color:var(--dim); display:flex; align-items:center; gap:.7em; }
+  .backup-vm summary { cursor:pointer; display:flex; align-items:center; gap:.7em; list-style:none; }
+  .backup-vm summary::-webkit-details-marker { display:none; }
+  .backup-vm summary::before { content:"\25B8"; color:var(--dimmer); font-size:10px; width:1em; }
+  .backup-vm[open] summary::before { content:"\25BE"; }
+  .bvm-name { font-weight:600; font-family:ui-monospace, Menlo, monospace; }
+  .bvm-meta { color:var(--dim); font-size:11px; margin-left:auto; font-family:ui-monospace, Menlo, monospace; }
+  .badge { font-size:10px; padding:1px 6px; border-radius:8px; font-family:ui-monospace, Menlo, monospace; text-transform:uppercase; letter-spacing:.5px; }
+  .badge.ok   { background:var(--ok-bg); color:var(--ok-fg); }
+  .badge.warn { background:var(--warn-bg); color:var(--warn-fg); }
+  .badge.bad  { background:var(--bad-bg); color:var(--bad-fg); }
+  .badge.off  { background:var(--unknown-bg); color:var(--unknown-fg); }
+  .bvm-paths { margin-top:8px; padding-left:14px; display:flex; flex-direction:column; gap:6px; }
+  .bpath { border-left:2px solid var(--border); padding:2px 0 2px 10px; }
+  .bpath-label { font-family:ui-monospace, Menlo, monospace; font-size:12px; color:var(--fg); }
+  .bpath-icon { color:var(--dimmer); margin-right:1px; }
+  .bpath-name { font-weight:500; }
+  .btargets-tbl { width:100%; font-size:11px; font-family:ui-monospace, Menlo, monospace; margin-top:3px; border-collapse:collapse; }
+  .btargets-tbl th { text-align:left; color:var(--dimmer); font-weight:normal; font-size:10px; text-transform:uppercase; letter-spacing:.5px; padding:2px 6px; }
+  .btargets-tbl td { padding:2px 6px; color:var(--fg); }
+  .btargets-tbl td.repo-path { color:var(--dimmer); font-size:10px; }
+  .ttype { color:var(--dim); }
+  .tlabel { font-weight:500; }
+  /* --- Force-graph toggles --- */
+  .fg-controls { display:flex; flex-wrap:wrap; gap:.6em 1em; align-items:center; padding:6px 8px; margin-bottom:6px; background:var(--card); border:1px solid var(--border); border-radius:4px; font-size:11px; }
+  .fg-controls .node-toggle { display:inline-flex; align-items:center; gap:.25em; cursor:pointer; user-select:none; font-family:ui-monospace, Menlo, monospace; }
+  .fg-controls .node-toggle input { accent-color:var(--ok); }
+  .fg-controls .node-toggle .sw { display:inline-block; width:8px; height:8px; border-radius:50%; }
+  .fg-controls .sep { width:1px; align-self:stretch; background:var(--border); }
+  .fg-controls .explore { display:inline-flex; align-items:center; gap:.3em; padding:2px 8px; border:1px solid var(--border); border-radius:3px; cursor:pointer; }
+  .fg-controls .explore.active { background:#2a3a26; color:#9fe6b5; border-color:#3a5a36; }
+  .fg-hidden { display:none !important; }
   .spark { width: 100%; height: 26px; display: block; }
+</style></head>
 </style></head>
 <body>
   <header class="topbar">
@@ -1592,34 +1763,66 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
 
   <section class="tab" id="tab-backups" data-tab="backups">
     <h2>backups</h2>
-    <table>
-      <thead><tr>
-        <th>VM</th><th>configured</th><th>latest</th>
-        <th>last 24h</th><th>last 7d</th><th>last 30d</th><th>older</th>
-        <th>repo size</th>
-      </tr></thead>
-      <tbody>
-      {{- range sortBackups .VMs }}
-        <tr>
-          <td class="name">{{ .Name }}</td>
-          <td>{{ if .Restic.Configured }}<span class="ok">yes</span>{{ else }}<span style="color:var(--dimmer);">no</span>{{ end }}</td>
-          <td class="restic {{ resticCls .Restic }}" style="font-family:monospace;font-size:12px;">
-            {{- if not .Restic.Configured -}}—
-            {{- else if eq .Restic.Snapshots 0 -}}<span class="bad">no snapshots</span>
-            {{- else -}}{{ ageText .Restic.AgeHours }} ago{{- end }}
-          </td>
-          <td>{{ .Restic.Last24h }}</td>
-          <td>{{ .Restic.Last7d }}</td>
-          <td>{{ .Restic.Last30d }}</td>
-          <td>{{ .Restic.Older }}</td>
-          <td><span style="font-family:monospace;">{{ if .Restic.Size }}{{ .Restic.Size }}{{ else }}—{{ end }}</span></td>
-        </tr>
+    <div class="backups-list">
+    {{- range sortBackups .VMs }}
+      {{- $vmCls := resticCls .Restic }}
+      {{- if not .Restic.Configured }}
+      <div class="backup-vm off" data-vm="{{ .Name }}" data-backup-paths="0">
+        <span class="bvm-name">{{ .Name }}</span>
+        <span class="badge off">no backups configured</span>
+      </div>
+      {{- else }}
+      <details class="backup-vm {{ $vmCls }}" data-vm="{{ .Name }}" data-backup-paths="{{ len .Backups.Paths }}" {{ if or (eq $vmCls "bad") (eq $vmCls "warn") }}open{{ end }}>
+        <summary>
+          <span class="bvm-name">{{ .Name }}</span>
+          <span class="badge {{ $vmCls }}">
+            {{- if eq .Restic.Snapshots 0 -}}no snapshots
+            {{- else -}}{{ ageText .Restic.AgeHours }} ago{{- end -}}
+          </span>
+          <span class="bvm-meta">{{ len .Backups.Paths }} path{{ if ne (len .Backups.Paths) 1 }}s{{ end }} · {{ .Restic.Snapshots }} snap{{ if ne .Restic.Snapshots 1 }}s{{ end }}{{ if .Restic.Size }} · {{ .Restic.Size }} on disk{{ end }}</span>
+        </summary>
+        <div class="bvm-paths">
+          {{- range .Backups.Paths }}
+          <div class="bpath">
+            <div class="bpath-label"><span class="bpath-icon">/</span><span class="bpath-name">{{ .Path }}</span></div>
+            <div class="btargets">
+              <table class="btargets-tbl">
+                <thead><tr>
+                  <th>target</th><th>latest</th><th>snaps</th>
+                  <th>24h</th><th>7d</th><th>30d</th><th>older</th><th>size</th><th>repo</th>
+                </tr></thead>
+                <tbody>
+                {{- range .Targets }}
+                  <tr>
+                    <td><span class="ttype">{{ .Kind }}</span> <span class="tlabel">{{ .Label }}</span></td>
+                    <td class="age">
+                      {{- if eq .Exists "no" -}}<span class="badge bad">no repo</span>
+                      {{- else if eq .Snapshots 0 -}}<span class="badge warn">no snaps</span>
+                      {{- else -}}{{ ageText .AgeHours }} ago{{- end -}}
+                    </td>
+                    <td>{{ .Snapshots }}</td>
+                    <td>{{ .Last24h }}</td>
+                    <td>{{ .Last7d }}</td>
+                    <td>{{ .Last30d }}</td>
+                    <td>{{ .Older }}</td>
+                    <td>{{ if .Size }}{{ .Size }}{{ else }}—{{ end }}</td>
+                    <td class="repo-path">{{ .Repo }}</td>
+                  </tr>
+                {{- end }}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {{- end }}
+        </div>
+      </details>
       {{- end }}
-      </tbody>
-    </table>
+    {{- end }}
+    </div>
     <div class="footer">
-      buckets computed from snapshot mtimes (no extra IO). "bad" = no snapshot &lt; 48h. Repo size is best-effort du -shx
-      with a short timeout to avoid wedging the CIFS mount.
+      Each VM groups its configured paths; each path lists every target it is backed up to.
+      Buckets from snapshot mtimes; repo size from du -shx (best-effort, short timeout).
+      VMs sorted bad → warn → ok → unconfigured. backupPaths exposed via /etc/status-board-graph.json.
     </div>
   </section>
 
@@ -1901,6 +2104,12 @@ func main() {
 	if g, err := loadGraphData(); err == nil {
 		for _, v := range g.VMs {
 			backupsEnabled[v.Name] = v.BackupsEnabled
+			backupPaths[v.Name] = v.BackupPaths
+			tgts := make([]BackupTarget, 0, len(v.BackupTargets))
+			for _, t := range v.BackupTargets {
+				tgts = append(tgts, BackupTarget{Kind: t.Kind, Label: t.Label, Repo: t.Repo})
+			}
+			backupTargets[v.Name] = tgts
 		}
 		zfsPoolNames = g.Zpools
 	} else {
