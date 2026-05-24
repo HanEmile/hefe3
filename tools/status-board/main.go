@@ -1029,13 +1029,13 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
   {{ .NATSVG }}
 
   <h2>traffic flow</h2>
-  {{ .SVG }}
+  {{ .ForceGraph }}
   <div class="legend">
     <div><span class="sw ok"></span> all probes up</div>
     <div><span class="sw warn"></span> reachable, no probes</div>
     <div><span class="sw bad"></span> unreachable / probe fail</div>
-    <div><span class="sw tls"></span> TLS via medano nginx</div>
-    <div><span class="sw byp"></span> tailscale-only (bypasses medano)</div>
+    <div><span class="sw tls"></span> TLS-terminating path via naraj</div>
+    <div><span class="sw byp"></span> tailscale-only (bypasses naraj)</div>
   </div>
 
   <h2>vm inventory ({{ len .VMs }} VMs)</h2>
@@ -1109,14 +1109,16 @@ func handle(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	page.Execute(w, struct {
 		Now string
-		SVG    template.HTML
-		NATSVG template.HTML
+		SVG        template.HTML
+		NATSVG     template.HTML
+		ForceGraph template.HTML
 		VMs []VMStat
 		SB  Storagebox
 	}{
 		Now: time.Now().Format("2006-01-02 15:04:05"),
-		SVG:    buildSVG(vms),
-		NATSVG: buildNATSVG(),
+		SVG:        buildSVG(vms),
+		NATSVG:     buildNATSVG(),
+		ForceGraph: buildForceGraph(vms),
 		VMs: vms,
 		SB:  sb,
 	})
