@@ -1,4 +1,4 @@
-{ config, ... }:
+{ config, lib, ... }:
 
 let
   pubv4 = "95.217.35.60";
@@ -7,8 +7,77 @@ let
   httpPort = "80";
   httpsPort = "80";
   narajVMip = "192.168.75.2";
+  vmSubnet = "192.168.75.0/24";
 
   ircBouncerPort = 6697;
+
+  # ---------- declarative NAT/forward topology ----------
+  # Single source of truth for both the iptables rules and the dashboard
+  # NAT visualization. Each entry describes one logical ingress flow into a
+  # backend VM. dport is the public-facing port (= naraj-facing port for
+  # forwards), dest is "<ip>:<port>" of the backend.
+  natFlows = [
+    {
+      name = "https-ingress";
+      desc = "External HTTPS to naraj reverse proxy";
+      proto = "tcp";
+      dport = 443;
+      dest  = "${narajVMip}:443";
+      hairpin = true; # also DNAT from vmSubnet -> pubv4:443
+      snatReturn = true; # SNAT replies on eno1 so external clients see pubv4
+    }
+    {
+      name = "http-ingress";
+      desc = "External HTTP to naraj (ACME http-01 + redirect)";
+      proto = "tcp";
+      dport = 80;
+      dest  = "${narajVMip}:80";
+      hairpin = true;
+      snatReturn = true;
+    }
+    # IRC bouncer kept as historical example, currently disabled in
+    # forwardPorts but the hairpin rule is still installed (harmless).
+    {
+      name = "ircs";
+      desc = "IRC bouncer (hairpin only; primary DNAT is via nixos nat.forwardPorts when re-enabled)";
+      proto = "tcp";
+      dport = ircBouncerPort;
+      dest  = "${ircVMip}:${toString ircBouncerPort}";
+      hairpin = true;
+      snatReturn = false;
+    }
+  ];
+
+  # natFlows -> iptables shell snippet.
+  mkFlowRules = f:
+    let
+      destIp = builtins.head (lib.splitString ":" f.dest);
+      destPort = builtins.elemAt (lib.splitString ":" f.dest) 1;
+    in
+    (lib.optionalString f.hairpin ''
+      # ${f.name}: hairpin DNAT (VM-originated traffic to public IP)
+      iptables -t nat -I PREROUTING 1 -s ${vmSubnet} -d ${pubv4} -p ${f.proto} --dport ${toString f.dport} -j DNAT --to-destination ${f.dest}
+    '')
+    + (lib.optionalString (destIp == narajVMip) ''
+      # ${f.name}: FORWARD chain accept (external -> bridge)
+      iptables -I FORWARD 1 -i eno1 -o virbr0 -d ${destIp} -p ${f.proto} --dport ${toString f.dport} -j ACCEPT
+      iptables -I FORWARD 1 -i virbr0 -o eno1 -s ${destIp} -p ${f.proto} --sport ${toString destPort} -j ACCEPT
+      # ${f.name}: hairpin FORWARD + MASQUERADE
+      iptables -I FORWARD 1 -i virbr0 -o virbr0 -d ${destIp} -p ${f.proto} --dport ${toString f.dport} -j ACCEPT
+      iptables -t nat -I POSTROUTING 1 -o virbr0 -d ${destIp} -p ${f.proto} --dport ${toString f.dport} -j MASQUERADE
+    '')
+    + (lib.optionalString f.snatReturn ''
+      # ${f.name}: SNAT replies on eno1 to pubv4 so clients see medano's address
+      iptables -t nat -I POSTROUTING 1 -o eno1 -s ${destIp} -j SNAT --to-source ${pubv4}
+    '');
+
+  natFlowsJSON = builtins.toJSON {
+    publicIp = pubv4;
+    vmSubnet = vmSubnet;
+    externalIface = "eno1";
+    bridge = "virbr0";
+    flows = natFlows;
+  };
 in
 {
 
@@ -84,45 +153,14 @@ in
       ];
 
       extraCommands = ''
-        # Clean hairpin NAT: internal -> external IP -> internal service
-        iptables -t nat -I PREROUTING 1 -s 192.168.75.0/24 -d ${pubv4} -p tcp --dport ${toString ircBouncerPort} -j DNAT --to-destination ${ircVMip}:${toString ircBouncerPort}
-
-        iptables -t nat -I PREROUTING 1 -s 192.168.75.0/24 -d ${pubv4} -p udp --dport ${toString ircBouncerPort} -j DNAT --to-destination ${ircVMip}:${toString ircBouncerPort}
-
-        # Allow web traffic from VMs to host
+        # Allow web traffic from VMs to host (used by status-board upstream)
         iptables -I INPUT 1 -i virbr0 -p tcp --dport 80 -j ACCEPT
         iptables -I INPUT 1 -i virbr0 -p tcp --dport 443 -j ACCEPT
 
-        # Forward DNAT'd web traffic to naraj (NixOS nat module only adds
-        # the DNAT rule; FORWARD has to be opened explicitly).
-        iptables -I FORWARD 1 -i eno1 -o virbr0 -d ${narajVMip} -p tcp --dport 80  -j ACCEPT
-        iptables -I FORWARD 1 -i eno1 -o virbr0 -d ${narajVMip} -p tcp --dport 443 -j ACCEPT
-        iptables -I FORWARD 1 -i virbr0 -o eno1 -s ${narajVMip} -p tcp --sport 80  -j ACCEPT
-        iptables -I FORWARD 1 -i virbr0 -o eno1 -s ${narajVMip} -p tcp --sport 443 -j ACCEPT
-
-        # SNAT the return packets so external clients see medano's public IP,
-        # not naraj's bridge IP. Without this the reply from naraj has src=
-        # 192.168.75.2 which is unroutable on the public internet.
-        iptables -t nat -I POSTROUTING 1 -o eno1 -s ${narajVMip} -j SNAT --to-source ${pubv4}
-
-        # Hairpin NAT: connections from other VMs (192.168.75.0/24) to
-        # medano's public IP on 80/443 should also DNAT to naraj. Without
-        # this, gotosocial on social VM resolving auth.medano.emile.space
-        # to medano's public IP fails because the regular DNAT only matches
-        # packets coming in on eno1.
-        iptables -t nat -I PREROUTING 1 -s 192.168.75.0/24 -d ${pubv4} -p tcp --dport 80  -j DNAT --to-destination ${narajVMip}:80
-        iptables -t nat -I PREROUTING 1 -s 192.168.75.0/24 -d ${pubv4} -p tcp --dport 443 -j DNAT --to-destination ${narajVMip}:443
-
-        # Allow virbr0->virbr0 forward for hairpin (when source and dest are
-        # both on virbr0 — needs explicit accept on most kernels).
-        iptables -I FORWARD 1 -i virbr0 -o virbr0 -d ${narajVMip} -p tcp --dport 80  -j ACCEPT
-        iptables -I FORWARD 1 -i virbr0 -o virbr0 -d ${narajVMip} -p tcp --dport 443 -j ACCEPT
-
-        # And SNAT so naraj sees the request as coming from medano, not the
-        # originating VM (avoids reply going via wrong path).
-        iptables -t nat -I POSTROUTING 1 -o virbr0 -d ${narajVMip} -p tcp --dport 80  -j MASQUERADE
-        iptables -t nat -I POSTROUTING 1 -o virbr0 -d ${narajVMip} -p tcp --dport 443 -j MASQUERADE
-      '';
+        # Generated from natFlows above (see let-binding). Editing this
+        # source produces the iptables rules below and the JSON file at
+        # /run/nat-flows.json consumed by the status-board NAT visualizer.
+      '' + lib.concatMapStrings mkFlowRules natFlows;
     };
 
     firewall = {
@@ -232,4 +270,6 @@ in
 
     };
   };
+
+  environment.etc."nat-flows.json".text = natFlowsJSON;
 }

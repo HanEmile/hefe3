@@ -1025,6 +1025,9 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
   {{- end }}
   {{ end }}
 
+  <h2>NAT topology</h2>
+  {{ .NATSVG }}
+
   <h2>traffic flow</h2>
   {{ .SVG }}
   <div class="legend">
@@ -1106,12 +1109,14 @@ func handle(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	page.Execute(w, struct {
 		Now string
-		SVG template.HTML
+		SVG    template.HTML
+		NATSVG template.HTML
 		VMs []VMStat
 		SB  Storagebox
 	}{
 		Now: time.Now().Format("2006-01-02 15:04:05"),
-		SVG: buildSVG(vms),
+		SVG:    buildSVG(vms),
+		NATSVG: buildNATSVG(),
 		VMs: vms,
 		SB:  sb,
 	})
