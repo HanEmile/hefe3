@@ -43,6 +43,9 @@ let
           Restart = "on-failure";
           RestartSec = 5;
           User = "root";
+          # Persistent sample store for the capacity-forecast trend fit.
+          StateDirectory = "status-board";
+          StateDirectoryMode = "0750";
         };
       };
 
