@@ -14,6 +14,7 @@
     domains = [
       {
         active = true;
+        restart = null; # only restart on XML change (matches networks/pools)
         definition =
           let
             vmdef = nixvirt.lib.domain.templates.linux {
