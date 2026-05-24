@@ -54,7 +54,7 @@ in
       OAUTH2_CLIENT_ID = "miniflux";
       OAUTH2_CLIENT_SECRET_FILE = config.age.secrets.miniflux_oidc_client_secret.path;
       OAUTH2_REDIRECT_URL = "${baseUrl}/oauth2/oidc/callback";
-      OAUTH2_OIDC_DISCOVERY_ENDPOINT = "https://auth.medano.emile.space";
+      OAUTH2_OIDC_DISCOVERY_ENDPOINT = "https://sso.emile.space";
       OAUTH2_USER_CREATION = "1";
     };
     createDatabaseLocally = true;

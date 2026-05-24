@@ -106,13 +106,14 @@ in
             locations."/".proxyPass = "http://${backend.v4}:${toString backend.ports.hedgedoc}";
           };
 
-        # --- authelia (auth) ---
-        "auth.emile.space" =
+        # --- authelia (single canonical host: sso.emile.space) ---
+        # Webauthn rp.id, OIDC issuer, session cookie domain and TOTP issuer
+        # are all pinned to sso.emile.space in authelia.nix.
+        "sso.emile.space" =
           let
             proxyPass = "http://192.168.75.3:9091";
           in
           tlsify {
-            serverAliases = [ "auth.medano.emile.space" ];
             locations = {
               "/".proxyPass = proxyPass;
               "/api/verify".proxyPass = proxyPass;
@@ -120,22 +121,13 @@ in
             };
           };
 
-        # --- sso.emile.space — legacy authelia hostname for gotosocial.
-        # Authelia's session config matches authelia_url=auth.medano.emile.space,
-        # so we rewrite Host on the upstream. recommendedProxySettings off to
-        # avoid the duplicate-Host-header bug.
-        "sso.emile.space" = tlsify {
-          locations."/" = {
-            proxyPass = "http://192.168.75.3:9091";
-            recommendedProxySettings = false;
-            extraConfig = ''
-              proxy_set_header Host auth.medano.emile.space;
-              proxy_set_header X-Real-IP $remote_addr;
-              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-              proxy_set_header X-Forwarded-Proto $scheme;
-              proxy_http_version 1.1;
-            '';
-          };
+        # Legacy hostnames: 301 to canonical so old bookmarks keep working
+        # and webauthn rp.id never sees the wrong host.
+        "auth.emile.space" = tlsify {
+          serverAliases = [ "auth.medano.emile.space" ];
+          locations."/".extraConfig = ''
+            return 301 https://sso.emile.space$request_uri;
+          '';
         };
 
         # --- gotosocial (social) ---
@@ -214,7 +206,7 @@ in
           locations."@authelia_signin" = {
             extraConfig = ''
               internal;
-              return 302 https://auth.emile.space/?rd=$target_url&rm=$request_method;
+              return 302 https://sso.emile.space/?rd=$target_url&rm=$request_method;
             '';
           };
         };

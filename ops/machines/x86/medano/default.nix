@@ -219,7 +219,7 @@ in
   services.healthProbes.probes = [
     { name = "naraj-root";       url = "http://${hefe.ops.ipam.default.naraj.v4}/"; }
     { name = "emile-space";      url = "https://emile.space/"; }
-    { name = "auth";             url = "https://auth.emile.space/api/health"; }
+    { name = "auth";             url = "https://sso.emile.space/api/health"; }
     { name = "md";               url = "https://md.emile.space/status"; }
     { name = "photo";            url = "https://photo.emile.space/api/server/ping"; }
     { name = "amalthea";         url = "https://amaltheea.medano.emile.space/"; expectedStatus = 502; }

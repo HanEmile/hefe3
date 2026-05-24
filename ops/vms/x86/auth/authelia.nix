@@ -133,7 +133,7 @@
           cookies = [
             {
               domain = "emile.space";
-              authelia_url = "https://auth.medano.emile.space";
+              authelia_url = "https://sso.emile.space";
               # The period of time the user can be inactive for until the session is destroyed. Useful if you want long session timers but don’t want unused devices to be vulnerable.
               inactivity = "1h";
               # The period of time before the cookie expires and the session is destroyed. This is overridden by remember_me when the remember me box is checked.
@@ -214,10 +214,18 @@
         };
 
         # type = types.enum [ "" "totp" "webauthn" "mobile_push" ];
+        webauthn = {
+          disable = false;
+          display_name = "Authelia";
+          attestation_conveyance_preference = "indirect";
+          user_verification = "preferred";
+        };
+
+
         default_2fa_method = "totp";
         totp = {
           disable = false;
-          issuer = "auth.medano.emile.space";
+          issuer = "sso.emile.space";
           algorithm = "sha1";
           digits = 6;
           period = 30;

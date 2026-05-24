@@ -39,7 +39,7 @@
   #     in
   #     {
   #       LISTEN_ADDR = with listen.amalthea; "${host}:${toString port}";
-  #       OIDC_ISSUER = "https://auth.medano.emile.space";
+  #       OIDC_ISSUER = "https://sso.emile.space";
   #       OIDC_CLIENT_ID = "amalthea";
   #       OIDC_REDIRECT_URI = "https://amalthea.medano.emile.space/auth/callback";
   #       IMMICH_URL = with listen.photo; "http://${host}:${toString port}";

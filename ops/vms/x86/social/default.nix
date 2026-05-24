@@ -51,7 +51,7 @@ in
 
       oidc-enabled = true;
       oidc-idp-name = "authelia";
-      oidc-issuer = "https://auth.medano.emile.space";
+      oidc-issuer = "https://sso.emile.space";
       oidc-client-id = "gotosocial";
       oidc-link-existing = true;
     };

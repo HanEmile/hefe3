@@ -29,6 +29,6 @@ in
 
   services.healthProbes.probes = [
     { name = "self"; url = "http://${ipam.v4}:${toString ipam.ports.authelia}/api/health"; }
-    { name = "public"; url = "https://auth.medano.emile.space/"; }
+    { name = "public"; url = "https://sso.emile.space/"; }
   ];
 }

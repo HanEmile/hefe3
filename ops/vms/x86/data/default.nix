@@ -128,7 +128,7 @@ in
         oidc = {
           client_id = "sftpgo";
           client_secret_file = config.age.secrets."sftpgo_oidc_client_password".path;
-          config_url = "https://auth.medano.emile.space";
+          config_url = "https://sso.emile.space";
           redirect_base_url = "data.medano.emile.space";
           scopes = [
             "openid"
