@@ -54,25 +54,6 @@ in
 
     # ctf
 
-    # syzkaller fuzzing VM pool
-    # (import (hefe.path.origSrc + "/ops/vms/x86/fuzz/libvirt.nix") {
-    #   inherit nixvirt;
-    #   pool = [
-    #     # Example: uncomment and set kernel paths to activate fuzz VMs
-    #     # {
-    #     #   name = "fuzz-mainline";
-    #     #   kernel = /keep/kernel/bzImage-mainline;
-    #     # }
-    #     # {
-    #     #   name = "fuzz-patched";
-    #     #   kernel = /keep/kernel/bzImage-patched;
-    #     #   initrd = /keep/kernel/initrd-patched.img;
-    #     #   memory = 4;
-    #     #   vcpu_count = 4;
-    #     #   extra_cmdline = "ksan.fault=panic";
-    #     # }
-    #   ];
-    # })
   ];
 
   age.secrets = {

@@ -77,8 +77,7 @@ hefe3/
 ```
 
 Companion docs (do not duplicate here):
-`MIGRATION.md`, `CORRINO-DECOMMISSION.md`, `NAMECHEAP-EMILE-SPACE.md`,
-`SYZKALLER-PLAN.md`.
+`MIGRATION.md`, `CORRINO-DECOMMISSION.md`, `NAMECHEAP-EMILE-SPACE.md`.
 
 ## Deploy commands
 
@@ -353,7 +352,7 @@ Three patterns:
   (libvirt holds the file open; silent swap = corrupted state).
   `virsh shutdown <vm>` first, redeploy, `virsh start <vm>`.
 - `MIGRATION.md`, `CORRINO-DECOMMISSION.md`,
-  `NAMECHEAP-EMILE-SPACE.md`, `SYZKALLER-PLAN.md` exist for
+  `NAMECHEAP-EMILE-SPACE.md` exist for
   history / one-shot procedures - read them, don't duplicate
   here.
 - caladan's `/etc/nix/machines` contains exactly one builder line
