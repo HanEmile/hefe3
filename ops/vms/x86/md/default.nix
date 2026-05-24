@@ -39,7 +39,7 @@
       host = hefe.ops.ipam.default.md.v4;
       port = hefe.ops.ipam.default.md.ports.hedgedoc;
 
-      domain = "md.medano.emile.space";
+      domain = "md.emile.space";
 
       urlPath = null; # we're hosting on the root of the subdomain and not a subpath
       allowGravatar = true;
@@ -80,6 +80,6 @@
 
   services.healthProbes.probes = [
     { name = "self"; url = "http://${hefe.ops.ipam.default.md.v4}:${toString hefe.ops.ipam.default.md.ports.hedgedoc}/status"; }
-    { name = "public"; url = "https://md.medano.emile.space/status"; }
+    { name = "public"; url = "https://md.emile.space/status"; }
   ];
 }

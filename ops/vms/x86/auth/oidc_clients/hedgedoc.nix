@@ -19,7 +19,7 @@
       public = false;
       authorization_policy = "one_factor";
       redirect_uris = [
-        "https://md.medano.emile.space/auth/oauth2/callback"
+        "https://md.emile.space/auth/oauth2/callback"
       ];
       scopes = [
         "openid"
