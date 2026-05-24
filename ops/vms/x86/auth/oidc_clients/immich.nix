@@ -21,8 +21,8 @@
       public = false;
       authorization_policy = "one_factor";
       redirect_uris = [
-        "https://photo.medano.emile.space/auth/login"
-        "https://photo.medano.emile.space/user-settings"
+        "https://photo.emile.space/auth/login"
+        "https://photo.emile.space/user-settings"
         "app.immich:///oauth-callback"
       ];
       scopes = [
