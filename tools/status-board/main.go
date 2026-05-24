@@ -11,6 +11,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -310,6 +311,12 @@ func virshState() map[string]VirshInfo {
 func resticFor(vm string) Restic {
 	repo := filepath.Join(storageboxBackupDir, vm)
 	r := Restic{Configured: backupsEnabled[vm], Exists: "no", RepoPath: repo}
+	// Skip the stat+du path entirely for VMs without configured backups -
+	// the storagebox is CIFS-over-autofs and 20 parallel stats can wedge
+	// it for tens of seconds.
+	if !r.Configured {
+		return r
+	}
 	if _, err := os.Stat(repo); err != nil {
 		return r
 	}
@@ -341,7 +348,13 @@ func resticFor(vm string) Restic {
 		r.AgeHours = time.Since(latest).Hours()
 		r.OldestHours = time.Since(oldest).Hours()
 	}
-	if out, err := exec.Command("du", "-shx", filepath.Join(repo, "data")).Output(); err == nil {
+	// 'du -shx' over the storagebox CIFS mount stalls under concurrent load
+	// (one du per VM in parallel during a page render = wedged mount). Wrap
+	// in a short context so a slow scan doesn't hold the entire dashboard
+	// hostage.
+	ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+	defer cancel()
+	if out, err := exec.CommandContext(ctx, "du", "-shx", filepath.Join(repo, "data")).Output(); err == nil {
 		fields := strings.Fields(string(out))
 		if len(fields) > 0 {
 			r.Size = fields[0]
