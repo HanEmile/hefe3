@@ -1278,16 +1278,13 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
 <html><head><meta charset="utf-8"><title>medano fleet</title>
 <style>
   /*
-   * Palette tuned for WCAG AA on the #181818 card background:
-   *   --fg      #eeeeee   contrast 17.0 : 1   (body text)
-   *   --dim     #bdbdbd   contrast  9.0 : 1   (secondary text, ≥ 4.5 required)
-   *   --border  #444444   contrast  2.4 : 1   (non-text — passes 3:1 for UI boundaries)
-   *   --link    #88aaff   contrast  7.4 : 1   (lifted from #88a → #88aaff for AA)
-   *   --ok      #4ec97b   contrast  6.8 : 1   (was #2ea043 ≈ 3.5 : 1 — failed AA)
-   *   --warn    #e2b04a   contrast  8.9 : 1
-   *   --bad     #ff7a7a   contrast  5.5 : 1   (was #f85149 ≈ 4.0 : 1 — borderline)
-   * Computed against #181818 (the card colour) via the standard sRGB
-   * relative luminance formula.
+   * Palette tuned for WCAG AA. Verified by tools/status-board/check-contrast.sh
+   * (runs on every nix build). Status badges have explicit fg/bg pairs because
+   * the previous design rendered text in the same colour as its background,
+   * which gave 1:1 contrast (illegible).
+   *
+   * Light-mode palette lives in the @media (prefers-color-scheme: light) block
+   * below; the OS picks one — there is intentionally no in-page toggle.
    */
   :root {
     --bg: #111;
@@ -1302,6 +1299,42 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
     --warn:    #e2b04a;
     --bad:     #ff7a7a;
     --unknown: #9a9a9a;
+    /* Status badge fg/bg pairs (text on tinted background). */
+    --ok-bg:      #1b3322;
+    --ok-fg:      #a8e8b8;
+    --warn-bg:    #3a2e15;
+    --warn-fg:    #ffd784;
+    --bad-bg:     #3a1d1d;
+    --bad-fg:     #ffc0c0;
+    --unknown-bg: #2a2a2a;
+    --unknown-fg: #d0d0d0;
+    /* Generic chip background (e.g. .probe). */
+    --chip-bg: #2a2a2a;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f7f7f7;
+      --fg: #1a1a1a;
+      --dim: #444444;
+      --dimmer: #5d5d5d;
+      --border: #cccccc;
+      --card: #ffffff;
+      --card2: #ececec;
+      --link: #1a4ea6;
+      --ok:      #0e5d28;
+      --warn:    #7a4a00;
+      --bad:     #8c1818;
+      --unknown: #5d5d5d;
+      --ok-bg:      #d6f5dd;
+      --ok-fg:      #0e5d28;
+      --warn-bg:    #fbe7b8;
+      --warn-fg:    #6b4100;
+      --bad-bg:     #fbd8d8;
+      --bad-fg:     #8c1818;
+      --unknown-bg: #e0e0e0;
+      --unknown-fg: #3a3a3a;
+      --chip-bg: #e6e6e6;
+    }
   }
   body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--fg); padding: 0; margin: 0; }
   main { padding: 0 1.5em 2em; }
@@ -1313,11 +1346,12 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
   td.name { font-weight: 600; }
   td.ip { font-family: monospace; color: var(--link); }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: middle; margin-right: 4px; }
-  .ok    { background: var(--ok);    color: var(--ok)    !important; }
-  .warn  { background: var(--warn);  color: var(--warn)  !important; }
-  .bad   { background: var(--bad);   color: var(--bad)   !important; }
-  .unknown { background: var(--unknown); color: var(--dim) !important; }
-  .probe { display: inline-block; padding: 2px 6px; margin: 1px 2px 1px 0; border-radius: 3px; font-size: 11px; background: #2a2a2a; color: var(--dim); }
+  /* Status badges: readable text on a tinted background, in a padded chip. */
+  .ok      { background: var(--ok-bg);      color: var(--ok-fg)      !important; padding: 1px 6px; border-radius: 3px; }
+  .warn    { background: var(--warn-bg);    color: var(--warn-fg)    !important; padding: 1px 6px; border-radius: 3px; }
+  .bad     { background: var(--bad-bg);     color: var(--bad-fg)     !important; padding: 1px 6px; border-radius: 3px; }
+  .unknown { background: var(--unknown-bg); color: var(--unknown-fg) !important; padding: 1px 6px; border-radius: 3px; }
+  .probe { display: inline-block; padding: 2px 6px; margin: 1px 2px 1px 0; border-radius: 3px; font-size: 11px; background: var(--chip-bg); color: var(--dim); }
   .probe.ok   { color: var(--ok); }
   .probe.bad  { color: var(--bad); }
   td.restic { font-family: monospace; font-size: 11px; line-height: 1.5; }
@@ -1327,7 +1361,7 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
   td.restic.off  { border-left: 3px solid var(--border);padding-left: 8px; color: var(--dimmer); }
   td.restic .repo { color: var(--dimmer); font-size: 10px; }
   /* progress bar inside table cells (memory / disk) */
-  .bar { position: relative; height: 6px; background: #2a2a2a; border-radius: 3px; overflow: hidden; margin-top: 3px; width: 120px; }
+  .bar { position: relative; height: 6px; background: var(--chip-bg); border-radius: 3px; overflow: hidden; margin-top: 3px; width: 120px; }
   .bar > span { display: block; height: 100%; background: var(--ok); }
   .bar.warn > span { background: var(--warn); }
   .bar.bad > span  { background: var(--bad); }
@@ -1337,7 +1371,7 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
   td.cap .forecast.warn { color: var(--warn); }
   td.cap .forecast.unknown { color: var(--unknown); }
   .footer { color: var(--dimmer); font-size: 11px; margin-top: 1em; }
-  svg { background: #181818; border-radius: 4px; max-width: 100%; }
+  svg { background: var(--card); border-radius: 4px; max-width: 100%; }
   /* legend lives outside the SVG to avoid overlap */
   .legend {
     display: flex; flex-wrap: wrap; gap: 1em;
@@ -1360,7 +1394,7 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
   /* ---- tab bar ---- */
   header.topbar {
     position: sticky; top: 0; z-index: 10;
-    background: #0d0d0d; border-bottom: 1px solid var(--border);
+    background: var(--card2); border-bottom: 1px solid var(--border);
     padding: 10px 1.5em 0;
   }
   header.topbar h1 { font-size: 1.1em; margin: 0 0 6px; color: var(--fg); }

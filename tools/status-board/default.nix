@@ -7,6 +7,15 @@ let
     version = "0.1.0";
     src = lib.cleanSource ./.;
     vendorHash = null;
+    nativeBuildInputs = [ pkgs.bash pkgs.python3 ];
+    # WCAG AA contrast check runs at build time so palette regressions fail
+    # nix-build rather than ship to the fleet. Runs against both dark and
+    # light @media branches. See tools/status-board/check-contrast.sh.
+    postPatch = ''
+      patchShebangs check-contrast.sh
+      bash check-contrast.sh
+      bash check-contrast.sh --mode=light
+    '';
   };
 
   module = { hefe }:
@@ -48,6 +57,23 @@ let
         let n = hefe.ops.nixos."${name}" or null;
         in if n == null then false
            else (n.config.vmBackups.enable or false);
+
+      backupPathsForVM = name:
+        let n = hefe.ops.nixos."${name}" or null;
+        in if n == null then []
+           else (n.config.vmBackups.paths or []);
+
+      # Backup targets per VM. Modeled as a list so adding a second target
+      # (e.g. a cold archive) becomes a config-only change here. Today every
+      # configured VM has exactly one target: the storagebox restic repo.
+      backupTargetsForVM = name:
+        if backupsEnabledForVM name then [
+          {
+            kind = "restic";
+            label = "storagebox-bx11";
+            repo = "/mnt/storagebox-bx11/backup/${name}";
+          }
+        ] else [];
 
       # Hand-edited cross-VM relationships. We can't reliably derive these
       # from per-VM evaluation because they cross OIDC, NFS, restic, etc.
@@ -103,6 +129,8 @@ let
           bridge = if ipam.default ? "${n}" then "virbr0" else "virbr1";
           ports = portsForVM n;
           backupsEnabled = backupsEnabledForVM n;
+          backupPaths = backupPathsForVM n;
+          backupTargets = backupTargetsForVM n;
         }) allVms;
         # Static list of ZFS pools to scrape via `zpool list -Hp` at runtime.
         zpools = [ "bpool" "rpool" "grave" ];
