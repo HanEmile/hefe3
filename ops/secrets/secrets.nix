@@ -55,8 +55,6 @@ in
   "guacamole_user_mapping_xml.age" = for [ medano ];
 
   # === arr ===
-  "arr.pinto-pike.ts.net.key.age" = for [ arr ];
-  "arr.pinto-pike.ts.net.crt.age" = for [ arr ];
   "mullvad_famous_hog_priv.age" = for [ rou ];
 
   # === mail ===

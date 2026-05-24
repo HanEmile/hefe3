@@ -45,7 +45,7 @@ in
     enable = true;
     package = pkgs.miniflux;
     config = {
-      LISTEN_ADDR = "${ipam.v4}:${toString ipam.ports.miniflux}";
+      LISTEN_ADDR = "127.0.0.1:${toString ipam.ports.miniflux}";
       BASE_URL = baseUrl;
       CLEANUP_FREQUENCY = 48;
 
@@ -70,8 +70,30 @@ in
     '';
   };
 
+  # tailscale serve: have tailscaled terminate TLS on
+  # https://rss.pinto-pike.ts.net and reverse-proxy to miniflux's local
+  # listener. The daemon handles cert provisioning and rotation, so there
+  # are no .age files to maintain.
+  systemd.services.tailscale-serve-rss = {
+    description = "Configure tailscale serve for rss.pinto-pike.ts.net";
+    after = [ "tailscaled.service" "network-online.target" "miniflux.service" ];
+    wants = [ "tailscaled.service" "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = pkgs.writeShellScript "tailscale-serve-rss" ''
+        set -eu
+        ${pkgs.tailscale}/bin/tailscale serve reset || true
+        ${pkgs.tailscale}/bin/tailscale serve --bg --https=443 \
+          http://127.0.0.1:${toString ipam.ports.miniflux}
+      '';
+      ExecStop = "${pkgs.tailscale}/bin/tailscale serve reset";
+    };
+  };
+
   # Healthcheck — miniflux's /healthcheck returns 200 when DB is reachable.
   services.healthProbes.probes = [
-    { name = "self"; url = "http://${ipam.v4}:${toString ipam.ports.miniflux}/healthcheck"; }
+    { name = "self"; url = "http://127.0.0.1:${toString ipam.ports.miniflux}/healthcheck"; }
   ];
 }
