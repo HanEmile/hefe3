@@ -1,7 +1,7 @@
 # hefe3
 
 NixOS monorepo for the emile.space fleet. One Hetzner host (`medano`)
-hypervises ~22 libvirt VMs; two more bare-metal machines (`lampadas`,
+hypervises ~23 libvirt VMs; two more bare-metal machines (`lampadas`,
 the `mail` host) and the Hetzner Storagebox sit outside. `caladan`
 (this Mac) is the dev/deploy box: every `nix-build` and `deploy`
 in here originates from caladan and uses medano as the remote x86_64

@@ -2,14 +2,10 @@
 
 let
   withDefault = let
-    default.root = [
-      (
-        hefe.users.hanemile.keys.all
-        ++ [
-          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGHcyg+yw1fwTfpbN1meNluaTXNcl6w1LIL0kz5Kan8I root@corrino"
-        ]
-      )
-    ];
+    default = {
+      root = [ hefe.users.hanemile.keys.all ];
+      emile = [ hefe.users.hanemile.keys.all ];
+    };
   in x: default // x;
 
   flattenKeys = lists: builtins.concatLists lists;

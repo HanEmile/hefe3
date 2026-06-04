@@ -149,6 +149,19 @@ let
         wantedBy = [ "multi-user.target" ];
         after = [ "network.target" "libvirtd.service" ];
         path = [ pkgs.libvirt pkgs.coreutils pkgs.zfs ];
+        # RequiresMountsFor pulls in mnt-storagebox\x2dbx11.automount as
+        # a dependency AND - crucially - tells systemd to propagate the
+        # autofs trigger plus any subsequent CIFS mount underneath it
+        # into the unit's mount namespace. Without this the service can
+        # end up with a private namespace snapshot taken before the
+        # CIFS share is ever mounted (observed 2026-06-01: service last
+        # restarted May 29, /mnt/storagebox-bx11 idle-unmounted shortly
+        # after, the service's namespace then stayed pinned to an empty
+        # autofs view - every os.Stat on /mnt/storagebox-bx11/backup/<vm>
+        # returned ENOENT and the dashboard showed "no repo yet" for
+        # every configured VM, while the host's root namespace had the
+        # share mounted normally).
+        unitConfig.RequiresMountsFor = "/mnt/storagebox-bx11";
         environment = {
           STATUS_BOARD_INVENTORY = "${vmInventory}";
           STATUS_BOARD_GRAPH = "/etc/status-board-graph.json";

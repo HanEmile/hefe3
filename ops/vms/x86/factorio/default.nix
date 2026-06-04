@@ -38,12 +38,16 @@ in
     public = false;
     lan = false;
     nonBlockingSaving = true;
+    mods = [];
+    description = "Emile's factorio server";
   };
 
   vmBackups.paths = [
-    # Bookkeeping/config. Saves live on /grave/games/factorio (ZFS snapshotted).
-    "/var/lib/factorio/server-settings.json"
-    "/var/lib/factorio/server-adminlist.json"
+    # Whole factorio state dir: saves, server-settings.json, mods, etc.
+    # Earlier this was just the two json files; saves were assumed to be
+    # rsync'd to /grave/games/factorio out-of-band, but that never
+    # happened, so the saves had no backup at all.
+    "/var/lib/factorio"
   ];
 
   services.healthProbes.probes = [

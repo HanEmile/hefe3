@@ -55,7 +55,7 @@ in
     onCalendar = lib.mkOption {
       type = lib.types.str;
       default = "*-*-* 03:17:00";
-      description = "systemd OnCalendar spec. Default: 03:17 daily (randomised offset so all VMs do not hammer storagebox at once).";
+      description = "systemd OnCalendar spec. Default: 03:17 daily; spread by RandomizedDelaySec=1h in the timer so all VMs do not hammer storagebox at once.";
     };
 
     pruneOpts = lib.mkOption {
@@ -113,7 +113,7 @@ in
       timerConfig = {
         OnCalendar = cfg.onCalendar;
         Persistent = true;
-        RandomizedDelaySec = "30m";
+        RandomizedDelaySec = "1h";
       };
       repository = "/mnt/storagebox-bx11/backup/${hostname}";
       initialize = true;

@@ -51,6 +51,7 @@ in
     (vm "minecraft") # minecraft world (NFS /grave/games/minecraft)
     (vm "factorio") # factorio (NFS /grave/games/factorio)
     (vm "r2wars") # radare2 workspace
+    (vm "irc") # irc
 
     # ctf
 
@@ -197,6 +198,25 @@ in
   system.stateVersion = "25.05";
 
   # External health probes - TLS terminates on naraj now.
+  # e1000e (eno1) Hardware Unit Hang mitigation. The 2026-05-29 outage
+  # was caused by 12k+ "Detected Hardware Unit Hang" events on eno1
+  # starting at 01:35 UTC with TSO/GSO/GRO all enabled. Known workaround
+  # for this driver/NIC family is to disable segmentation/large-receive
+  # offloads. Run as a oneshot at boot so the state is applied even when
+  # the link is already routable - networkd-dispatcher's routable.d hook
+  # only fires on state transitions, which won't re-fire on plain switch.
+  systemd.services."e1000e-eno1-offloads" = {
+    description = "Disable e1000e TX offloads on eno1 (HW unit hang workaround)";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "network-pre.target" "sys-subsystem-net-devices-eno1.device" ];
+    bindsTo = [ "sys-subsystem-net-devices-eno1.device" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = "${pkgs.ethtool}/sbin/ethtool -K eno1 tso off gso off gro off tx off rx off sg off";
+    };
+  };
+
   services.healthProbes.probes = [
     { name = "naraj-root";       url = "http://${hefe.ops.ipam.default.naraj.v4}/"; }
     { name = "emile-space";      url = "https://emile.space/"; }

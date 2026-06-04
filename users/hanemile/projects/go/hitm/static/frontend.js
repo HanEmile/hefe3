@@ -5,13 +5,25 @@ let currentFlowId;
 let interceptedFlowId = null;
 let selectedFlowId;
 
+// Central tracking address matching your proxy instantiation logic
+const ACTIVE_LISTENER = "http://127.0.0.1:9002";
+
 async function loadHistory() {
   try {
-    const res = await fetch('/history');
+    const activeListener = encodeURIComponent(ACTIVE_LISTENER);
+    const res = await fetch(`/history?l=${activeListener}`);
+    
+    if (!res.ok) {
+      const errTxt = await res.text();
+      console.error("History endpoint error:", errTxt);
+      return;
+    }
+
     const history = await res.json();
+    if (flowList) flowList.innerHTML = '';
+    
     history.forEach(flow => {
-      f = JSON.parse(flow)
-      renderFlowItem(f);
+      renderFlowItem(flow);
     });
   } catch (err) {
     console.error("Failed to load history:", err);
@@ -21,7 +33,6 @@ async function loadHistory() {
 function renderFlowItem(flow) {
   flows.set(flow.id, flow);
   if (!flowList) return;
-  // console.log("rendering", flow)
 
   let div = document.getElementById("flow-item-" + flow.id);
   let Id = document.getElementById("flow-item-" + flow.id + "-id");
@@ -52,7 +63,7 @@ function renderFlowItem(flow) {
       element.className = `flow-item-${name}`;
       parent.appendChild(element);
 
-      elementText = document.createTextNode(content);
+      const elementText = document.createTextNode(content);
       element.appendChild(elementText);
       return element;
     }
@@ -60,7 +71,7 @@ function renderFlowItem(flow) {
     Id = createElement('id', div, flow.id);
     method = createElement('method', div, flow.method);
     url = createElement('url', div, flow.url);
-    HTTPstatus = createElement('status', div, flow.status);
+    HTTPstatus = createElement('status', div, flow.status || '-');
   } else {
     Id = document.getElementById("flow-item-" + flow.id + "-id");
     method = document.getElementById("flow-item-" + flow.id + "-method");
@@ -68,10 +79,11 @@ function renderFlowItem(flow) {
     HTTPstatus = document.getElementById("flow-item-" + flow.id + "-status");
   }
 
-  if (flow.id) Id.childNodes[0].nodeValue = flow.id;
-  if (flow.method) method.childNodes[0].nodeValue = flow.method;
-  if (flow.url) url.childNodes[0].nodeValue = flow.url;
-  if (flow.status) HTTPstatus.childNodes[0].nodeValue = flow.status;
+  // FIX: Swapped nodeValue updates to modern textContent targeting to prevent empty lifecycle rendering errors
+  if (flow.id !== undefined) Id.textContent = flow.id;
+  if (flow.method !== undefined) method.textContent = flow.method;
+  if (flow.url !== undefined) url.textContent = flow.url;
+  if (flow.status !== undefined) HTTPstatus.textContent = flow.status || '-';
 
   if (flow.status >= 400) {
     HTTPstatus.style.color = "#ff0000";
@@ -83,47 +95,53 @@ function renderFlowItem(flow) {
 
   div.onclick = () => {
     inspectFlow(flow.id);
-    document.getElementById("selected-flow").innerHTML = `${flow.id} ${flow.method} ${flow.url} ${flow.status}`;
-    document.getElementById("repeat-request").value = atob(flows.get(flow.id).request);
+    const flowDisplay = document.getElementById("selected-flow");
+    if (flowDisplay) {
+      flowDisplay.innerHTML = `${flow.id} ${flow.method} ${flow.url} ${flow.status || ''}`;
+    }
+    const repeatArea = document.getElementById("repeat-request");
+    if (repeatArea) {
+      repeatArea.value = flows.get(flow.id).request || '';
+    }
   };
 }
 
 function autoPopulateIntercept(flow) {
   interceptedFlowId = flow.id;
-  const textarea = document.querySelector('#intercept-view textarea');
-  textarea.value = atob(flow.request);
-  // Optional: auto-switch to intercept tab
-  // showTab('intercept');
+  const textarea = document.querySelector('#intercept-view textarea') || document.getElementById('intercept-request');
+  if (textarea) {
+    textarea.value = flow.request || '';
+  }
 }
 
 const es = new EventSource("/events");
 es.onmessage = (e) => {
-  const flow = JSON.parse(e.data);
+  try {
+    const flow = JSON.parse(e.data);
+    renderFlowItem(flow);
 
-  renderFlowItem(flow);
-
-  // If a request has no response yet, it might be an intercepted one
-  if (!flow.response && document.getElementById("enable-intercept").style.display === "none") {
-    autoPopulateIntercept(flow);
+    const interceptBtn = document.getElementById("enable-intercept");
+    if (!flow.response && interceptBtn && interceptBtn.style.display === "none") {
+      autoPopulateIntercept(flow);
+    }
+    if (currentFlowId == flow.id) {
+      renderDetails(flow);
+    }
+  } catch (err) {
+    console.error("Error parsing event data stream block:", err);
   }
-  if (currentFlowId == flow.id) {
-    renderDetails(flow);
-  }
-
-
 };
 es.onerror = (e) => {
-  console.error('EventSource error:', e);
+  console.error('EventSource connection error:', e);
 };
 
 function buildSitemap() {
   const sitemapView = document.getElementById('sitemap-view');
-  // Clear previous view but keep the header if you have one
+  if (!sitemapView) return;
   sitemapView.innerHTML = '';
 
   const tree = {};
 
-  // 1. Build the tree structure from flows
   flows.forEach(flow => {
     try {
       const url = new URL(flow.url);
@@ -137,7 +155,6 @@ function buildSitemap() {
         if (!currentNode[part]) {
           currentNode[part] = { _isDir: true, children: {} };
         }
-        // If it's the last part of the path, it's a "leaf" (file/endpoint)
         if (index === pathParts.length - 1) {
           currentNode[part]._isLeaf = true;
           currentNode[part]._flowId = flow.id;
@@ -151,9 +168,7 @@ function buildSitemap() {
     }
   });
 
-  // 2. Recursively render the tree using details/summary
   const container = document.createElement('div');
-  // container.style.padding = "1ex";
 
   Object.keys(tree).sort().forEach(host => {
     container.appendChild(renderNode(host, tree[host]));
@@ -163,16 +178,13 @@ function buildSitemap() {
 }
 
 function renderNode(name, data) {
-  // 1. If it's a leaf node, don't use <details>/<summary>
   if (data._isLeaf && Object.keys(data.children).length === 0) {
     const leafDiv = document.createElement('div');
     leafDiv.className = 'sitemap-leaf';
-    // leafDiv.textContent = "📄 " + name;
-    leafDiv.textContent = name + " | " + data.method + " " + data.status;
+    leafDiv.textContent = name + " | " + data.method + " " + (data.status || '');
     leafDiv.style.cursor = "pointer";
     leafDiv.style.padding = "2px 5px";
-    leafDiv.style.marginLeft = "3.5ex"; // Offset to align with parent text
-    // leafDiv.style.color = "#85e89d";
+    leafDiv.style.marginLeft = "3.5ex";
     if (data.status >= 400) {
       leafDiv.style.color = "#ff0000";
     } else if (data.status >= 300) {
@@ -183,30 +195,25 @@ function renderNode(name, data) {
 
     leafDiv.onclick = () => {
       inspectFlow(data._flowId);
-      // showTab('inspect');
     };
     return leafDiv;
   }
 
-  // 2. If it's a directory, use <details> and <summary>
   const details = document.createElement('details');
   details.style.marginLeft = "1.5ex";
 
   const summary = document.createElement('summary');
   summary.style.cursor = "pointer";
   summary.style.padding = "2px 5px";
-  // summary.textContent = "📁 " + name;
   summary.textContent = name;
 
   details.appendChild(summary);
 
-  // 3. Recursively add children
   const childKeys = Object.keys(data.children).sort();
   childKeys.forEach(key => {
     details.appendChild(renderNode(key, data.children[key]));
   });
 
-  // Auto-expand the root domains
   if (name.includes('.')) details.open = true;
 
   return details;
@@ -214,24 +221,23 @@ function renderNode(name, data) {
 
 async function loadCATab() {
   const caView = document.getElementById('ca-view');
+  if (!caView) return;
   caView.innerHTML = '';
 
   try {
     const res = await fetch('/ca/list');
     const files = await res.json();
 
-    // 1. Root CA Section (The important one for the user)
     const rootSection = document.createElement('div');
     rootSection.innerHTML = `
-            <div style="background:#2d2d2d; padding:15px; margin:10px; border-radius:4px; border-left:4px solid #f1e05a;">
-                <h4>Primary CA Certificate</h4>
-                <p>Download and install this certificate in your browser/OS to decrypt HTTPS traffic.</p>
-                <button onclick="window.location='/ca/download?name=HITM-Proxy.pem'" class="btn">Download HITM-Proxy.pem (Public)</button>
-            </div>
-        `;
+        <div style="background:#2d2d2d; padding:15px; margin:10px; border-radius:4px; border-left:4px solid #f1e05a;">
+            <h4>Primary CA Certificate</h4>
+            <p>Download and install this certificate in your browser/OS to decrypt HTTPS traffic.</p>
+            <button onclick="window.location='/ca/download?name=HITM-Proxy.pem'" class="btn">Download HITM-Proxy.pem (Public)</button>
+        </div>
+    `;
     caView.appendChild(rootSection);
 
-    // 2. Generated Certificates Section
     const listSection = document.createElement('div');
     listSection.style.padding = "10px";
     listSection.innerHTML = `<h4>Generated Site Certificates</h4>`;
@@ -241,13 +247,11 @@ async function loadCATab() {
     table.innerHTML = `<tr><th align="left">Filename</th><th align="right">Action</th></tr>`;
 
     files.forEach(file => {
-      // Filter out keys if you only want them to download public certs
-      // or leave them if you want full access.
       const row = table.insertRow();
       row.innerHTML = `
-                <td><code>${file}</code></td>
-                <td align="right"><a href="/ca/download?name=${file}" style="color:#85e89d;">Download</a></td>
-            `;
+          <td><code>${file}</code></td>
+          <td align="right"><a href="/ca/download?name=${file}" style="color:#85e89d;">Download</a></td>
+      `;
     });
 
     listSection.appendChild(table);
@@ -260,11 +264,7 @@ async function loadCATab() {
 
 function updateUrlState(tab) {
   const flowId = selectedFlowId || '';
-
-  // Format: #tabName/flowId (e.g., #inspect/15)
   window.location.hash = flowId ? `${tab}/${flowId}` : `${tab}`;
-
-  console.log("updated url")
 }
 
 async function showTab(tab) {
@@ -284,34 +284,27 @@ async function showTab(tab) {
 
   updateUrlState(tab);
 
-  // 3. Tab-Specific Logic
   if (tab === 'repeat') {
     const textarea = document.getElementById('repeat-request');
-
-    if (!currentFlowId) {
-      textarea.placeholder = 'Select a flow from the sidebar to populate the repeat...';
-      return;
-    }
-
-    const flow = flows.get(currentFlowId);
-    if (flow && flow.request) {
-      // Use .value for textareas, not .innerHTML
-      textarea.value = atob(flow.request);
+    if (textarea) {
+      if (!currentFlowId) {
+        textarea.placeholder = 'Select a flow from the sidebar to populate the repeat...';
+        return;
+      }
+      const flow = flows.get(currentFlowId);
+      if (flow && flow.request) textarea.value = flow.request;
     }
   }
 
   if (tab === 'intercept') {
     const textarea = document.getElementById('intercept-request');
-
-    if (!currentFlowId) {
-      textarea.placeholder = 'Enable interception and send a request to the proxy';
-      return;
-    }
-
-    const flow = flows.get(currentFlowId);
-    if (flow && flow.request) {
-      // Use .value for textareas, not .innerHTML
-      textarea.value = atob(flow.request);
+    if (textarea) {
+      if (!currentFlowId) {
+        textarea.placeholder = 'Enable interception and send a request to the proxy';
+        return;
+      }
+      const flow = flows.get(currentFlowId);
+      if (flow && flow.request) textarea.value = flow.request;
     }
   }
 
@@ -323,85 +316,89 @@ function addElement(tag, text, parent, className = "", id = "") {
   const el = document.createElement(tag);
   if (className) el.className = className;
   if (id) el.id = id;
-  if (text) el.textContent = text; // Use textContent for safety
+  if (text) el.textContent = text;
   if (parent) parent.appendChild(el);
   return el;
 }
 
 function renderDetails(flow) {
   const details = document.getElementById('details');
+  if (!details) return;
 
-  const safeAtob = (str) => {
-    try {
-      return str ? atob(str) : null;
-    } catch (e) {
-      return "Error decoding data: " + e.message;
-    }
-  };
+  const req = flow.request || "";
+  const reqBody = flow.requestBody || "";
+  const res = flow.responseBody || "";
+  const resBody = flow.response || "";
 
-  const req = safeAtob(flow.request);
-  const reqBody = safeAtob(flow.requestBody);
-  const res = safeAtob(flow.responseBody);
-  const resBody = safeAtob(flow.response);
+  details.innerHTML = ""; // Clear loader explicitly
 
-  addElement("div", `Request ${flow.requestTime}`, details, "h3", "inspect-request")
-  addElement("pre", req, details)
-  addElement("pre", reqBody, details)
-  addElement("div", `Response ${flow.responseTime}`, details, "h3", "inspect-response")
-  if (res) {
-    addElement("pre", resBody, details)
-    addElement("pre", res, details)
+  addElement("div", `Request ${flow.requestTime || ''}`, details, "h3", "inspect-request");
+  addElement("pre", req, details);
+  if (reqBody) addElement("pre", reqBody, details);
+  
+  addElement("div", `Response ${flow.responseTime || ''}`, details, "h3", "inspect-response");
+  if (res || resBody) {
+    if (resBody) addElement("pre", resBody, details);
+    if (res) addElement("pre", res, details);
   } else {
-    addElement("p", "Waiting for response...", details)
+    addElement("p", "Waiting for response...", details);
   }
 }
 
 async function inspectFlow(id) {
   const details = document.getElementById('details');
+  if (!details) return;
 
   document.querySelectorAll('.flow-item').forEach(el => el.classList.remove('active-flow'));
-  document.getElementById("flow-item-" + id).classList.add('active-flow');
+  const targetEl = document.getElementById("flow-item-" + id);
+  if (targetEl) targetEl.classList.add('active-flow');
   currentFlowId = id;
 
   try {
     details.innerHTML = "Loading...";
-    const raw = await fetch('/flow?id=' + id);
-    const flow = await raw.json();
-    details.innerHTML = "";
+    const activeListener = encodeURIComponent(ACTIVE_LISTENER); 
+    const raw = await fetch(`/flow?id=${id}&l=${activeListener}`);
+    
+    if (!raw.ok) {
+      const errorText = await raw.text();
+      throw new Error(`Server returned ${raw.status}: ${errorText}`);
+    }
 
-    renderDetails(flow)
+    const textData = await raw.text();
+    const flow = JSON.parse(textData);
+    renderDetails(flow);
 
   } catch (err) {
-    details.innerHTML = "Error loading flow: " + err;
+    details.innerHTML = "<span style='color:#ff0000; font-weight:bold;'>Error loading flow: " + err.message + "</span>";
+    console.error("Inspect flow crash details:", err);
   }
 
-  updateUrlState();
+  updateUrlState('inspect');
 }
 
-// Helper to push an existing request into the Repeater tab
-function copyToRepeater(base64Req) {
-  document.getElementById('repeat-request').value = atob(base64Req);
-  showTab('repeat'); // Switch tabs automatically
+function copyToRepeater(rawReq) {
+  const repeatArea = document.getElementById('repeat-request');
+  if (repeatArea) repeatArea.value = rawReq;
+  showTab('repeat');
 }
 
 async function sendRepeat() {
-  document.getElementById('repeat-response').innerText = "Loading...";
-  const raw = document.getElementById('repeat-request').value;
+  const respContainer = document.getElementById('repeat-response');
+  const reqArea = document.getElementById('repeat-request');
+  if (respContainer) respContainer.innerText = "Loading...";
+  if (!reqArea) return;
+
+  const raw = reqArea.value;
   const res = await fetch('/repeat', { method: 'POST', body: raw });
   const resp = await res.text();
-  document.getElementById('repeat-response').innerText = resp;
+  if (respContainer) respContainer.innerText = resp;
 }
 
 function loadStateFromUrl() {
-  console.log("loading state from url")
-  const hash = window.location.hash.substring(1); // Remove the '#'
+  const hash = window.location.hash.substring(1);
   if (!hash) return;
 
   const [tab, flowId] = hash.split('/');
-
-  console.log("tab: ", tab)
-  console.log("flowid: ", flowId)
-
   if (tab) {
     showTab(tab);
   } else {
@@ -423,41 +420,51 @@ document.addEventListener('DOMContentLoaded', () => {
 async function enableIntercept() {
   document.getElementById("enable-intercept").style.display = "none";
   document.getElementById("disable-intercept").style.display = "";
-  document.getElementById("header").style = "background: #ff0000; color: white;";
-  const res = await fetch('/intercept?enable=true', { method: 'POST', body: '' });
+  const header = document.getElementById("header");
+  if (header) header.style = "background: #ff0000; color: white;";
+  
+  const activeListener = encodeURIComponent(ACTIVE_LISTENER);
+  await fetch(`/intercept?enable=true&l=${activeListener}`, { method: 'POST', body: '' });
 }
 
 async function disableIntercept() {
   document.getElementById("enable-intercept").style.display = "";
   document.getElementById("disable-intercept").style.display = "none";
-  document.getElementById("header").style = "background: #dddddd;";
-  const res = await fetch('/intercept?enable=false', { method: 'POST', body: '' });
+  const header = document.getElementById("header");
+  if (header) header.style = "background: #dddddd;";
+  
+  const activeListener = encodeURIComponent(ACTIVE_LISTENER);
+  await fetch(`/intercept?enable=false&l=${activeListener}`, { method: 'POST', body: '' });
 }
 
 async function forwardRequest() {
-  // Make sure interceptedFlowId was set when the flow arrived via SSE
   if (!interceptedFlowId) {
     console.error("No flow ID to forward");
     return;
   }
 
-  const raw = document.getElementById('intercept-request').value;
-  // Note the template literal for the ID
-  const res = await fetch(`/forward?id=${interceptedFlowId}`, {
+  const textarea = document.getElementById('intercept-request');
+  const raw = textarea ? textarea.value : "";
+  const activeListener = encodeURIComponent(ACTIVE_LISTENER);
+  
+  const res = await fetch(`/forward?id=${interceptedFlowId}&l=${activeListener}`, {
     method: 'POST',
     body: raw
   });
 
   if (res.ok) {
-    interceptedFlowId = null; // Clear it for the next one
-    document.getElementById('intercept-request').value = "";
+    interceptedFlowId = null;
+    if (textarea) textarea.value = "";
   }
 }
 
 async function dropRequest() {
   if (!interceptedFlowId) return;
 
-  await fetch(`/drop?id=${interceptedFlowId}`, { method: 'POST' });
-  document.querySelector('#intercept-view textarea').value = "";
+  const activeListener = encodeURIComponent(ACTIVE_LISTENER);
+  await fetch(`/drop?id=${interceptedFlowId}&l=${activeListener}`, { method: 'POST' });
+  
+  const textarea = document.querySelector('#intercept-view textarea') || document.getElementById('intercept-request');
+  if (textarea) textarea.value = "";
   interceptedFlowId = null;
 }

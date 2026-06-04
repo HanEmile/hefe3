@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   pubv4 = "95.217.35.60";
@@ -269,6 +269,48 @@ in
         iptables -A FORWARD -i virbr0 -o eno1 -j ACCEPT
       '';
 
+    };
+  };
+
+  # Durable workaround for the LIBVIRT_FWI gotcha (see CLAUDE.md and the
+  # firewall.extraCommands comment below). libvirt installs its LIBVIRT_FWI
+  # chain into FORWARD with `-I FORWARD 1` *after* nixos's firewall.service
+  # has run, which pushes our public-ingress ACCEPT rules below libvirt's
+  # blanket REJECT. The 2026-05-29 incident hit this when a fan-out of VM
+  # redeploys re-triggered libvirtd and broke public emile.space until
+  # firewall.service was restarted.
+  #
+  # This unit re-asserts the same `-I FORWARD 1` inserts via the libvirtd
+  # lifecycle: PartOf=libvirtd.service makes it stop+start whenever libvirtd
+  # does, so the rules end back on top of the chain without manual
+  # intervention. It is idempotent (each insert is preceded by a tolerant
+  # `-D ... || true`).
+  systemd.services.medano-forward-fixup = {
+    description = "Re-assert FORWARD/NAT inserts above libvirt's LIBVIRT_FWI chain";
+    wantedBy = [ "multi-user.target" "libvirtd.service" ];
+    after = [ "firewall.service" "libvirtd.service" ];
+    partOf = [ "libvirtd.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = pkgs.writeShellScript "medano-forward-fixup" (''
+        set -eu
+        # Bare `iptables ...` calls (from mkFlowRules) need iptables on PATH.
+        export PATH=${pkgs.iptables}/bin:$PATH
+        IPT=${pkgs.iptables}/bin/iptables
+
+        # General virbr0 <-> eno1 forwarding (mirrors firewall.extraCommands).
+        "$IPT" -D FORWARD -i eno1 -o virbr0 -j ACCEPT 2>/dev/null || true
+        "$IPT" -D FORWARD -i virbr0 -o eno1 -j ACCEPT 2>/dev/null || true
+        "$IPT" -I FORWARD 1 -i eno1 -o virbr0 -j ACCEPT
+        "$IPT" -I FORWARD 1 -i virbr0 -o eno1 -j ACCEPT
+
+        # IRC bouncer (matches firewall.extraCommands).
+        "$IPT" -I FORWARD 1 -i eno1 -o virbr0 -p tcp --dport ${toString ircBouncerPort} -j ACCEPT
+        "$IPT" -I FORWARD 1 -i virbr0 -o eno1 -p tcp --sport ${toString ircBouncerPort} -j ACCEPT
+        "$IPT" -I FORWARD 1 -i eno1 -o virbr0 -p udp --dport ${toString ircBouncerPort} -j ACCEPT
+        "$IPT" -I FORWARD 1 -i virbr0 -o eno1 -p udp --sport ${toString ircBouncerPort} -j ACCEPT
+      '' + lib.concatMapStrings mkFlowRules natFlows);
     };
   };
 

@@ -52,6 +52,7 @@ let
     minecraft = withDefault { };
     factorio = withDefault { };
     r2wars = withDefault { };
+    irc = withDefault { };
   };
 in
 {
