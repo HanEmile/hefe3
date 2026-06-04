@@ -87,7 +87,7 @@ let
       inherit system;
       pkgs = pkgsStable;
 
-      # 🚀 Bypass the strict channel version mismatch assertion
+      # Bypass the strict channel version mismatch assertion
       enableNixpkgsReleaseCheck = false;
 
       specialArgs = {
@@ -107,7 +107,7 @@ let
           {
             home-manager.users.emile = import "${machineDir}/home_emile.nix";
 
-            # 🌟 Inject variables directly into the home_emile.nix module arguments
+            # Inject variables directly into the home_emile.nix module arguments
             home-manager.extraSpecialArgs = {
               inherit unstable;
             };
