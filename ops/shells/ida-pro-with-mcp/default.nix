@@ -3,7 +3,7 @@
 let
   sources = hefe.third_party;
 
-  nixos = sources."nixos-25.11";
+  nixos = sources."nixos-26.05";
 
   pkgs = import nixos {
     system = "aarch64-darwin";

@@ -13,89 +13,6 @@
     # let home-manager install and manage itself
     home-manager.enable = true;
 
-    aerospace = {
-      enable = false;
-      launchd.enable = true;
-      userSettings = {
-        #persistent-workspaces = [];
-
-        # i3 doesn't have "normalizations" feature that why we disable them here.
-        # But the feature is very helpful.
-        # Normalizations eliminate all sorts of weird tree configurations that don't make sense.
-        # Give normalizations a chance and enable them back.
-        enable-normalization-flatten-containers = false;
-        enable-normalization-opposite-orientation-for-nested-containers = false;
-
-        # Mouse follows focus when focused monitor changes
-        # on-focused-monitor-changed = ["move-mouse monitor-lazy-center"];
-
-        gaps = {
-          outer.left = 0;
-          outer.bottom = 0;
-          outer.top = 0;
-          outer.right = 0;
-        };
-
-        mode.main.binding = {
-          alt-enter = "exec-and-forget open -na kitty";
-          alt-shift-q = "close";
-          
-          alt-h = "focus --boundaries-action wrap-around-the-workspace left";
-          alt-j = "focus --boundaries-action wrap-around-the-workspace down";
-          alt-k = "focus --boundaries-action wrap-around-the-workspace up";
-          alt-l = "focus --boundaries-action wrap-around-the-workspace right";
-
-
-          alt-shift-h = "move left";
-          alt-shift-j = "move down";
-          alt-shift-k = "move up";
-          alt-shift-l = "move right";
-
-          alt-v = "split vertical";
-          alt-b = "split horizontal";
-
-          alt-f = "fullscreen";
-
-          alt-s = "layout v_accordion";
-          alt-w = "layout h_accordion";
-          alt-e = "layout tiles horizontal vertical";
-
-          alt-1 = "workspace 1";
-          alt-2 = "workspace 2";
-          alt-3 = "workspace 3";
-          alt-4 = "workspace 4";
-          alt-5 = "workspace 5";
-          alt-6 = "workspace 6";
-          alt-7 = "workspace 7";
-          alt-8 = "workspace 8";
-          alt-9 = "workspace 9";
-
-          alt-shift-1 = "move-node-to-workspace 1";
-          alt-shift-2 = "move-node-to-workspace 2";
-          alt-shift-3 = "move-node-to-workspace 3";
-          alt-shift-4 = "move-node-to-workspace 4";
-          alt-shift-5 = "move-node-to-workspace 5";
-          alt-shift-6 = "move-node-to-workspace 6";
-          alt-shift-7 = "move-node-to-workspace 7";
-          alt-shift-8 = "move-node-to-workspace 8";
-          alt-shift-9 = "move-node-to-workspace 9";
-
-          alt-shift-c = "reload-config";
-
-          alt-r = "mode resize";
-        };
-
-        mode.resize.binding = {
-          h = "resize width -50";
-          j = "resize height +50";
-          k = "resize height -50";
-          l = "resize width +50";
-          enter = "mode main";
-          esc = "mode main";
-        };
-      };
-    };
-
     direnv = {
       enable = true;
       nix-direnv.enable = true;
@@ -230,7 +147,7 @@
     entr
 
     # filesystem size analysis
-    broot
+    # broot
     dust
 
     # viewing stuff
@@ -265,6 +182,26 @@
     ragenix # agenix
     npins
 
+    # Now clue why this isn't working, when rebuilding and switching to caladan, I'm still on version 0.3.1
+    #
+    # ; nix-build -A ops.darwin.caladan.switch && ./result/bin/switch
+    # ; npins -V
+    # npins 0.3.1
+    # 
+    # (pkgs.npins.overrideAttrs (finalAttrs: prevAttrs:
+    #   let
+    #     version = "0.5.0";
+    #   in {
+    #     inherit version;
+    #     src = fetchFromGitHub {
+    #       owner = "andir";
+    #       repo = "npins";
+    #       tag = version;
+    #       sha256 = "sha256-PPk9Ve1pM3X7NfGeGb8Jiq4YDEwAjErP4xzGwLaakTU=";
+    #     };
+    #   }
+    # ))
+
     # editor
     helix
 
@@ -288,7 +225,7 @@
     tailscale
 
     # rss
-    yarr
+    # yarr
 
     # go
     go
@@ -304,18 +241,18 @@
     # iot hack
     minicom
 
-    SDL2
+    # SDL2
 
     # qemu tooling
     qemu
-    sphinx # docs
+    # sphinx # docs
     # virt-manager
 
     # lisp
     sbcl
 
     # infrastructure as code
-    terraform
+    # terraform
 
     portmidi
 
@@ -337,33 +274,33 @@
       ]
     ))
 
-    z3 # theorem prover
+    # z3 # theorem prover
 
-    taskwarrior3
+    # taskwarrior3
 
     # rust
     cargo
     rust-analyzer
 
     # vms
-    utm
+    # utm
 
     # discovery tools
     nmap
     ffuf
 
     # typesetting
-    typst
+    # typst
 
     # crypto
     age
-    gnupg
+    # gnupg
 
     # java
-    jre_minimal
+    # jre_minimal
 
     # getting out of networks
-    iodine
+    # iodine
 
     # reversing
     ghidra
@@ -371,16 +308,15 @@
 
     # file sync
     syncthing
-    git-annex
+    # git-annex
 
-    senpai # irc
+    # senpai # irc
 
     zed-editor # editor
     # (zed-editor.overrideAttrs (oldAttrs: {
     #   dontStrip = true;
     #   noAuditTmpdir = true;
     # }))
-
 
     # ai
     # gemini-cli
@@ -389,7 +325,8 @@
 
     package-version-server
 
-    logseq
+    # Logseq ships with a deprecated Electron version by default
+    # logseq
 
     # custom
     # libc-database

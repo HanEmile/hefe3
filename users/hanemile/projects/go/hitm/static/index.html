@@ -5,11 +5,17 @@
     </head>
     <body class="rows">
 		<div id="header" class="cols">
+			<div id="filter-bar" class="cols">
+				<span id="filter-icon">&#9655;</span>
+				<input id="filter-input" type="text" placeholder="Filter: method==GET  status>=400  url~=/api  source!=intrude" spellcheck="false">
+				<button id="filter-clear" onclick="clearFilter()">&#x2715;</button>
+			</div>
 			<div id="selected-flow"></div>
 		</div>
         <div id="main" class="cols">
     		<div id="left-sidebar" class="rows w-1">
     			<div class="h3">Flows</div>
+    			<div id="flow-header" class="flow-header"></div>
     			<div id="flow-list" class="rows"></div>
     		</div>
     		<div id="content" class="rows w-3">
@@ -17,7 +23,9 @@
     				<div id="inspect-tab" class="tab active" onclick="showTab('inspect')">Inspect</div>
     				<div id="intercept-tab" class="tab active" onclick="showTab('intercept')">Intercept</div>
     				<div id="repeat-tab" class="tab" onclick="showTab('repeat')">Repeat</div>
-    				<div id="intrude-tab" class="tab" onclick="showTab('intrude')">Intrude</div>
+    				<div id="fuzz-tab" class="tab" onclick="showTab('fuzz')">Fuzzer</div>
+    				<div id="spider-tab" class="tab" onclick="showTab('spider')">Spider</div>
+    				<div id="map-tab" class="tab" onclick="showTab('map')">Map</div>
     				<div id="sitemap-tab" class="tab" onclick="showTab('sitemap')">Sitemap</div>
     				<div id="jobs-tab" class="tab" onclick="showTab('jobs')">Jobs</div>
     				<div id="ca-tab" class="tab" onclick="showTab('ca')">CA</div>
@@ -47,7 +55,11 @@
                             <pre id="repeat-response"></pre>
         				</div>
          			</div>
-         			<div id="intrude-view" class="rows">
+         			<div id="fuzz-view" class="rows">
+         			</div>
+         			<div id="spider-view" class="rows">
+         			</div>
+         			<div id="map-view" class="rows">
          			</div>
          			<div id="sitemap-view" class="rows">
          			</div>

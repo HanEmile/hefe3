@@ -68,10 +68,142 @@ textarea {
 /* header */
 
 #header {
-    /*display: none;*/
-    background: #dddddd;
-    color: #000000;
+    background: #1e1e1e;
+    color: #ccc;
     border-bottom: 1px solid #000000;
+    align-items: stretch;
+}
+
+/* filter bar */
+
+#filter-bar {
+    flex: 1;
+    align-items: center;
+    gap: 0;
+    padding: 0;
+    background: #2d2d2d;
+    border: 1px solid #444;
+}
+
+#filter-icon {
+    color: #85e89d;
+    font-size: 12px;
+    padding: 0 6px;
+    user-select: none;
+}
+
+#filter-input {
+    flex: 1;
+    background: #2d2d2d;
+    color: #85e89d;
+    border: none;
+    padding: 3px 4px;
+    font-family: monospace;
+    font-size: 13px;
+    outline: none;
+}
+
+#filter-input::placeholder {
+    color: #666;
+}
+
+#filter-input.filter-error {
+    color: #ff6b6b;
+}
+
+#filter-bar:focus-within {
+    border-color: #85e89d;
+}
+
+#filter-clear {
+    width: auto;
+    padding: 0 8px;
+    font-size: 12px;
+    border: none;
+    border-left: 1px solid #444;
+    background: #2d2d2d;
+    color: #888;
+}
+
+#filter-clear:hover {
+    background: #444;
+    color: #fff;
+}
+
+#selected-flow {
+    padding: 3px 8px;
+    color: #888;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+}
+
+/* context menu */
+
+.ctx-menu {
+    position: fixed;
+    z-index: 10000;
+    background: #2d2d2d;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 2px 0;
+    min-width: 200px;
+    box-shadow: 2px 2px 8px rgba(0,0,0,0.5);
+}
+
+.ctx-menu-item {
+    padding: 4px 12px;
+    cursor: pointer;
+    color: #ccc;
+    font-family: monospace;
+    font-size: 12px;
+}
+
+.ctx-menu-item:hover {
+    background: #444;
+    color: #fff;
+}
+
+.ctx-menu-sep {
+    border-top: 1px solid #444;
+    margin: 2px 0;
+}
+
+/* sortable headers */
+
+#flow-header.flow-header {
+    display: flex !important;
+    flex-direction: row !important;
+    flex: 0 0 3ex;
+    height: 3ex;
+    background: #333;
+    border-bottom: 1px solid #555;
+    overflow: hidden;
+}
+
+#flow-header.flow-header > div {
+    flex: 1 1 0;
+    min-width: 0;
+    text-align: center;
+    padding: 0 1ex;
+    line-height: 3ex;
+    cursor: pointer;
+    user-select: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #aaa;
+    font-size: 0.9em;
+}
+
+#flow-header.flow-header > div:hover {
+    color: #fff;
+    background: #444;
+}
+
+#flow-header.flow-header > div.flow-item-url {
+    text-align: left;
+    flex: 5 1 0;
 }
 
 
@@ -131,16 +263,39 @@ textarea {
     flex: 5 !important;
 }
 
+.flow-cap-note {
+    padding: 4px 8px;
+    color: #ffa500;
+    font-size: 11px;
+    text-align: center;
+    flex: 0 0 auto;
+}
+
 /* general view */
 
 #content {
     width: 100%;
     height: 100%;
+    min-height: 0;
     border-left: 1px solid #dddddd;
 }
 
+#tabs {
+    flex: 0 0 auto;
+}
+
 #view {
-    height: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+    width: 100%;
+    overflow: hidden;
+}
+
+/* Every tab view fills the available height and manages its own scrolling. */
+#view > [id$="-view"] {
+    flex: 1 1 auto;
+    min-height: 0;
     width: 100%;
 }
 
@@ -176,8 +331,33 @@ textarea {
     width: 100%;
     padding: 1ex;
     border: 1px solid #dddddd;
-    word-break: break-all; /* Essential for long base64/tokens */
+    word-break: break-all;
     box-sizing: border-box;
+    margin: 0;
+}
+
+#details details {
+    margin: 0 0 2px 0;
+    border: 1px solid #444;
+    border-radius: 2px;
+}
+
+#details details[open] > pre {
+    border-top: 1px solid #444;
+}
+
+.inspect-section-header {
+    padding: 2px 1ex;
+    cursor: pointer;
+    user-select: none;
+    background: #2a2a2a;
+    color: #aaa;
+    font-size: 0.9em;
+}
+
+.inspect-section-header:hover {
+    background: #333;
+    color: #ccc;
 }
 
 /* Intercept */
@@ -240,27 +420,239 @@ pre#repeat-response {
 }
 
 /* Intrude */
+
+#intrude-view {
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+}
+
+#intrude-results table th {
+    text-align: left;
+    padding: 4px;
+    border-bottom: 1px solid #555;
+}
+
+/* Jobs */
+
+#jobs-view {
+    width: 100%;
+    height: 100%;
+}
+
+#jobs-view table th {
+    text-align: left;
+    padding: 4px;
+    border-bottom: 1px solid #555;
+}
+
+/* Listeners */
+
+#listeners-view {
+    width: 100%;
+    height: 100%;
+}
+
 /* Sitemap */
 
 #sitemap-view {
-    overflow-y: auto;
     background: #1e1e1e;
     width: 100%;
+    flex-direction: column;
+    overflow: hidden;
 }
 
-summary {
+.sitemap-filter-bar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    background: #2d2d2d;
+    border: 1px solid #444;
+    margin: 6px;
+}
+.sitemap-filter-bar:focus-within {
+    border-color: #85e89d;
+}
+.sitemap-filter-icon {
+    color: #85e89d;
+    font-size: 12px;
+    padding: 0 6px;
+    user-select: none;
+}
+#sitemap-filter-input {
+    flex: 1;
+    background: #2d2d2d;
+    color: #85e89d;
+    border: none;
+    padding: 4px 4px;
+    font-family: monospace;
+    font-size: 13px;
+    outline: none;
+}
+#sitemap-filter-input::placeholder { color: #666; }
+#sitemap-filter-input.filter-error { color: #ff6b6b; }
+
+.sitemap-tree {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+#sitemap-view summary {
     outline: none;
     user-select: none;
 }
 
-
-summary:hover {
+#sitemap-view summary:hover {
     background: #333;
 }
 
-details div:hover {
+.sitemap-open {
+    cursor: pointer;
+    color: #85e89d;
+    font-size: 0.85em;
+    margin-left: 6px;
+}
+.sitemap-open:hover {
+    text-decoration: underline;
+}
+
+#sitemap-view details div:hover {
     background: #dddddd;
     color: #000000;
+}
+
+/* === Fuzzer / Spider panels === */
+
+#fuzz-view, #spider-view {
+    flex-direction: row !important;
+    width: 100%;
+    min-height: 0;
+    gap: 8px;
+    padding: 8px;
+    box-sizing: border-box;
+}
+
+/* Left config column: scrolls internally, full height. */
+.fuzz-config {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+/* Results column: full height, scrolls internally. */
+#fuzz-results, #spider-results {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    border-left: 1px solid #333;
+    padding-left: 8px;
+}
+
+.fuzz-req-area {
+    height: 140px;
+    flex: 0 0 auto;
+}
+
+/* Collapsible option groups */
+.opt-group {
+    border: 1px solid #333;
+    background: #242424;
+}
+
+.opt-group > summary {
+    padding: 4px 8px;
+    cursor: pointer;
+    user-select: none;
+    background: #2d2d2d;
+    color: #ccc;
+    font-weight: bold;
+    font-size: 12px;
+}
+
+.opt-group > summary:hover {
+    background: #383838;
+    color: #fff;
+}
+
+.opt-group[open] > summary {
+    border-bottom: 1px solid #333;
+}
+
+.opt-body {
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Fields stack vertically, label above input. */
+.opt-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.opt-field {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.opt-label {
+    color: #888;
+    font-size: 11px;
+}
+
+/* Square, theme-matching inputs. */
+.opt-input,
+.opt-field input,
+.opt-field select,
+.opt-body textarea {
+    background: #1e1e1e;
+    color: #85e89d;
+    border: 1px solid #444;
+    border-radius: 0;
+    padding: 4px 6px;
+    font-family: monospace;
+    font-size: 12px;
+    width: 100%;
+    box-sizing: border-box;
+    outline: none;
+}
+
+.opt-input:focus,
+.opt-field input:focus,
+.opt-field select:focus,
+.opt-body textarea:focus {
+    border-color: #85e89d;
+}
+
+.opt-checks {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.opt-check {
+    color: #ccc;
+    font-size: 12px;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.opt-check input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+}
+
+/* Square buttons inside the config panels to match the theme. */
+#fuzz-view button, #spider-view button {
+    border-radius: 0;
 }
 
 /* Jobs */
@@ -274,4 +666,404 @@ details div:hover {
     color: #000000;
     border-top: 1px solid #000000;
     z-index: 999;
+}
+
+/* ===== Map tab ===== */
+
+#map-view {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+    flex-direction: column;
+}
+
+.map-toolbar {
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-bottom: 1px solid #333;
+    background: #1e1e1e;
+}
+
+.map-toolbar .map-btn {
+    width: auto;
+    padding: 4px 12px;
+}
+
+.map-cb {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #ccc;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.map-slider {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #ccc;
+    white-space: nowrap;
+}
+
+.map-slider input[type="range"] {
+    width: 110px;
+    accent-color: #85e89d;
+    cursor: pointer;
+}
+
+.map-slider-val {
+    color: #85e89d;
+    min-width: 2.5em;
+    text-align: right;
+}
+
+.map-status {
+    margin-left: auto;
+    color: #85e89d;
+    white-space: nowrap;
+}
+
+.map-filter-bar {
+    display: flex;
+    align-items: center;
+    flex: 1 1 200px;
+    min-width: 160px;
+    max-width: 420px;
+    background: #2d2d2d;
+    border: 1px solid #444;
+}
+.map-filter-bar:focus-within {
+    border-color: #85e89d;
+}
+.map-filter-icon {
+    color: #85e89d;
+    font-size: 12px;
+    padding: 0 6px;
+    user-select: none;
+}
+#map-filter-input {
+    flex: 1;
+    background: #2d2d2d;
+    color: #85e89d;
+    border: none;
+    padding: 3px 4px;
+    font-family: monospace;
+    font-size: 13px;
+    outline: none;
+}
+#map-filter-input::placeholder { color: #666; }
+#map-filter-input.filter-error { color: #ff6b6b; }
+
+.map-canvas {
+    flex: 1 1 auto;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+    background: #1a1a1a;
+}
+
+.map-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: grab;
+    background: #1a1a1a;
+}
+
+/* page-node label: centered inside the rounded rect */
+.map-node-label {
+    fill: #c8e6c9;
+    font-family: monospace;
+    font-size: 11px;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    pointer-events: none;
+}
+/* status-pill code text: centered, small */
+.map-status-text {
+    fill: #1a1a1a;
+    font-family: monospace;
+    font-size: 10px;
+    font-weight: bold;
+    text-anchor: middle;
+    dominant-baseline: central;
+    pointer-events: none;
+}
+.map-node:hover .map-page-node,
+.map-node:hover .map-status-node {
+    stroke: #85e89d;
+}
+
+.map-edge-label {
+    fill: #aaa;
+    font-family: monospace;
+    font-size: 10px;
+    text-anchor: middle;
+    pointer-events: auto;
+}
+.map-renders-edge { pointer-events: stroke; }
+.map-transition-edge { pointer-events: stroke; }
+
+.map-empty, .map-notice {
+    position: absolute;
+    color: #888;
+    font-family: monospace;
+    padding: 10px;
+}
+.map-empty {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+.map-notice {
+    bottom: 6px;
+    left: 8px;
+    color: #d0a85e;
+    background: rgba(26,26,26,0.85);
+    border: 1px solid #444;
+    padding: 4px 8px;
+}
+
+.map-edge-flows {
+    position: absolute;
+    width: 230px;
+    max-height: 220px;
+    display: flex;
+    flex-direction: column;
+    background: #242424;
+    border: 1px solid #444;
+    border-radius: 2px;
+    color: #ccc;
+    font-family: monospace;
+    font-size: 12px;
+    z-index: 50;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+}
+.map-ef-head {
+    padding: 6px 8px;
+    color: #85e89d;
+    border-bottom: 1px solid #333;
+    word-break: break-all;
+}
+.map-ef-sub {
+    padding: 4px 8px;
+    color: #888;
+}
+.map-ef-list {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    min-height: 0;
+}
+.map-ef-row {
+    padding: 4px 8px;
+    cursor: pointer;
+    border-top: 1px solid #2a2a2a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.map-ef-row:hover {
+    background: #333;
+    color: #85e89d;
+}
+.map-ef-close {
+    width: auto;
+    margin: 6px;
+    padding: 3px 10px;
+}
+
+/* ===== Map v2 (icicle + WebGL overview) ===== */
+
+.mapv2-toolbar {
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-bottom: 1px solid #333;
+    background: #1e1e1e;
+}
+
+.mapv2-searchbar {
+    display: flex;
+    align-items: center;
+    flex: 1 1 260px;
+    min-width: 180px;
+    max-width: 520px;
+    background: #2d2d2d;
+    border: 1px solid #444;
+}
+.mapv2-searchbar:focus-within { border-color: #85e89d; }
+.mapv2-search-icon {
+    color: #85e89d;
+    font-size: 12px;
+    padding: 0 6px;
+    user-select: none;
+}
+#mapv2-search {
+    flex: 1;
+    background: #2d2d2d;
+    color: #85e89d;
+    border: none;
+    padding: 3px 4px;
+    font-family: monospace;
+    font-size: 13px;
+    outline: none;
+}
+#mapv2-search::placeholder { color: #666; }
+
+.mapv2-select {
+    background: #2d2d2d;
+    color: #c8e6c9;
+    border: 1px solid #444;
+    font-family: monospace;
+    font-size: 12px;
+    padding: 3px 6px;
+    cursor: pointer;
+    width: auto;
+}
+
+.mapv2-status {
+    margin-left: auto;
+    color: #85e89d;
+    white-space: nowrap;
+    font-family: monospace;
+    font-size: 12px;
+}
+
+.mapv2-main {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: row;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Left: icicle host. A fixed canvas overlay + a separate scroll layer whose
+   tall .mapv2-spacer drives the scrollbar. The canvas never scrolls; it is
+   redrawn (virtualized) on the scroll layer's scroll event. */
+.mapv2-left {
+    flex: 1 1 auto;
+    min-width: 0;
+    position: relative;
+    overflow: hidden;
+    background: #1a1a1a;
+}
+.mapv2-tree-canvas {
+    position: absolute;
+    inset: 0;
+    display: block;
+    /* width/height set in JS (mv2ResizeIcicle) to the host's client box (DPR). */
+    pointer-events: none; /* clicks/hover handled on the scroll layer above */
+    z-index: 0;
+}
+.mapv2-scroll {
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 1;
+}
+.mapv2-spacer {
+    width: 1px;
+    /* height set in JS = totalRows * rowHeight; drives virtualized scrolling */
+}
+
+/* Right: detail + neighborhood pane. */
+.mapv2-right {
+    flex: 0 0 360px;
+    min-width: 260px;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid #333;
+    background: #181818;
+}
+.mapv2-detail {
+    flex: 0 0 auto;
+    padding: 8px 10px;
+    border-bottom: 1px solid #333;
+    color: #ccc;
+    font-family: monospace;
+    font-size: 12px;
+    max-height: 40%;
+    overflow: auto;
+}
+.mapv2-detail-title {
+    color: #85e89d;
+    font-size: 13px;
+    word-break: break-all;
+    margin-bottom: 4px;
+}
+.mapv2-detail-meta {
+    color: #888;
+    word-break: break-all;
+    margin-bottom: 6px;
+}
+.mapv2-detail-btn {
+    width: auto;
+    padding: 3px 10px;
+}
+.mapv2-neighborhood {
+    flex: 1 1 auto;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+    background: #1a1a1a;
+}
+
+/* WebGL Overview host (occupies the whole main row when active). */
+.mapv2-gl-host {
+    position: absolute;
+    inset: 0;
+    background: #1a1a1a;
+}
+.mapv2-gl-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+}
+.mapv2-gl-labels {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+.mapv2-label-div {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: translate(0, 0);
+    will-change: transform;
+    color: #c8e6c9;
+    background: rgba(20, 20, 20, 0.7);
+    border: 1px solid #333;
+    padding: 1px 4px;
+    font-family: monospace;
+    font-size: 11px;
+    white-space: nowrap;
+    pointer-events: none;
+    /* anchor by the node center: nudge up-left so it floats above the disc */
+    margin: -22px 0 0 6px;
+}
+.mapv2-label-hover {
+    color: #1a1a1a;
+    background: #85e89d;
+    border-color: #85e89d;
+    z-index: 2;
+}
+.mapv2-gl-fallback {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #d0a85e;
+    font-family: monospace;
+    text-align: center;
+    padding: 12px;
 }

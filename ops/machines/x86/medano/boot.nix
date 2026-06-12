@@ -10,7 +10,12 @@
 {
   boot = {
     supportedFilesystems = [ "zfs" ];
-    kernelPackages = config.boot.zfs.package.latestCompatibleLinuxPackages;
+    # Pin 6.12 LTS. `latestCompatibleLinuxPackages` is deprecated and on
+    # 26.05 resolves to 6.18 (non-LTS) - rebooting this remote-only box
+    # into an untested non-LTS kernel is risky, and 6.18 may outrun ZFS
+    # support. medano is ALREADY running 6.12.82, so pinning 6.12 makes
+    # the next reboot boot the same proven kernel family it runs today.
+    kernelPackages = pkgs.linuxPackages_6_12;
     zfs.devNodes = "/dev/disk/by-partlabel";
 
     kernelParams = [
@@ -26,6 +31,14 @@
     ];
 
     initrd = {
+      # Use the scripted (pre-systemd) initrd. medano relies on scripted-
+      # initrd-only features: postDeviceCommands (the SYSINIT rollback
+      # below) and network.postCommands (the remote-unlock zfs load-key
+      # flow). systemd stage-1 supports neither. Newer nixpkgs default
+      # stage-1 to systemd, which now hard-errors on postDeviceCommands;
+      # this pins the scripted initrd that medano was always built around.
+      systemd.enable = false;
+
       postDeviceCommands = lib.mkAfter ''
         zfs rollback -r rpool/nixos@SYSINIT
       '';

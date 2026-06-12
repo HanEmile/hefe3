@@ -1,1 +1,7 @@
 certs/*
+hitm.db
+hitm.db-shm
+hitm.db-wal
+*.db
+*.db-shm
+*.db-wal

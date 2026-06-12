@@ -4,8 +4,13 @@
 	mail
 	medano
 	lampadas
+	lernaeus
 ])
 ++
 (with hefe.ops.machines.aarch64; [
 	caladan
+	lampadas-bmc
+	lernaeus-bmc
+	lankiveil-bmc
+	parella-bmc
 ])

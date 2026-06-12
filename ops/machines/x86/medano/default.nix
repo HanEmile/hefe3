@@ -69,6 +69,7 @@ in
   fileSystems = {
     "/proc" = {
       device = "/proc";
+      fsType = "proc"; # required since 26.05; was tolerated by older eval
       options = [
         "nosuid"
         "nodev"

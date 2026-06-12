@@ -3,7 +3,7 @@
 # Usage (inside ops/nixos.nix):
 #   image = (import ./lib/mkVmImage.nix) {
 #     inherit pkgs lib;
-#     nixos = sources."nixos-25.11";
+#     nixos = sources."nixos-26.05";
 #     nixosConfig = (nixosFor "<vmname>").config;
 #     name = "<vmname>";
 #   };

@@ -14,7 +14,20 @@ let
       corrino = [ [
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGHcyg+yw1fwTfpbN1meNluaTXNcl6w1LIL0kz5Kan8I root@corrino"
       ] ];
+
+      # lernaeus pulls cached store paths from medano over ssh-ng as a
+      # substituter (nix-build@lernaeus). This grants the lernaeus nix
+      # daemon read access to medano's /nix/store. See lernaeus/default.nix
+      # nix.settings.substituters.
+      lernaeus = [ [
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG92u5aCk6teomk2TgYbbFEhH161th8vZC5M8WbsCrP9 nix-build@lernaeus"
+      ] ];
     };
+    lernaeus = withDefault { };
+    lampadas-bmc = withDefault { };
+    lernaeus-bmc = withDefault { };
+    lankiveil-bmc = withDefault { };
+    parella-bmc = withDefault { };
     naraj = withDefault { };
     arr = withDefault { };
     auth = withDefault { };

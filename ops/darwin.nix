@@ -10,7 +10,7 @@
 let
   sources = hefe.third_party;
 
-  nixos = sources."nixos-25.11";
+  nixos = sources."nixos-26.05";
   nixos-unstable = sources."nixos-unstable";
   nix-darwin = sources."nix-darwin";
   home-manager = sources."home-manager";
@@ -106,7 +106,7 @@ let
           { unstable, ... }:
           {
             home-manager.users.emile = import "${machineDir}/home_emile.nix";
-
+             
             # Inject variables directly into the home_emile.nix module arguments
             home-manager.extraSpecialArgs = {
               inherit unstable;
@@ -146,7 +146,7 @@ let
       set -euo pipefail
 
       echo "Building darwin configuration for ${hostname}..."
-      SYSTEM_PATH=$(nix-build -A ops.darwin.${hostname}.system --no-out-link)
+      SYSTEM_PATH=$(nix-build -A ops.darwin.${hostname}.system --no-out-link --show-trace)
 
       echo "Activating configuration..."
       sudo env NIX_PATH="darwin=${darwinPath}:nixpkgs=${nixpkgsPath}:darwin-config=${configPath}" $SYSTEM_PATH/activate

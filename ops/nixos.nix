@@ -7,12 +7,12 @@
 }@args:
 
 let
-  nixosFor =
-    machineName:
-    let
-      sources = hefe.third_party;
+  sources = hefe.third_party;
+  nixos = sources."nixos-26.05";
 
-      nixos = sources."nixos-25.11";
+  nixosFor =
+    machineName: extraModules:
+    let
       pkgs = import nixos {
         system = "x86_64-linux";
         config.allowUnfree = true;
@@ -74,8 +74,46 @@ let
         agenix # secrets
         { nixpkgs.pkgs = pkgs; }
         (import ./modules/late-sh.nix)
+      ] ++ extraModules;
+    };
+
+  # ── armv6l-linux (BMC Raspberry Pi) NixOS evaluation ──────────────────
+  #
+  # Cross-compilation: the NixOS config targets armv6l-linux (RPi 1) but
+  # all compilation happens on x86_64-linux (medano, the remote builder).
+  # This avoids the need for an armv6l builder or binfmt emulation.
+
+  nixosLib = import (nixos + "/lib");
+
+  nixosForBmc =
+    machineDef:
+    let
+      agenix = (sources."agenix".outPath + "/modules/age.nix");
+    in
+    import (nixos + "/nixos/lib/eval-config.nix") {
+      lib = nixosLib;
+      system = null;
+      specialArgs = {
+        inherit hefe args sources;
+      };
+      modules = [
+        "${nixos}/nixos/modules/installer/sd-card/sd-image-raspberrypi.nix"
+        machineDef
+        agenix
+        {
+          # Cross-compilation: build on x86_64-linux, target armv6l-linux.
+          nixpkgs.buildPlatform.system = "x86_64-linux";
+          nixpkgs.hostPlatform.system = "armv6l-linux";
+          nixpkgs.config = {
+            allowUnfree = true;
+            allowUnsupportedSystem = true;
+            allowBroken = true;
+          };
+          sdImage.compressImage = false;
+        }
       ];
     };
+
 
   build = hostname: ''
     ${pkgs.nix}/bin/nix-build \
@@ -89,6 +127,13 @@ let
       -v
   '';
 
+  instantiate = hostname: ''
+    ${pkgs.nix}/bin/nix-instantiate \
+      -A ops.nixos.${hostname}.toplevel \
+      --system "x86_64-linux" \
+      --show-trace
+  '';
+
   buildScriptFor =
     hostname:
     pkgs.writeShellScriptBin "build" ''
@@ -98,15 +143,12 @@ let
       ${build hostname}
     '';
 
-  # If sshTarget is set, deploy talks to that address directly. Otherwise
-  # uses the bare hostname (relies on ~/.ssh/config aliases).
-  # sshJump (optional): a host alias to ProxyJump through (e.g. "medano" for
-  # VMs that are only reachable via the hypervisor).
   deployScriptForOpts =
     { hostname,
       host_suffix ? "",
       sshTarget ? null,
       sshJump ? null,
+      buildOnTarget ? false,
     }:
     let
       target = if sshTarget != null then sshTarget else "${hostname}${host_suffix}";
@@ -114,17 +156,46 @@ let
                 then "-o ProxyJump=root@${sshJump} -o StrictHostKeyChecking=accept-new"
                 else "";
     in
+    if buildOnTarget then
+    pkgs.writeShellScriptBin "deploy" ''
+      set -ue
+
+      echo "[STEP 1/4]: Evaluating ${hostname} on caladan (no local build)"
+      DRV=$(${instantiate hostname})
+      echo "drv: $DRV"
+
+      echo "[STEP 2/4]: Shipping the derivation to ${target} (jump=${toString sshJump})"
+      NIX_SSHOPTS="${sshOpts}" ${pkgs.nix}/bin/nix copy \
+        --derivation \
+        --to "ssh-ng://root@${target}?compress=true" \
+        --no-check-sigs \
+        --verbose \
+        "$DRV"
+
+      echo "[STEP 3/4]: Building on ${target} + setting the profile"
+      OUT=$(ssh ${sshOpts} root@${target} \
+        "nix-store --realise \"$DRV\"")
+      echo "built: $OUT"
+      ssh ${sshOpts} root@${target} \
+        nix-env -p /nix/var/nix/profiles/system --set "$OUT"
+
+      echo "[STEP 4/4]: Switching to configuration"
+      ssh ${sshOpts} root@${target} \
+        /nix/var/nix/profiles/system/bin/switch-to-configuration switch
+    ''
+    else
     pkgs.writeShellScriptBin "deploy" ''
       set -ue
 
       echo "[STEP 1/4]: Building host ${hostname}"
       ${build hostname}
 
-      echo "[STEP 2/4]: Copying build result to host (target=${target})"
+      echo "[STEP 2/4]: Copying build result to host (target=${target} jump=${toString sshJump})"
       NIX_SSHOPTS="${sshOpts}" ${pkgs.nix}/bin/nix copy \
         --to "ssh-ng://root@${target}?compress=true" \
         --substitute-on-destination \
         --no-check-sigs \
+        --verbose \
         ./result
 
       echo "[STEP 3/4]: Setting the profile"
@@ -141,10 +212,8 @@ let
   deployScriptFor =
     hostname:
     host_suffix:
-    deployScriptForOpts { inherit hostname host_suffix; };
+    deployScriptForOpts { inherit hostname host_suffix; buildOnTarget = true; };
 
-  # VMs: pull primary IP from IPAM (default bridge first, then private bridge),
-  # and use medano as the ProxyJump.
   deployVmScriptFor =
     name:
     let
@@ -162,18 +231,15 @@ let
       sshJump = "medano";
     };
 
-  # Build a bootable qcow2 image from a VM's NixOS config.
   imageFor =
     name:
     let
-      sources = hefe.third_party;
-      nixos = sources."nixos-25.11";
       linuxPkgs = import nixos {
         system = "x86_64-linux";
         config.allowUnfree = true;
       };
       linuxLib = import (nixos + "/lib");
-      nixosCfg = (nixosFor hefe.ops.vms.x86."${name}").config;
+      nixosCfg = (nixosFor hefe.ops.vms.x86."${name}" (homeModulesFor name "vms")).config;
     in
     (import ./lib/mkVmImage.nix) {
       pkgs = linuxPkgs;
@@ -183,9 +249,6 @@ let
       inherit name;
     };
 
-  # Script that builds the qcow2 image for a VM and uploads it to medano
-  # at /keep/pools/vmpool/<name>.qcow2. Refuses to overwrite a running VM's
-  # disk (libvirt holds the file open; operator must shut down first).
   deployImageScriptFor =
     name:
     pkgs.writeShellScriptBin "deploy-image" ''
@@ -224,15 +287,157 @@ let
       echo "Image deployed. Start with: ssh root@medano 'virsh start ${name}'"
     '';
 
+  homeModulesFor =
+    name: type:
+    let
+      homeNix =
+        hefe.path.origSrc + "/ops/${type}/x86/${name}/home.nix";
+    in
+    if builtins.pathExists homeNix then
+      [
+        (hefe.third_party."home-manager".outPath + "/nixos")
+        homeNix
+      ]
+    else
+      [ ];
+
+  # ── BMC build / deploy / flash / qemu scripts ─────────────────────────
+
+  bmcBuildScript =
+    name:
+    pkgs.writeShellScriptBin "build" ''
+      set -ue
+      echo "Building SD card image for ${name} (armv6l-linux)..."
+      echo ""
+      echo "Prerequisites:"
+      echo "  - A Linux builder that can handle armv6l-linux"
+      echo "  - Either: binfmt emulation on the nix-darwin linux-builder VM"
+      echo "    or: a remote armv6l/aarch64 builder with binfmt"
+      echo ""
+      ${pkgs.nix}/bin/nix-build \
+        -A ops.nixos.${name}.sdImage \
+        -j 0 \
+        --cores 0 \
+        --keep-going \
+        --builders-use-substitutes \
+        --show-trace \
+        -v
+      echo ""
+      echo "SD image built:"
+      ls -lh ./result/sd-image/
+    '';
+
+  bmcFlashScript =
+    name:
+    pkgs.writeShellScriptBin "flash" ''
+      set -ue
+      if [ -z "''${1:-}" ]; then
+        echo "Usage: $(basename "$0") /dev/diskN"
+        echo ""
+        echo "On macOS: diskutil list   (use /dev/rdiskN for speed)"
+        exit 1
+      fi
+      DISK="$1"
+
+      echo "Building SD card image for ${name}..."
+      ${pkgs.nix}/bin/nix-build \
+        -A ops.nixos.${name}.sdImage \
+        -j 0 --cores 0 --keep-going --builders-use-substitutes --show-trace
+
+      IMG=$(find ./result/sd-image/ -name '*.img' -o -name '*.img.zst' | head -1)
+      [ -n "$IMG" ] || { echo "ERROR: no image found" >&2; exit 1; }
+
+      echo ""
+      echo "Image: $IMG"
+      echo "Target: $DISK"
+      read -p "This will ERASE $DISK. Continue? [y/N] " confirm
+      [ "$confirm" = "y" ] || exit 1
+
+      if [[ "$IMG" == *.zst ]]; then
+        ${pkgs.zstd}/bin/zstd -d "$IMG" --stdout | sudo dd of="$DISK" bs=64K status=progress
+      else
+        sudo dd if="$IMG" of="$DISK" bs=64K status=progress
+      fi
+      echo "Done. Eject the SD card and boot your Pi."
+    '';
+
+  bmcQemuScript =
+    name:
+    pkgs.writeShellScriptBin "qemu-bmc" ''
+      set -ue
+
+      echo "Building SD card image for ${name}..."
+      ${pkgs.nix}/bin/nix-build \
+        -A ops.nixos.${name}.sdImage \
+        -j 0 --cores 0 --keep-going --builders-use-substitutes --show-trace
+
+      IMG=$(find ./result/sd-image/ -name '*.img' | head -1)
+      [ -n "$IMG" ] || { echo "ERROR: no .img found (compression enabled?)" >&2; exit 1; }
+
+      WORKDIR=$(mktemp -d)
+      trap "rm -rf $WORKDIR" EXIT
+
+      echo "Copying image to $WORKDIR..."
+      cp "$IMG" "$WORKDIR/sd.img"
+      ${pkgs.qemu}/bin/qemu-img resize "$WORKDIR/sd.img" 2G
+
+      echo ""
+      echo "Starting QEMU (versatilepb, arm1176, 256MB RAM)..."
+      echo "  SSH forwarded: localhost:2222 -> guest:22"
+      echo "  Press Ctrl-A X to exit QEMU."
+      echo ""
+
+      exec ${pkgs.qemu}/bin/qemu-system-arm \
+        -M versatilepb \
+        -cpu arm1176 \
+        -m 256 \
+        -drive file="$WORKDIR/sd.img",format=raw,if=sd \
+        -nographic \
+        -serial stdio \
+        -no-reboot \
+        -net nic \
+        -net user,hostfwd=tcp::2222-:22
+    '';
+
+  bmcDeployScript =
+    name:
+    pkgs.writeShellScriptBin "deploy" ''
+      set -ue
+
+      echo "[STEP 1/4]: Building ${name} toplevel"
+      ${pkgs.nix}/bin/nix-build \
+        -A ops.nixos.${name}.toplevel \
+        -j 0 --cores 0 --keep-going --builders-use-substitutes --show-trace -v
+
+      echo "[STEP 2/4]: Copying closure to ${name}"
+      NIX_SSHOPTS="" ${pkgs.nix}/bin/nix copy \
+        --to "ssh-ng://root@${name}?compress=true" \
+        --no-check-sigs \
+        --verbose \
+        ./result
+
+      echo "[STEP 3/4]: Setting the profile"
+      ssh root@${name} \
+        nix-env -p /nix/var/nix/profiles/system --set $(readlink ./result)
+
+      echo "[STEP 4/4]: Switching to configuration"
+      ssh root@${name} \
+        /nix/var/nix/profiles/system/bin/switch-to-configuration switch
+    '';
+
+  # ── Per-type conf builders ─────────────────────────────────────────────
+
   # type being "machines" or "vms"
-  conf = name: type: {
+  conf = name: type:
+    let
+      homeModules = homeModulesFor name type;
+    in
+    {
     "${name}" =
       {
-        config = (nixosFor hefe.ops."${type}".x86."${name}").config;
-        toplevel = (nixosFor hefe.ops."${type}".x86."${name}").config.system.build.toplevel;
+        config = (nixosFor hefe.ops."${type}".x86."${name}" homeModules).config;
+        toplevel = (nixosFor hefe.ops."${type}".x86."${name}" homeModules).config.system.build.toplevel;
         build = buildScriptFor "${name}";
-        # machines (bare-metal hosts): just hostname or hostname + .pinto-pike.ts.net
-        # vms: route through medano with the IPAM IP
         deploy =
           if type == "vms"
           then deployVmScriptFor name
@@ -245,8 +450,24 @@ let
       });
   };
 
+  bmcConf =
+    name:
+    {
+      "${name}" = {
+        config = (nixosForBmc hefe.ops.machines.aarch64."${name}").config;
+        toplevel = (nixosForBmc hefe.ops.machines.aarch64."${name}").config.system.build.toplevel;
+        sdImage = (nixosForBmc hefe.ops.machines.aarch64."${name}").config.system.build.sdImage;
+        build = bmcBuildScript name;
+        flash = bmcFlashScript name;
+        qemu = bmcQemuScript name;
+        deploy = bmcDeployScript name;
+      };
+    };
+
   machine = name: conf name "machines";
   vm = name: conf name "vms";
+
+  # ── Directory scanners ─────────────────────────────────────────────────
 
   abc =
     func: dir:
@@ -260,9 +481,24 @@ let
       )
     );
 
+  abcFiltered =
+    func: dir: filter:
+    lib.attrsets.mergeAttrsList (
+      lib.attrsets.attrValues (
+        lib.attrsets.mergeAttrsList (
+          builtins.map (x: { "${x}" = (func "${x}"); }) (
+            builtins.filter filter (
+              builtins.attrNames (lib.attrsets.filterAttrs (k: v: v == "directory") (builtins.readDir dir))
+            )
+          )
+        )
+      )
+    );
+
   machines = abc machine ./machines/x86;
   vms = abc vm ./vms/x86;
+  bmcs = abcFiltered bmcConf ./machines/aarch64 (n: lib.hasSuffix "-bmc" n);
 
   withAll = keys: keys // { all = builtins.attrValues keys; };
 in
-withAll (machines // vms)
+withAll (machines // vms // bmcs)

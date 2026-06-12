@@ -17,6 +17,7 @@ let
     exceptions = [
       # The access control lists access the ssh keys in the users folders
       [ "ops" "acl" ]
+      [ "ops" "nixos" ]
 
       # machines is allowed to access //users for several reasons:
       #
@@ -27,6 +28,11 @@ let
       [ "ops" "machines" "x86" "lampadas" ]
       [ "ops" "machines" "x86" "naraj" ]
       [ "ops" "machines" "x86" "medano" ]
+      [ "ops" "machines" "x86" "lernaeus" ]
+      [ "ops" "machines" "aarch64" "lampadas-bmc" ]
+      [ "ops" "machines" "aarch64" "lernaeus-bmc" ]
+      [ "ops" "machines" "aarch64" "lankiveil-bmc" ]
+      [ "ops" "machines" "aarch64" "parella-bmc" ]
         [ "ops" "vms" "x86" "md" ]
         [ "ops" "vms" "x86" "arr" ]
         [ "ops" "vms" "x86" "auth" ]
@@ -69,7 +75,7 @@ let
   sources = import ./third_party {};
 
   # nixos
-  nixos = sources."nixos-25.11";
+  nixos = sources."nixos-26.05";
   pkgs = import nixos { system = localSystem; config = {}; };
   lib = import (nixos + "/lib");
 
