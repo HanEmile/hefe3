@@ -16,6 +16,7 @@ let
   medano = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDo2MqY7BD6rd/L3UURx/2kTuHMC7V7WmW74bCsejChq root@medano";
   mail = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGY7/xWbF1+VO6+tGB5IHMr8RHne1A9eEtJvqaPU/dck root@mail";
   lampadas = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAbvlQjEsZO4hsfdUwhVQnxYkxyoRiVxkPGlJO2hzMOl root@lampadas";
+  lernaeus = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOASVDM+HusQY7btHM76V0HyllczztxRESaQMnL1PnFi root@lernaeus";
 
   # vms
   arr = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFCQ5JRwEr8LUmWtMR/Gue/bSiXJxyIk4dKyDi1s2M7o root@arr";
