@@ -44,6 +44,7 @@ let
   minecraft = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA/0Vc34WKHLyJYcZ2KF98PX7A+L5BC0JqLz/5doKDe1 root@minecraft";
   factorio  = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBuAa/baIxfJoSCyptxyrhvsINa1XjZxKYmwgReBBUVe root@factorio";
   r2wars    = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExKIrQADDElPIh3jARxGrRtEsjUlXcWyhCk/bkT47nC root@r2wars";
+  irc       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF5pt9Yq/wc/jQOCQ8K7IMB+aGUN7/LSZazWGTLdXcvR root@irc";
   # allHosts = [ medano arr ];
 
   # convinience function: the hosts themselves and all admins should be able to access the host
@@ -104,12 +105,16 @@ in
   "miniflux_oidc_client_secret.age" = for [ rss auth ];
 
 
+  # === irc ===
+  "irc_tls_crt.age" = for [ irc ];
+  "irc_tls_key.age" = for [ irc ];
+
   # === backups ===
-  "storagebox_bx11_restic_password.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea late sb1 sb2 sb3 minecraft factorio r2wars ];
+  "storagebox_bx11_restic_password.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea late sb1 sb2 sb3 minecraft factorio r2wars irc ];
 
   # The config bx11 connection config contains this:
   # username=u331921
   # domain=u331921.your-storagebox.de
   # password=...
-  "storagebox_bx11_connection_config.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea late sb1 sb2 sb3 minecraft factorio r2wars ];
+  "storagebox_bx11_connection_config.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea late sb1 sb2 sb3 minecraft factorio r2wars irc ];
 }
