@@ -18,6 +18,10 @@ let
   vm = name: hefe.path.origSrc + ("/ops/vms/x86/" + name + "/libvirt.nix");
 in
 {
+  # QEMU user-mode emulation for armv6l — lets medano build armv6l-linux
+  # derivations (RPi 1 BMC images) via transparent emulation.
+  boot.binfmt.emulatedSystems = [ "armv6l-linux" ];
+
   imports = [
     (import ./boot.nix (args1 // args2))
     ./networking.nix
@@ -124,6 +128,7 @@ in
 
   hardware.enableRedistributableFirmware = true;
 
+  nix.settings.system-features = [ "nixos-test" "benchmark" "big-parallel" "kvm" "gccarch-armv6kz" "gccarch-x86-64-v2" ];
   nix.settings.trusted-users = [
     "root"
     "@wheel"

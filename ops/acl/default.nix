@@ -28,6 +28,7 @@ let
     lernaeus-bmc = withDefault { };
     lankiveil-bmc = withDefault { };
     parella-bmc = withDefault { };
+    parella = withDefault { };
     naraj = withDefault { };
     arr = withDefault { };
     auth = withDefault { };

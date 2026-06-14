@@ -29,6 +29,7 @@ let
       [ "ops" "machines" "x86" "naraj" ]
       [ "ops" "machines" "x86" "medano" ]
       [ "ops" "machines" "x86" "lernaeus" ]
+      [ "ops" "machines" "x86" "parella" ]
       [ "ops" "machines" "aarch64" "lampadas-bmc" ]
       [ "ops" "machines" "aarch64" "lernaeus-bmc" ]
       [ "ops" "machines" "aarch64" "lankiveil-bmc" ]
