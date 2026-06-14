@@ -152,9 +152,36 @@ let
       sudo env NIX_PATH="darwin=${darwinPath}:nixpkgs=${nixpkgsPath}:darwin-config=${configPath}" $SYSTEM_PATH/activate
     '';
 
+  updateMachinesFor =
+    hostname:
+    pkgs.writeShellScriptBin "update-machines" ''
+      set -euo pipefail
+
+      echo "Building darwin configuration for ${hostname}..."
+      SYSTEM_PATH=$(nix-build -A ops.darwin.${hostname}.system --no-out-link)
+
+      MACHINES="$SYSTEM_PATH/etc/nix/machines"
+      if [ ! -f "$MACHINES" ]; then
+        echo "ERROR: $MACHINES not found in built system" >&2
+        exit 1
+      fi
+
+      echo "Current /etc/nix/machines:"
+      cat /etc/nix/machines 2>/dev/null || echo "(empty)"
+      echo ""
+      echo "New /etc/nix/machines:"
+      cat "$MACHINES"
+      echo ""
+
+      echo "Updating /etc/nix/machines..."
+      sudo cp "$MACHINES" /etc/nix/machines
+      echo "Done. Nix daemon will pick up the new builders on the next build."
+    '';
+
   conf = name: {
     "${name}" = {
       switch = switchScriptFor name;
+      update-machines = updateMachinesFor name;
       system = (darwinFor name).system;
     };
   };
@@ -163,8 +190,10 @@ let
     lib.attrsets.attrValues (
       lib.attrsets.mergeAttrsList (
         builtins.map (x: { "${x}" = (conf (lib.removeSuffix ".nix" x)); }) (
-          builtins.attrNames (
-            lib.attrsets.filterAttrs (k: v: v == "directory") (builtins.readDir ./machines/aarch64)
+          builtins.filter (n: !(lib.hasSuffix "-bmc" n)) (
+            builtins.attrNames (
+              lib.attrsets.filterAttrs (k: v: v == "directory") (builtins.readDir ./machines/aarch64)
+            )
           )
         )
       )

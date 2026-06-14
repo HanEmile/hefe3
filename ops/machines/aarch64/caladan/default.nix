@@ -105,7 +105,8 @@
       # }
       {
         hostName = "medano.emile.space";
-        system = "x86_64-linux";
+        sshKey = "/Users/emile/.ssh/id_ed25519";
+        systems = [ "x86_64-linux" "armv6l-linux" ];
         maxJobs = 10;
         speedFactor = 2;
 
@@ -114,9 +115,30 @@
           "benchmark"
           "big-parallel"
           "kvm"
+          "gccarch-armv6kz"
+          "gccarch-x86-64-v2"
         ];
         mandatoryFeatures = [ ];
       }
+      # lernaeus removed as a remote builder for now: the box is off and its
+      # LAN hostname (192.168.1.79) is unreachable from caladan, which made
+      # every distributed build hang on the SSH connect before falling back
+      # to medano. Re-enable once lernaeus is reliably up on the tailnet.
+      # {
+      #   hostName = "lernaeus";
+      #   sshKey = "/Users/emile/.ssh/id_ed25519";
+      #   systems = [ "x86_64-linux" "armv6l-linux" ];
+      #   maxJobs = 12;
+      #   speedFactor = 1;
+      #
+      #   supportedFeatures = [
+      #     "benchmark"
+      #     "big-parallel"
+      #     "gccarch-armv6kz"
+      #     "gccarch-x86-64-v2"
+      #   ];
+      #   mandatoryFeatures = [ ];
+      # }
     ];
   };
 
@@ -135,6 +157,19 @@
       bashInteractive
       zsh
     ];
+  };
+
+
+  # System-wide SSH known hosts so the nix daemon (root) can reach remote
+  # builders without hanging on the host key verification prompt.
+  programs.ssh.knownHosts = {
+    "medano.emile.space" = {
+      publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDo2MqY7BD6rd/L3UURx/2kTuHMC7V7WmW74bCsejChq";
+    };
+    lernaeus = {
+      hostNames = [ "lernaeus" "lernaeus.pinto-pike.ts.net" "192.168.1.79" "100.122.98.27" ];
+      publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOASVDM+HusQY7btHM76V0HyllczztxRESaQMnL1PnFi";
+    };
   };
 
   system.primaryUser = "emile";

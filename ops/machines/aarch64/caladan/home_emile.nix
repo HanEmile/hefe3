@@ -310,7 +310,7 @@
     syncthing
     # git-annex
 
-    # senpai # irc
+    senpai # irc
 
     zed-editor # editor
     # (zed-editor.overrideAttrs (oldAttrs: {

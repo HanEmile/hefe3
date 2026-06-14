@@ -11,13 +11,33 @@
       generic-extlinux-compatible.enable = true;
     };
 
-    initrd.availableKernelModules = [
+    # Disable RP1 (Pi 5) and other modules that fail cross-compilation
+    # for armv6l due to missing __aeabi_uldivmod in modpost.
+    kernelPatches = [{
+      name = "disable-rp1-for-armv6l";
+      patch = null;
+      structuredExtraConfig = with lib.kernel; {
+        PWM_RP1 = lib.mkForce no;
+        I2C_DESIGNWARE_PLATFORM = lib.mkForce no;
+        VIDEO_RP1_CFE = lib.mkForce no;
+        SND_SOC_RP1_HEADPHONES = lib.mkForce no;
+        DRM_RP1_DSI = lib.mkForce no;
+        DRM_RP1_DPI = lib.mkForce no;
+        DRM_RP1_VEC = lib.mkForce no;
+      };
+    }];
+
+    initrd.availableKernelModules = lib.mkForce [
       "usbhid"
       "usb_storage"
-      "vc4"
+      "mmc_block"
+      "sdhci"
       "bcm2835_dma"
       "i2c_bcm2835"
+      "ext4"
+      "sd_mod"
     ];
+    initrd.kernelModules = lib.mkForce [ ];
   };
 
   hardware.enableRedistributableFirmware = true;
@@ -48,10 +68,12 @@
   users = {
     mutableUsers = false;
     users.root = {
+      initialPassword = "bmc";
       openssh.authorizedKeys.keys = hefe.users.hanemile.keys.all;
     };
     users.emile = {
       isNormalUser = true;
+      initialPassword = "bmc";
       extraGroups = [ "wheel" "gpio" "dialout" ];
       openssh.authorizedKeys.keys = hefe.users.hanemile.keys.all;
     };
@@ -66,7 +88,7 @@
 
   environment.systemPackages = with pkgs; [
     vim
-    git
+    # git — disabled: cross-compilation of gitcore (Rust) fails for armv6l
     tmux
     htop
     libgpiod
@@ -82,6 +104,11 @@
         PasswordAuthentication = false;
         KbdInteractiveAuthentication = false;
       };
+    };
+
+    tailscale = {
+      enable = true;
+      extraUpFlags = [ "--ssh" ];
     };
   };
 

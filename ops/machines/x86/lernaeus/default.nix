@@ -19,6 +19,8 @@
 }@args2:
 
 {
+  boot.binfmt.emulatedSystems = [ "armv6l-linux" ];
+
   imports = [
     (import ./boot.nix (args1 // args2))
     (import ./gpu.nix (args1 // args2))
@@ -110,6 +112,7 @@
     };
 
   nix.settings = {
+    system-features = [ "nixos-test" "benchmark" "big-parallel" "kvm" "gccarch-armv6kz" "gccarch-x86-64-v2" ];
     trusted-users = [
       "root"
       "@wheel"
