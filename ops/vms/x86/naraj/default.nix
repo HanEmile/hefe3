@@ -16,7 +16,7 @@ in
 
   # naraj is the fleet's public ingress: TLS termination + reverse proxy +
   # ACME. medano DNATs eno1:80,443 to naraj:80,443.
-  networking.firewall.interfaces."enp1s0".allowedTCPPorts = [ 80 443 ];
+  networking.firewall.interfaces."enp1s0".allowedTCPPorts = [ 80 443 6697 ];
 
   systemd.tmpfiles.rules = [
     "d /var/www/emile.space 0755 nginx nginx - -"
@@ -210,8 +210,76 @@ in
             '';
           };
         };
+
+        # --- irc.emile.space: ACME http-01 only ---
+        # IRC is not HTTP, so this vhost exists solely to obtain/renew the
+        # Let's Encrypt cert for irc.emile.space. The actual IRC traffic is
+        # handled by the nginx stream block below (TLS-terminating TCP proxy
+        # to Ergo on the irc VM). Port 80 ACME challenges land here; 443 just
+        # returns a small notice.
+        "irc.emile.space" = tlsify {
+          locations."/".extraConfig = ''
+            default_type text/plain;
+            return 200 "irc.emile.space is an IRC server. Connect with an IRC client on port 6697 (TLS).";
+          '';
+        };
       };
   };
+
+  # ---------------------------------------------------------------------------
+  # IRC ingress: TLS-terminating TCP stream proxy.
+  # nginx terminates TLS for irc.emile.space using the ACME cert above, then
+  # forwards plaintext IRC to Ergo on the irc VM. medano DNATs :6697 -> naraj.
+  # ---------------------------------------------------------------------------
+  services.nginx.streamConfig = ''
+    upstream ergo_backend {
+      server ${hefe.ops.ipam.default.irc.v4}:6667;
+    }
+    server {
+      listen 6697 ssl;
+      ssl_certificate     /var/lib/acme/irc.emile.space/fullchain.pem;
+      ssl_certificate_key /var/lib/acme/irc.emile.space/key.pem;
+      proxy_pass ergo_backend;
+      proxy_timeout 1h;
+    }
+  '';
+
+  # First-boot bootstrap: if ACME has not issued the irc.emile.space cert yet,
+  # drop a self-signed placeholder at the expected path so the nginx stream
+  # block can start. ACME replaces it on its first successful run, after which
+  # the postRun hook below reloads nginx to pick up the real cert.
+  systemd.services.nginx = {
+    wants = [ "acme-irc.emile.space.service" ];
+    after = [ "acme-irc.emile.space.service" ];
+  };
+
+  systemd.services.irc-stream-cert-bootstrap = {
+    description = "Seed a self-signed placeholder cert for the irc.emile.space stream";
+    wantedBy = [ "nginx.service" ];
+    before = [ "nginx.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      set -eu
+      D=/var/lib/acme/irc.emile.space
+      if [ ! -f "$D/fullchain.pem" ] || [ ! -f "$D/key.pem" ]; then
+        mkdir -p "$D"
+        ${pkgs.openssl}/bin/openssl req -x509 -newkey rsa:2048 -nodes \
+          -keyout "$D/key.pem" -out "$D/fullchain.pem" \
+          -subj "/CN=irc.emile.space" -days 3650
+        # Match ACME's ownership so its renewal can overwrite these later.
+        chown acme:nginx "$D" "$D/fullchain.pem" "$D/key.pem" || true
+        chmod 0640 "$D/fullchain.pem" "$D/key.pem" || true
+      fi
+    '';
+  };
+
+  # Reload nginx after ACME (re)issues the irc cert so the stream picks it up.
+  security.acme.certs."irc.emile.space".postRun = ''
+    systemctl reload nginx.service || true
+  '';
 
   # external probes from naraj's own viewpoint
   services.healthProbes.probes = [

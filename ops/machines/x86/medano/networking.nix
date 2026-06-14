@@ -2,7 +2,7 @@
 
 let
   pubv4 = "95.217.35.60";
-  ircVMip = "192.168.75.5";
+  ircVMip = "192.168.75.23";
 
   httpPort = "80";
   httpsPort = "80";
@@ -35,16 +35,18 @@ let
       hairpin = true;
       snatReturn = true;
     }
-    # IRC bouncer kept as historical example, currently disabled in
-    # forwardPorts but the hairpin rule is still installed (harmless).
+    # IRCS: public IRC (Ergo). naraj terminates TLS for irc.emile.space and
+    # stream-proxies plaintext IRC onward to the irc VM's Ergo listener. This
+    # follows the same ingress path as 80/443 so the destIp==naraj branch in
+    # mkFlowRules installs the FORWARD/hairpin/MASQUERADE rules automatically.
     {
       name = "ircs";
-      desc = "IRC bouncer (hairpin only; primary DNAT is via nixos nat.forwardPorts when re-enabled)";
+      desc = "Public IRC (Ergo) via naraj TLS-terminating stream proxy";
       proto = "tcp";
       dport = ircBouncerPort;
-      dest  = "${ircVMip}:${toString ircBouncerPort}";
+      dest  = "${narajVMip}:${toString ircBouncerPort}";
       hairpin = true;
-      snatReturn = false;
+      snatReturn = true;
     }
   ];
 
@@ -133,23 +135,21 @@ in
       ];
 
       # The IP address ranges for which to perform NAT. Packets coming from these addresses (on any interface) and destined for the external interface will be rewritten.
+      # (IRC now routes via naraj like 80/443, so no per-irc-VM SNAT entry is needed.)
       internalIPs = [
-        # TODO(emile): get this ip via ops.ipam
-        # TODO(emile): pass `hefe` to this file
-        # irc
-        "${ircVMip}/32"
       ];
 
       forwardPorts = [
         # Forward external 80/443 to naraj (TLS-terminating ingress VM).
         { destination = "${narajVMip}:80";  proto = "tcp"; sourcePort = 80; }
         { destination = "${narajVMip}:443"; proto = "tcp"; sourcePort = 443; }
-        # forward irc traffic directed at the host to the `irc` VM
-        # {
-        #   destination = "${ircVMip}:${toString ircBouncerPort}";
-        #   proto = "tcp";
-        #   sourcePort = ircBouncerPort;
-        # }
+        # Forward external IRC (6697) to naraj, which terminates TLS for
+        # irc.emile.space and stream-proxies plaintext to the irc VM's Ergo.
+        {
+          destination = "${narajVMip}:${toString ircBouncerPort}";
+          proto = "tcp";
+          sourcePort = ircBouncerPort;
+        }
       ];
 
       extraCommands = ''
@@ -174,7 +174,6 @@ in
             ircBouncerPort # irc
           ];
           allowedUDPPorts = [
-            ircBouncerPort # irc
           ];
         };
 
