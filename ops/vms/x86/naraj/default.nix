@@ -211,16 +211,25 @@ in
           };
         };
 
-        # --- irc.emile.space: ACME http-01 only ---
-        # IRC is not HTTP, so this vhost exists solely to obtain/renew the
-        # Let's Encrypt cert for irc.emile.space. The actual IRC traffic is
-        # handled by the nginx stream block below (TLS-terminating TCP proxy
-        # to Ergo on the irc VM). Port 80 ACME challenges land here; 443 just
-        # returns a small notice.
+        # --- irc.emile.space (HTTP/443) ---
+        # Raw IRC-over-TLS is served by the nginx stream block below (port
+        # 6697, for native clients). This 443 vhost does two things: obtain/
+        # renew the Let's Encrypt cert via ACME http-01, and expose a WebSocket
+        # entrypoint at /webirc so browser clients (kiwiirc.com) can connect --
+        # browsers can't open raw TCP/TLS, only WebSockets. The upgrade is
+        # proxied to Ergo's plaintext ws listener (:8067) on the irc VM.
         "irc.emile.space" = tlsify {
+          locations."/webirc" = {
+            proxyPass = "http://${hefe.ops.ipam.default.irc.v4}:8067";
+            proxyWebsockets = true;
+            extraConfig = ''
+              proxy_read_timeout 1h;
+              proxy_send_timeout 1h;
+            '';
+          };
           locations."/".extraConfig = ''
             default_type text/plain;
-            return 200 "irc.emile.space is an IRC server. Connect with an IRC client on port 6697 (TLS).";
+            return 200 "irc.emile.space is an IRC server. Native clients: port 6697 (TLS). Web clients: wss://irc.emile.space/webirc.";
           '';
         };
       };

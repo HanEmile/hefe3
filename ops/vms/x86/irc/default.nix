@@ -10,8 +10,19 @@ let
   # Ergo itself speaks plaintext on the bridge. medano DNATs :6697 -> naraj.
   ergoPlainPort = 6667;
 
-  # soju: personal bouncer, tailscale-only. Aggregates the local Ergo plus
-  # any external networks (Libera, OFTC, ...) behind one always-on session.
+  # Ergo WebSocket listener. Browsers can't open raw IRC-over-TLS sockets,
+  # so web clients (kiwiirc.com) need a WebSocket entrypoint. naraj terminates
+  # wss for irc.emile.space/webirc and proxies the upgrade to this plaintext ws
+  # listener; like ergoPlainPort it's reachable only from the bridge + tailnet.
+  ergoWsPort = 8067;
+
+  # soju: personal bouncer, tailscale-only. Aggregates the emilespace Ergo
+  # network plus external networks (Libera, hackint, ...) behind one
+  # always-on session. Upstream network addrs live in soju's DB (not declared
+  # here); the emilespace network points at the public ingress
+  # ircs://irc.emile.space:6697 (-> medano DNAT -> naraj TLS -> Ergo), reaching
+  # Ergo from this VM via medano's hairpin NAT. Manage with `sojuctl ... user
+  # run emile network status|update`.
   # TLS via a tailscale-issued cert so senpai connects with ircs://.
   sojuTlsPort = 6698;
 in
@@ -30,8 +41,8 @@ in
   networking.firewall = {
     # Ergo plaintext: only reachable from the bridge (naraj proxies in) and
     # tailscale (you, directly). Never exposed publicly in plaintext.
-    interfaces."enp1s0".allowedTCPPorts = [ ergoPlainPort ];
-    interfaces."tailscale0".allowedTCPPorts = [ ergoPlainPort sojuTlsPort ];
+    interfaces."enp1s0".allowedTCPPorts = [ ergoPlainPort ergoWsPort ];
+    interfaces."tailscale0".allowedTCPPorts = [ ergoPlainPort ergoWsPort sojuTlsPort ];
   };
 
   # ---------------------------------------------------------------------------
@@ -46,6 +57,16 @@ in
         # Plaintext listener (naraj does TLS). Bound to all interfaces; the
         # firewall above restricts who can reach it.
         listeners.":${toString ergoPlainPort}" = { };
+        # WebSocket listener for browser clients (plaintext; naraj terminates
+        # wss). Same trust model as the plaintext IRC port. Ergo requires
+        # enforce-utf8 whenever a websocket listener is enabled (browsers only
+        # speak UTF-8).
+        "enforce-utf8" = true;
+        listeners.":${toString ergoWsPort}".websocket = true;
+        # Restrict which web origins may open a WebSocket to us (an empty list
+        # would allow any site to make visitors connect unknowingly). Allow the
+        # hosted kiwiirc.com client.
+        websockets."allowed-origins" = [ "https://kiwiirc.com" ];
         # naraj is the proxy in front of us: trust its forwarded source IPs
         # so cloaks/bans reflect the real client, not naraj.
         "proxy-allowed-from" = [ "localhost" hefe.ops.ipam.default.naraj.v4 ];
@@ -85,6 +106,34 @@ in
         "client-length" = 512;
         "autoresize-window" = "3d";
         "autoreplay-on-join" = 25;
+      };
+      # Operator classes. The NixOS ergochat module renders only what we put
+      # in `settings`, so (unlike Ergo's bundled defaultconfig) we must define
+      # the oper-classes we reference. "server-admin" carries `accreg`, which
+      # is what lets the admin oper reset a lost account password via
+      # `NS SAPASSWD`.
+      "oper-classes" = {
+        "server-admin" = {
+          title = "Server Admin";
+          capabilities = [
+            "kill" "ban" "nofakelag" "relaymsg" "vhosts" "sajoin" "samode"
+            "snomasks" "roleplay"
+            "rehash" "accreg" "chanreg" "history" "defcon" "massmessage"
+            "metadata"
+          ];
+        };
+      };
+      # Server operator. Needed for account administration (e.g. resetting a
+      # lost account password via `NS SAPASSWD`): the "server-admin" oper-class
+      # above carries the `accreg` capability. Log in with
+      # `/OPER admin <password>`. The value below is a bcrypt hash produced by
+      # `ergo genpasswd`; the plaintext lives only in the operator's hands
+      # (not in the repo). Rotate by regenerating the hash and redeploying.
+      opers.admin = {
+        class = "server-admin";
+        hidden = true;
+        "whois-line" = "is the server administrator";
+        password = "$2a$04$duSbo.TvoboIkHH7VP/gMOk8oDGNrxCPiRTf8tq2FL1tAIpJUdwjm";
       };
     };
   };
