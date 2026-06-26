@@ -3,8 +3,8 @@
   pkgs,
   lib,
   ...
-}:
-{ config, ... }:
+}@args1:
+{ config, ... }@args2:
 
 let
   # TODO(emile): pull these from hefe.users.hanemile
@@ -21,6 +21,9 @@ in
     ./hardware-configuration.nix
 
     ../../../modules/makhor.nix
+
+    # Home Assistant Core (migrated off the OOMing 1GB Pi). See file header.
+    (import ./homeassistant.nix (args1 // args2))
   ];
 
   hardware.fancontrol = {
@@ -66,7 +69,7 @@ in
     blacklistedKernelModules = [ "r8169" ];
 
     # r8168 module options. After the r8169 -> r8168 swap and disabling
-    # TX offloads (see r8168-enp2s0-offloads service below), the NIC
+    # TX offloads (see r8168-offloads service below), the NIC
     # still entered a continuous TX-timeout / reset cycle (one watchdog
     # event every ~12s, observed 2026-06-01 ~20h after the offload
     # service applied successfully). The two remaining well-known
@@ -81,6 +84,11 @@ in
     '';
 
     initrd = {
+      # Scripted initrd: the remote-unlock flow below uses network.postCommands
+      # + a cryptsetup-askpass shell, neither supported by systemd stage-1
+      # (the default since 26.05). Matches medano/lernaeus.
+      systemd.enable = false;
+
       # Initrd must use r8168 too, otherwise the blacklist below
       # leaves the NIC unbound at LUKS-unlock time and remote unlock
       # over ssh stops working. boot.extraModulePackages above feeds
@@ -530,6 +538,34 @@ in
       ];
     };
 
+    # Home Assistant state: config + .storage + the recorder DB (full history).
+    restic.backups."homeassistant" = {
+      timerConfig = {
+        OnCalendar = "daily";
+        Persistent = true;
+        RandomizedDelaySec = "1h";
+      };
+      backupPrepareCommand = "${pkgs.util-linux}/bin/findmnt /mnt/storagebox-bx11 > /dev/null || ls /mnt/storagebox-bx11 > /dev/null";
+      repository = "/mnt/storagebox-bx11/backup/homeassistant";
+      initialize = true;
+      passwordFile = config.age.secrets."storagebox_bx11_restic_password".path;
+
+      paths = [ "/data/private/homeassistant" ];
+      # Exclude regenerable / churny bits; the recorder DB itself IS kept.
+      exclude = [
+        "/data/private/homeassistant/home-assistant_v2.db-wal"
+        "/data/private/homeassistant/home-assistant_v2.db-shm"
+        "/data/private/homeassistant/*.log"
+        "/data/private/homeassistant/tts"
+      ];
+      pruneOpts = [
+        "--keep-daily 7"
+        "--keep-weekly 5"
+        "--keep-monthly 12"
+        "--keep-yearly 75"
+      ];
+    };
+
     # shares
     #
     # Reset password:
@@ -729,7 +765,7 @@ in
     };
   };
 
-  # r8168 (enp2s0) TX-timeout mitigation. After the 2026-05-31 swap from
+  # r8168 TX-timeout mitigation. After the 2026-05-31 swap from
   # r8169 to r8168 the NETDEV WATCHDOG events dropped from thousands/day
   # but did not stop entirely - r8168 still logged a "transmit queue 0
   # timed out / Transmit timeout reset Device!" within minutes of boot.
@@ -750,25 +786,44 @@ in
   # propagation list. Same pattern used in tools/status-board/default.nix.
   systemd.services."restic-backups-photos".unitConfig.RequiresMountsFor = "/mnt/storagebox-bx11";
   systemd.services."restic-backups-immich-data".unitConfig.RequiresMountsFor = "/mnt/storagebox-bx11";
+  systemd.services."restic-backups-homeassistant".unitConfig.RequiresMountsFor = "/mnt/storagebox-bx11";
 
-  systemd.services."r8168-enp2s0-offloads" = {
-    description = "Disable r8168 TX offloads on enp2s0 (TX timeout workaround)";
+  # Disable offloads on whichever interface(s) are bound to r8168, resolved at
+  # runtime. (A previous version hardcoded enp2s0, which does not exist on this
+  # board - the cabled port enumerates as enp1s0 - so the workaround never ran
+  # and the NIC TX-timeout-stormed itself off the network.)
+  systemd.services."r8168-offloads" = {
+    description = "Disable r8168 TX offloads on all r8168 NICs (TX timeout workaround)";
     wantedBy = [ "multi-user.target" ];
-    after = [ "network-pre.target" "sys-subsystem-net-devices-enp2s0.device" ];
-    bindsTo = [ "sys-subsystem-net-devices-enp2s0.device" ];
+    after = [ "network-pre.target" ];
+    wants = [ "network-pre.target" ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
-      # -K: turn off every offload; --set-eee: belt-and-braces on top of
-      # the eee_enable=0 module option (the module knob covers boot, the
-      # ethtool call covers any post-boot re-negotiation); -A: disable
-      # link-level pause frames, which on this NIC have been correlated
-      # with stuck TX queues when the upstream switch flow-controls us.
-      ExecStart = [
-        "${pkgs.ethtool}/sbin/ethtool -K enp2s0 tso off gso off gro off tx off rx off sg off"
-        "${pkgs.ethtool}/sbin/ethtool --set-eee enp2s0 eee off"
-        "${pkgs.ethtool}/sbin/ethtool -A enp2s0 autoneg off rx off tx off"
-      ];
     };
+    # ethtool calls are best-effort (some knobs return non-zero even when they
+    # apply), hence set +e and the trailing `exit 0`.
+    script = ''
+      set +e
+      shopt -s nullglob
+      found=0
+      for dev in /sys/class/net/*; do
+        ifname=$(basename "$dev")
+        drv=$(readlink -f "$dev/device/driver" 2>/dev/null)
+        case "$drv" in
+          *r8168*)
+            found=1
+            echo "r8168-offloads: tuning $ifname"
+            ${pkgs.ethtool}/sbin/ethtool -K "$ifname" tso off gso off gro off tx off rx off sg off || true
+            ${pkgs.ethtool}/sbin/ethtool --set-eee "$ifname" eee off || true
+            ${pkgs.ethtool}/sbin/ethtool -A "$ifname" autoneg off rx off tx off || true
+            ;;
+        esac
+      done
+      if [ "$found" = 0 ]; then
+        echo "r8168-offloads: no r8168 interface found (nothing to do)" >&2
+      fi
+      exit 0
+    '';
   };
 }
