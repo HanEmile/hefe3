@@ -15,3 +15,5 @@ target/
 # IDA-Pro project state
 *.gpr
 *.rep/
+
+tools/paleki
