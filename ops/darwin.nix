@@ -110,6 +110,7 @@ let
             # Inject variables directly into the home_emile.nix module arguments
             home-manager.extraSpecialArgs = {
               inherit unstable;
+              inherit hefe;
             };
 
             # Set the state version globally for safety

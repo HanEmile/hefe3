@@ -1,4 +1,4 @@
-{ config, pkgs, lib, unstable, ... }:
+{ hefe, config, pkgs, lib, unstable, ... }:
 
 {
   home = {
@@ -324,6 +324,31 @@
     claude-code
 
     package-version-server
+
+    (pkgs.callPackage hefe.ops.pkgs.uxn2 {})
+
+    # (uxn.overrideAttrs (oldAtrrs: {
+    #   version = "main";
+    #   src = /Users/emile/src/sr.ht/rabbits/uxn2;
+    #   outputs = [ "out" ];
+    #   postPatch = "";
+    #   buildPhase = ''
+    #     mkdir -p $out
+    #     make PREFIX="$out" install
+
+    #     echo "==="
+
+    #     echo "# Creating drifblim rom from source"
+    #     ls -l $out/bin
+    #     cat etc/utils/drifblim.rom.txt \
+    #       | $out/bin/uxn2 etc/utils/xh.rom \
+    #       > $out/bin/drifblim.rom
+    #   '';
+    #   installPhase = ''
+    #     echo ">>> INSTALL <<<"
+    #   '';
+    #   fixupPhase = "";
+    # }))
 
     # Logseq ships with a deprecated Electron version by default
     # logseq
