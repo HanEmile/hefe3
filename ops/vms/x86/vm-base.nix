@@ -37,6 +37,7 @@ in
     git
     tailscale
     vnstat
+    ripgrep
   ];
 
   networking = {

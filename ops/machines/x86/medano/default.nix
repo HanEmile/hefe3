@@ -56,6 +56,7 @@ in
     (vm "factorio") # factorio (NFS /grave/games/factorio)
     (vm "r2wars") # radare2 workspace
     (vm "irc") # irc
+    (vm "pretix") # ticket shop
 
     # ctf
 
@@ -233,6 +234,7 @@ in
     { name = "tmp";              url = "https://tmp.emile.space/"; }
     { name = "social";           url = "https://social.emile.space/api/v1/instance"; }
     { name = "status";           url = "https://status.emile.space/"; expectedStatus = 302; }
+    { name = "pretix";           url = "https://tickets.emile.space/healthcheck/"; }
   ];
 
   # Prometheus node-exporter for medano itself. Bind on tailscale + localhost

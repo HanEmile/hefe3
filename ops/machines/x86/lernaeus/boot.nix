@@ -63,6 +63,7 @@
       # off on that port). Disabling PCIe-port power management stops the
       # misfiring PME interrupt path; negligible cost on an always-on box.
       "pcie_port_pm=off"
+      "pcie_aspm=off"
     ];
 
     initrd = {

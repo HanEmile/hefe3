@@ -238,6 +238,13 @@
     cmake
     pkg-config
 
+    # ocaml
+    ocaml
+    ocamlPackages.utop
+    ocamlPackages.odoc
+    ocamlPackages.fmt
+    ocamlPackages.ocaml-lsp
+
     # iot hack
     minicom
 
@@ -310,7 +317,8 @@
     syncthing
     # git-annex
 
-    senpai # irc
+    # irc
+    senpai # config in /Users/emile/Library/Application Support/senpai
 
     zed-editor # editor
     # (zed-editor.overrideAttrs (oldAttrs: {

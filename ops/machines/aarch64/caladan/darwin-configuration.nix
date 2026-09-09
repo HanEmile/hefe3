@@ -9,6 +9,9 @@
 
   system.stateVersion = 5;
 
+  ids.uids.nixbld = lib.mkForce 350;
+  ids.gids.nixbld = lib.mkForce 350;
+
   users.users.emile = {
     name = "emile";
     home = "/Users/emile";
@@ -25,9 +28,8 @@
     home = "/Users/hydra";
   };
 
-  ids.gids.nixbld = 30000;
-
   nix = {
+    enable = true;
     extraOptions =
       ''
     		builders-use-substitutes = true

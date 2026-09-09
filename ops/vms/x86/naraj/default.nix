@@ -211,6 +211,16 @@ in
           };
         };
 
+
+        # --- pretix (tickets) ---
+        "tickets.emile.space" =
+          let
+            backend = hefe.ops.ipam.default.pretix;
+          in
+          tlsify {
+            locations."/".proxyPass = "http://${backend.v4}:${toString backend.ports.pretix}";
+          };
+
         # --- irc.emile.space (HTTP/443) ---
         # Raw IRC-over-TLS is served by the nginx stream block below (port
         # 6697, for native clients). This 443 vhost does two things: obtain/

@@ -27,6 +27,7 @@
     (import ./sway.nix (args1 // args2))
     (import ./gaming.nix (args1 // args2))
     (import ./fans.nix (args1 // args2))
+    (import ./bluetooth.nix (args1 // args2))
     ./hardware-configuration.nix
   ];
 
@@ -72,13 +73,15 @@
   # like medano. root's key is pinned here as a safeguard.
   users =
     let
-      aclconf = with hefe.ops.acl; (usersForHost host."${config.networking.hostName}");
+      acl = hefe.ops.acl;
+      hostname = config.networking.hostName;
+      aclconf = with acl; (usersForHost host."${hostname}");
     in
     {
       mutableUsers = false;
       users = aclconf.users // {
         root = aclconf.users.root or { } // {
-          openssh.authorizedKeys.keys = hefe.users.hanemile.keys.all;
+          openssh.authorizedKeys.keys = (aclconf.users.root.openssh.authorizedKeys.keys or []) ++ hefe.users.hanemile.keys.all;
         };
         # emile is the autologin/sway/gaming user (created by the ACL's
         # withDefault, which sets isNormalUser + authorizedKeys). Merge ON
@@ -150,7 +153,19 @@
     tailscale
     ethtool
     dmidecode
+
+    blueman
+    bluez
+
+    firefox
   ];
+
+  hardware.opengl = {
+    enable = true;
+    extraPackages = [
+      pkgs.nvidia-vaapi-driver
+    ];
+  };
 
   programs.mosh.enable = true;
 

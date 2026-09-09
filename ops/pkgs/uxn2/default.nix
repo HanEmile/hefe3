@@ -14,7 +14,7 @@ stdenv.mkDerivation (finalAttrs: {
     owner = "~rabbits";
     repo = "uxn2";
     rev = "main";
-    hash = "sha256-/vcLXD0ghMRRpZmF9OqtX3NTVUe8C3wT/pUbBoXhnKE=";
+    hash = "sha256-8KfCcfoWpHBEfps3pvGTjs90FncY2oMrqfAfVRCd/ZY=";
   };
 
   outputs = [ "out" ];

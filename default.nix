@@ -56,6 +56,7 @@ let
         [ "ops" "vms" "x86" "factorio" ]
         [ "ops" "vms" "x86" "r2wars" ]
         [ "ops" "vms" "x86" "irc" ]
+        [ "ops" "vms" "x86" "pretix" ]
     ];
   };
 

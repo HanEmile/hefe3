@@ -16,6 +16,7 @@
     (import ./oidc_clients/amalthea.nix args)
     (import ./oidc_clients/miniflux.nix args)
     (import ./oidc_clients/gotosocial.nix args)
+    (import ./oidc_clients/pretix.nix args)
   ];
 
   users.users."authelia-main" = {

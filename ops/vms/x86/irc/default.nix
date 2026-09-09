@@ -129,14 +129,27 @@ in
       # `/OPER admin <password>`. The value below is a bcrypt hash produced by
       # `ergo genpasswd`; the plaintext lives only in the operator's hands
       # (not in the repo). Rotate by regenerating the hash and redeploying.
-      opers.admin = {
-        class = "server-admin";
-        hidden = true;
-        "whois-line" = "is the server administrator";
-        password = "$2a$04$duSbo.TvoboIkHH7VP/gMOk8oDGNrxCPiRTf8tq2FL1tAIpJUdwjm";
+      opers = {
+        admin = {
+          class = "server-admin";
+          hidden = true;
+          "whois-line" = "is the server administrator";
+          password = "$2a$04$CJCQCPMzrHccBlg49OYOcu4pDGVYwQkUWQpm6tbavwuOoOwmW4fzC";
+        };
+        hanemile = {
+          class = "server-admin";
+          hidden = true;
+          "whois-line" = "is the server administrator";
+          password = "$2a$04$CJCQCPMzrHccBlg49OYOcu4pDGVYwQkUWQpm6tbavwuOoOwmW4fzC";
+        };
       };
     };
   };
+
+  # Ergo 2.17 does not implement the sd_notify reload protocol that the
+  # upstream NixOS 26.05 module's Type=notify-reload expects, so reloads
+  # time out silently and leave the old config running. Override to simple.
+  systemd.services.ergochat.serviceConfig.Type = lib.mkForce "simple";
 
   # ---------------------------------------------------------------------------
   # soju - personal bouncer (tailscale-only), TLS via tailscale cert

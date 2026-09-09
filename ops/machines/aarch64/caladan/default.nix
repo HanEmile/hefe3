@@ -18,7 +18,10 @@
     home = "/Users/hydra";
   };
 
-  ids.gids.nixbld = 30000;
+  # ids.gids.nixbld = 30000;
+
+  ids.uids.nixbld = lib.mkForce 350;
+  ids.gids.nixbld = lib.mkForce 350;
 
   nix = {
 

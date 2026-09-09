@@ -14,7 +14,34 @@ in
   networking.hostName = "sb3";
   system.stateVersion = "25.05";
 
-  # standby VM: idle, ready for ad-hoc use. node-exporter only.
+  # kernelCTF development environment
+  environment.systemPackages = with pkgs; [
+    qemu
+    gcc
+    gnumake
+    binutils
+    python3
+    wget
+    curl
+    gdb
+    strace
+    bpftools
+    clang
+    llvm
+    flex
+    bison
+    bc
+    elfutils
+    openssl
+    pkg-config
+    ncurses
+  ];
+
+  # Enable KVM for nested virtualization (kernelCTF QEMU inside this VM)
+  virtualisation.libvirtd.enable = false;
+  boot.kernelModules = [ "kvm-intel" "kvm-amd" ];
+
+  # Allow larger disk for kernel builds
   services.healthProbes.probes = [
     { name = "node-exporter"; url = "http://${ipam.v4}:9100/metrics"; }
   ];

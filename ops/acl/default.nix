@@ -23,7 +23,14 @@ let
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG92u5aCk6teomk2TgYbbFEhH161th8vZC5M8WbsCrP9 nix-build@lernaeus"
       ] ];
     };
-    lernaeus = withDefault { };
+    lernaeus = withDefault {
+      emile = [ [
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIALyAIxFMxjbQtrTMlZM4j8oaq0W+/a8bthBmCUiIntd emile@shattered"
+      ] ];
+      root = [ [
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIALyAIxFMxjbQtrTMlZM4j8oaq0W+/a8bthBmCUiIntd emile@shattered"
+      ] ];
+    };
     lampadas-bmc = withDefault { };
     lernaeus-bmc = withDefault { };
     lankiveil-bmc = withDefault { };
@@ -67,6 +74,7 @@ let
     factorio = withDefault { };
     r2wars = withDefault { };
     irc = withDefault { };
+    pretix = withDefault { };
   };
 in
 {

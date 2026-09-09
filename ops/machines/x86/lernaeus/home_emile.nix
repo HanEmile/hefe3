@@ -88,8 +88,8 @@ let
       eth=$(eth_ip); [ -n "$eth" ] || eth="-"
       wifi=$(wifi_ip); [ -n "$wifi" ] || wifi="-"
 
-      # Disk: root filesystem used/size + percent.
-      disk=$(df -h / | awk 'NR==2{print $3"/"$2" "$5}')
+      # Disk: home filesystem used/size + percent.
+      disk=$(df -h /home | awk 'NR==2{print $3"/"$2" "$5}')
       # RAM: used/total (human).
       ram=$(free -h | awk '/^Mem:/{print $3"/"$2}')
 
@@ -185,6 +185,7 @@ in
   home.sessionVariables = {
     NIXOS_OZONE_WL = "1"; # Electron/Chromium (incl. some launchers) -> Wayland
     MOZ_ENABLE_WAYLAND = "1";
+    LIBVA_DRIVER_NAME = "nvidia";
   };
 
   # kitty, ported from caladan's programs.kitty

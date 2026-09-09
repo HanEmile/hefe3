@@ -22,8 +22,16 @@ in
 
     ../../../modules/makhor.nix
 
+    # Immich
+    (import ./immich.nix (args1 // args2))
+
     # Home Assistant Core (migrated off the OOMing 1GB Pi). See file header.
     (import ./homeassistant.nix (args1 // args2))
+
+    # Reachability watchdog: re-establishes the tailnet on flaky-link
+    # drops and logs diagnostics. See file header.
+    (import ./tailscale-watchdog.nix (args1 // args2))
+
   ];
 
   hardware.fancontrol = {
@@ -45,8 +53,6 @@ in
   };
 
   boot = {
-
-
     loader = {
       systemd-boot.enable = true;
       efi.canTouchEfiVariables = true;
@@ -220,9 +226,9 @@ in
       dmidecode
       ethtool
     ];
-    variables = {
-      "REDIS_HOSTNAME" = "immich_redis";
-    };
+    # variables = {
+    #   "REDIS_HOSTNAME" = "immich_redis";
+    # };
   };
 
   programs.mosh.enable = true;

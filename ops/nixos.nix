@@ -17,11 +17,19 @@ let
         system = "x86_64-linux";
         config.allowUnfree = true;
         overlays = [
+          # makhor
           (final: prev: {
             makhor = final.callPackage hefe.ops.pkgs.makhor {
               inherit pkgs;
             };
           })
+
+          # syzkaller
+          (final: prev: {
+            syzkaller = final.callPackage hefe.ops.pkgs.syzkaller {};
+          })
+
+          # late
           (
             final: prev:
             let
@@ -42,7 +50,21 @@ let
               };
             }
           )
+
+          # rust
           (import (sources."rust-overlay"))
+
+          # fix immich
+          (final: prev: {
+            python313 = prev.python313.override {
+              packageOverrides = pFinal: pPrev: {
+                albumentations = pPrev.albumentations.overridePythonAttrs (oldAttrs: {
+                  doCheck = false; # Skip running pytest during the build
+                });
+              };
+            };
+          })
+
         ];
       };
 
@@ -134,6 +156,8 @@ let
       --show-trace
   '';
 
+  # --add-root \
+
   buildScriptFor =
     hostname:
     pkgs.writeShellScriptBin "build" ''
@@ -162,6 +186,12 @@ let
 
       echo "[STEP 1/4]: Evaluating ${hostname} on caladan (no local build)"
       DRV=$(${instantiate hostname})
+
+      # Guard against bad evaluation output:
+      if [[ "$DRV" != /nix/store/* ]]; then
+        echo "Error: Evaluation failed to produce a valid store path. Got: '$DRV'" >&2
+        exit 1
+      fi
       echo "drv: $DRV"
 
       echo "[STEP 2/4]: Shipping the derivation to ${target} (jump=${toString sshJump})"
@@ -172,14 +202,28 @@ let
         --verbose \
         "$DRV"
 
-      echo "[STEP 3/4]: Building on ${target} + setting the profile"
-      OUT=$(ssh ${sshOpts} root@${target} \
-        "nix-store --realise \"$DRV\"")
-      echo "built: $OUT"
-      ssh ${sshOpts} root@${target} \
-        nix-env -p /nix/var/nix/profiles/system --set "$OUT"
+      # echo "[STEP 3/4]: Building on ${target} + setting the profile"
+      # OUT=$(ssh ${sshOpts} root@${target} \
+      #   "nix-store --realise --add-root \"$DRV\"")
+      # echo "built: $OUT"
+      # ssh ${sshOpts} root@${target} \
+      #   nix-env -p /nix/var/nix/profiles/system --set "$OUT"
 
-      echo "[STEP 4/4]: Switching to configuration"
+      # #########################
+      echo "[STEP 3/4]: Building on ${target} + setting the profile"
+
+      # 1. Build the derivation and extract ONLY the resulting /nix/store/... path
+      OUT=$(ssh ${sshOpts} root@${target} \
+        "nix-store --realise \"$DRV\"" | tail -n 1)
+
+      echo "built: $OUT"
+
+      # 2. Set the system profile using the explicit store path
+      ssh ${sshOpts} root@${target} \
+        "nix-env -p /nix/var/nix/profiles/system --set \"$OUT\""
+      # #########################
+
+      echo "[STEP 4/4]: Switching to configuration on target"
       ssh ${sshOpts} root@${target} \
         /nix/var/nix/profiles/system/bin/switch-to-configuration switch
     ''
@@ -206,7 +250,7 @@ let
 
       echo "[STEP 4/4]: Switching to configuration"
       ssh ${sshOpts} root@${target} \
-        /nix/var/nix/profiles/system/bin/switch-to-configuration switch
+        /nix/var/nix/profiles/system/bin/switch-to-configuration switch --verbose --show-trace
     '';
 
   deployScriptFor =
