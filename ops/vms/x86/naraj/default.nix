@@ -16,6 +16,7 @@ in
 
   # naraj is the fleet's public ingress: TLS termination + reverse proxy +
   # ACME. medano DNATs eno1:80,443 to naraj:80,443.
+  # 6697 is the native irc port
   networking.firewall.interfaces."enp1s0".allowedTCPPorts = [ 80 443 6697 ];
 
   systemd.tmpfiles.rules = [
@@ -66,7 +67,7 @@ in
         };
 
         # --- amalthea (astrophotography) ---
-        "amaltheea.medano.emile.space" =
+        "amalthea.medano.emile.space" =
           let
             backend = hefe.ops.ipam.default.amalthea;
           in
