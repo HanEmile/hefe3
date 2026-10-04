@@ -61,7 +61,7 @@ in
   "mullvad_famous_hog_priv.age" = for [ rou ];
 
   # === mail ===
-  "mail_emile_space_password.age" = for [ mail auth lampadas ];
+  "mail_emile_space_password.age" = for [ mail auth lampadas r2wars ];
 
   # === auth ===
   "authelia_jwt_secret.age" = for [ auth ];
@@ -113,6 +113,11 @@ in
   # === pretix ===
   "pretix_environment_file.age" = for [ pretix ];
   "pretix_oidc_client_secret.age" = for [ auth ];
+
+  # === r2wars-web ===
+  # SESSION_KEY=<32 random bytes> (required)
+  # SALT=<random> (optional, used to hash passwords)
+  "r2wars_web_environment_file.age" = for [ r2wars ];
 
   # === backups ===
   "storagebox_bx11_restic_password.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea late sb1 sb2 sb3 minecraft factorio r2wars irc pretix ];
