@@ -1,0 +1,163 @@
+diff --git a/app.go b/app.go
+index a7a4193..47927ff 100644
+--- a/app.go
++++ b/app.go
+@@ -462,6 +462,7 @@ func (app *App) ircLoop(netID string) {
+ 			break
+ 		}
+ 		delay = throttleInterval
++		app.setNetworkOffline(netID, false)
+ 
+ 		in, out := irc.ChanInOut(conn)
+ 		if app.cfg.Debug {
+@@ -497,26 +498,34 @@ func (app *App) ircLoop(netID string) {
+ 			src:     netID,
+ 			content: nil,
+ 		})
+-		app.queueStatusLine(netID, ui.Line{
+-			Head: ui.ColorString("!!", ui.ColorRed),
+-			Body: ui.PlainString("Connection lost"),
+-		})
++		app.setNetworkOffline(netID, true)
++		if app.cfg.Debug {
++			app.queueStatusLine(netID, ui.Line{
++				Head: ui.ColorString("!!", ui.ColorRed),
++				Body: ui.PlainString("Connection lost"),
++			})
++		}
+ 	}
+ }
+ 
+ func (app *App) connect(netID string) net.Conn {
+-	app.queueStatusLine(netID, ui.Line{
+-		Head: ui.PlainString("--"),
+-		Body: ui.PlainSprintf("Connecting to %s...", app.cfg.Addr),
+-	})
++	if app.cfg.Debug {
++		app.queueStatusLine(netID, ui.Line{
++			Head: ui.PlainString("--"),
++			Body: ui.PlainSprintf("Connecting to %s...", app.cfg.Addr),
++		})
++	}
+ 	conn, err := app.tryConnect()
+ 	if err == nil {
+ 		return conn
+ 	}
+-	app.queueStatusLine(netID, ui.Line{
+-		Head: ui.ColorString("!!", ui.ColorRed),
+-		Body: ui.PlainSprintf("Connection failed: %v", err),
+-	})
++	app.setNetworkOffline(netID, true)
++	if app.cfg.Debug {
++		app.queueStatusLine(netID, ui.Line{
++			Head: ui.ColorString("!!", ui.ColorRed),
++			Body: ui.PlainSprintf("Connection failed: %v", err),
++		})
++	}
+ 	return nil
+ }
+ 
+@@ -653,6 +662,8 @@ func (app *App) handleUIEvent(ev interface{}) bool {
+ 		}
+ 	case statusLine:
+ 		app.addStatusLine(ev.netID, ev.line)
++	case networkStatus:
++		app.win.SetNetworkOffline(ev.netID, ev.offline)
+ 	case *events.EventClickNick:
+ 		app.handleNickEvent(ev)
+ 	case *events.EventClickLink:
+diff --git a/ui/buffers.go b/ui/buffers.go
+index f790667..115a0fd 100644
+--- a/ui/buffers.go
++++ b/ui/buffers.go
+@@ -203,6 +203,7 @@ type buffer struct {
+ 	unread        bool
+ 	read          time.Time
+ 	openedOnce    bool
++	disconnected  bool
+ 
+ 	pinned bool
+ 	muted  bool
+@@ -598,6 +599,17 @@ func (bs *BufferList) SetTopic(netID, title string, topic StyledString) {
+ 	b.topic = topic
+ }
+ 
++// SetNetworkOffline marks every buffer belonging to netID as
++// (dis)connected, so the buffer list can render them in a distinct color
++// instead of interleaving connection status lines into their backlogs.
++func (bs *BufferList) SetNetworkOffline(netID string, offline bool) {
++	for i := range bs.list {
++		if bs.list[i].netID == netID {
++			bs.list[i].disconnected = offline
++		}
++	}
++}
++
+ func (bs *BufferList) GetPinned(netID, title string) bool {
+ 	_, b := bs.at(netID, title)
+ 	if b == nil {
+@@ -849,6 +861,9 @@ func (bs *BufferList) DrawVerticalBufferList(vx *Vaxis, x0, y0, width, height in
+ 		} else if b.muted {
+ 			st.Foreground = bs.ui.config.Colors.Gray
+ 		}
++		if b.disconnected {
++			st.Foreground = ColorRed
++		}
+ 
+ 		var title string
+ 		if b.title == "" {
+@@ -1048,6 +1063,9 @@ func (bs *BufferList) DrawHorizontalBufferList(vx *Vaxis, x0, y0, width int, off
+ 		} else if b.muted {
+ 			st.Foreground = bs.ui.config.Colors.Gray
+ 		}
++		if b.disconnected {
++			st.Foreground = ColorRed
++		}
+ 
+ 		var title string
+ 		if b.title == "" {
+diff --git a/ui/ui.go b/ui/ui.go
+index 94e83ac..a8bfb6c 100644
+--- a/ui/ui.go
++++ b/ui/ui.go
+@@ -570,6 +570,10 @@ func (ui *UI) SetTopic(netID, buffer string, topic StyledString) {
+ 	ui.bs.SetTopic(netID, buffer, topic)
+ }
+ 
++func (ui *UI) SetNetworkOffline(netID string, offline bool) {
++	ui.bs.SetNetworkOffline(netID, offline)
++}
++
+ func (ui *UI) GetPinned(netID, buffer string) bool {
+ 	return ui.bs.GetPinned(netID, buffer)
+ }
+diff --git a/window.go b/window.go
+index 160a32c..4c9c316 100644
+--- a/window.go
++++ b/window.go
+@@ -27,6 +27,25 @@ type statusLine struct {
+ 	line  ui.Line
+ }
+ 
++type networkStatus struct {
++	netID   string
++	offline bool
++}
++
++// setNetworkOffline marks netID as (dis)connected in the UI, without adding
++// a line to any buffer's backlog: repeated connection attempts otherwise
++// interleave noisy status lines into the scrollback of every buffer on that
++// network.
++func (app *App) setNetworkOffline(netID string, offline bool) {
++	app.postEvent(event{
++		src: "*",
++		content: networkStatus{
++			netID:   netID,
++			offline: offline,
++		},
++	})
++}
++
+ func (app *App) queueStatusLine(netID string, line ui.Line) {
+ 	if line.At.IsZero() {
+ 		line.At = time.Now()
