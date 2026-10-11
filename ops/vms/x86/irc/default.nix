@@ -25,6 +25,63 @@ let
   # run emile network status|update`.
   # TLS via a tailscale-issued cert so senpai connects with ircs://.
   sojuTlsPort = 6698;
+
+  # ircc: a small web IRC client (the-lounge-style) fronting the same soju
+  # bouncer account senpai uses. Tailscale-only, plain HTTP - tailscale's own
+  # WireGuard already encrypts the hop, matching how e.g. node-exporter is
+  # exposed elsewhere in this fleet.
+  irccPort = 8098;
+
+  # ---------------------------------------------------------------------------
+  # uptimebot targets
+  # ---------------------------------------------------------------------------
+  tsDomain = "pinto-pike.ts.net";
+
+  # Every VM under ops/vms/x86 (vm-base.nix) and the medano machine run
+  # node-exporter on :9100, open on tailscale0. Scraping it both proves the
+  # box itself is reachable ("<name>/node") and relays whatever
+  # services.healthProbes.probes that machine already defines
+  # (health_probe_up{name=...} lines in the same /metrics body) without
+  # redeclaring a single URL here.
+  metricsVMs = [
+    "amalthea" "arr" "auth" "code" "data" "demo01" "factorio" "git" "late"
+    "md" "miki" "minecraft" "naraj" "photo" "pretix" "r2wars" "rou" "rss"
+    "sb1" "sb2" "sb3" "sb4" "sb5" "social" "tmp"
+  ];
+
+  metricsTargets = map
+    (name: {
+      kind = "metrics";
+      inherit name;
+      url = "http://${name}.${tsDomain}:9100/metrics";
+    })
+    metricsVMs
+  ++ [
+    # irc is this VM itself; no tailscale hop needed.
+    { kind = "metrics"; name = "irc"; url = "http://127.0.0.1:9100/metrics"; }
+    { kind = "metrics"; name = "medano"; url = "http://medano.${tsDomain}:9100/metrics"; }
+  ];
+
+  # lampadas (home NAS): on the tailnet, but which ports are actually
+  # reachable through its firewall is murky, so a plain ICMP ping is the
+  # one liveness check that doesn't depend on guessing that correctly.
+  pingTargets = [
+    { kind = "ping"; name = "lampadas"; host = "lampadas.${tsDomain}"; }
+  ];
+
+  # mail (Hetzner, no tailscale): checked directly over the public internet.
+  # The meaningful signal for a mail server is "are the mail protocols up",
+  # not an HTTP status, so raw TCP connects to the actual mail ports.
+  mailTargets = map
+    (p: { kind = "tcp"; name = "mail"; host = "mail.emile.space"; port = p.port; label = p.label; })
+    [
+      { port = 25; label = "smtp"; }
+      { port = 587; label = "submission"; }
+      { port = 993; label = "imaps"; }
+    ];
+
+  uptimebotTargets = pkgs.writeText "uptimebot-targets.json"
+    (builtins.toJSON (metricsTargets ++ pingTargets ++ mailTargets));
 in
 {
   imports = [
@@ -42,7 +99,7 @@ in
     # Ergo plaintext: only reachable from the bridge (naraj proxies in) and
     # tailscale (you, directly). Never exposed publicly in plaintext.
     interfaces."enp1s0".allowedTCPPorts = [ ergoPlainPort ergoWsPort ];
-    interfaces."tailscale0".allowedTCPPorts = [ ergoPlainPort ergoWsPort sojuTlsPort ];
+    interfaces."tailscale0".allowedTCPPorts = [ ergoPlainPort ergoWsPort sojuTlsPort irccPort ];
   };
 
   # ---------------------------------------------------------------------------
@@ -152,6 +209,57 @@ in
   systemd.services.ergochat.serviceConfig.Type = lib.mkForce "simple";
 
   # ---------------------------------------------------------------------------
+  # ircc - small web IRC client (the-lounge-style), fronting soju
+  # ---------------------------------------------------------------------------
+  age.secrets.ircc_bouncer_password = {
+    file = hefe.ops.secrets."ircc_bouncer_password.age";
+    owner = "ircc";
+    group = "ircc";
+  };
+
+  # A static (not Dynamic-) user: agenix's activation-time chown of the
+  # bouncer-password secret needs a user that actually exists in /etc/passwd
+  # at activation time, which a DynamicUser (created only at service start)
+  # isn't.
+  users.groups.ircc = { };
+  users.users.ircc = {
+    isSystemUser = true;
+    group = "ircc";
+  };
+
+  systemd.services.ircc = {
+    description = "ircc - web IRC client fronting the soju bouncer";
+    after = [ "soju.service" "tailscale-cert-renew.service" ];
+    wants = [ "soju.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      User = "ircc";
+      Group = "ircc";
+      # soju's message logs (for /search) live under /var/lib/soju/logs,
+      # owned soju:soju mode 0750 -- read access via group membership rather
+      # than widening the directory's own permissions.
+      SupplementaryGroups = [ "soju" ];
+      # Core.Command flags are single-dash (-port), not GNU-style --port.
+      ExecStart = ''
+        ${hefe.ops.pkgs.ircc}/bin/ircc \
+          -port ${toString irccPort} \
+          -bouncer-host ${tsHost} \
+          -bouncer-port ${toString sojuTlsPort} \
+          -bouncer-user emile \
+          -bouncer-pass-file ${config.age.secrets.ircc_bouncer_password.path} \
+          -nick hanemile \
+          -network emilespace \
+          -network libera \
+          -network hackint \
+          -logs-dir /var/lib/soju/logs
+      '';
+      Restart = "always";
+      RestartSec = "5s";
+      RestrictAddressFamilies = [ "AF_INET" "AF_INET6" ];
+    };
+  };
+
+  # ---------------------------------------------------------------------------
   # soju - personal bouncer (tailscale-only), TLS via tailscale cert
   # ---------------------------------------------------------------------------
   tailscaleCertRenew.hostnames = [ tsHost ];
@@ -238,6 +346,89 @@ in
       OnBootSec = "60s";
       OnUnitActiveSec = "1min";
       AccuracySec = "5s";
+    };
+  };
+
+  # ---------------------------------------------------------------------------
+  # weatherman - posts a daily Düsseldorf forecast to #emile
+  # ---------------------------------------------------------------------------
+  systemd.services.weatherman = {
+    description = "Post the daily Düsseldorf forecast to #emile";
+    after = [ "ergochat.service" ];
+    wants = [ "ergochat.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      DynamicUser = true;
+      ExecStart = "${pkgs.callPackage hefe.ops.pkgs.weatherman { }}/bin/weatherman --server 127.0.0.1:${toString ergoPlainPort} --channel '#emile'";
+      # wttr^Wopen-meteo is on the public internet; needs outbound DNS + HTTPS.
+      RestrictAddressFamilies = [ "AF_INET" "AF_INET6" ];
+    };
+  };
+
+  systemd.timers.weatherman = {
+    description = "Daily #emile forecast";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "*-*-* 08:00:00 Europe/Berlin";
+      Persistent = true;
+      AccuracySec = "1min";
+    };
+  };
+
+  # ---------------------------------------------------------------------------
+  # xkcdbot - posts new xkcd comics to #emile as they're published
+  # ---------------------------------------------------------------------------
+  systemd.services.xkcdbot = {
+    description = "Post new xkcd comics to #emile";
+    after = [ "ergochat.service" ];
+    wants = [ "ergochat.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      DynamicUser = true;
+      StateDirectory = "xkcdbot";
+      ExecStart = "${pkgs.callPackage hefe.ops.pkgs.xkcdbot { }}/bin/xkcdbot --server 127.0.0.1:${toString ergoPlainPort} --channel '#emile' --state /var/lib/xkcdbot/last-seen";
+      RestrictAddressFamilies = [ "AF_INET" "AF_INET6" ];
+    };
+  };
+
+  systemd.timers.xkcdbot = {
+    description = "Poll xkcd for a new comic";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "*:0/30";
+      Persistent = true;
+      AccuracySec = "1min";
+    };
+  };
+
+  # ---------------------------------------------------------------------------
+  # uptimebot - posts fleet-wide up/down transitions to #emile
+  # ---------------------------------------------------------------------------
+  systemd.services.uptimebot = {
+    description = "Check fleet health and post state changes to #emile";
+    after = [ "ergochat.service" ];
+    wants = [ "ergochat.service" ];
+    path = [ pkgs.iputils ];
+    serviceConfig = {
+      Type = "oneshot";
+      DynamicUser = true;
+      StateDirectory = "uptimebot";
+      # ping needs a raw ICMP socket; grant just that, nothing else.
+      AmbientCapabilities = [ "CAP_NET_RAW" ];
+      CapabilityBoundingSet = [ "CAP_NET_RAW" ];
+      ExecStart = "${pkgs.callPackage hefe.ops.pkgs.uptimebot { }}/bin/uptimebot --server 127.0.0.1:${toString ergoPlainPort} --channel '#emile' --targets ${uptimebotTargets} --state /var/lib/uptimebot/state.json";
+      RestrictAddressFamilies = [ "AF_INET" "AF_INET6" ];
+    };
+  };
+
+  systemd.timers.uptimebot = {
+    description = "Periodic fleet health check";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnBootSec = "1min";
+      OnCalendar = "*:0/5";
+      Persistent = true;
+      AccuracySec = "1min";
     };
   };
 }

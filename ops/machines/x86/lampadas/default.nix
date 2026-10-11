@@ -1,6 +1,7 @@
 {
   hefe,
   pkgs,
+  pkgs-unstable,
   lib,
   ...
 }@args1:
@@ -393,6 +394,7 @@ in
 
     immich = {
       enable = true;
+      package = pkgs-unstable.immich;
       secretsFile = config.age.secrets.immich_secrets_file.path;
       accelerationDevices = null;
       mediaLocation = "/data/private/immich";

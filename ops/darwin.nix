@@ -147,10 +147,49 @@ let
       set -euo pipefail
 
       echo "Building darwin configuration for ${hostname}..."
-      SYSTEM_PATH=$(nix-build -A ops.darwin.${hostname}.system --no-out-link --show-trace)
+      SYSTEM_PATH=$(nix-build "${repoPath}" -A ops.darwin.${hostname}.system --no-out-link --show-trace)
 
       echo "Activating configuration..."
       sudo env NIX_PATH="darwin=${darwinPath}:nixpkgs=${nixpkgsPath}:darwin-config=${configPath}" $SYSTEM_PATH/activate
+    '';
+
+  remoteSwitchScriptFor =
+    let
+      darwinPath = nix-darwin.outPath;
+      nixpkgsPath = nixos.outPath;
+      repoPath = toString ../.;
+    in
+    hostname:
+    let
+      machineDir = "${repoPath}/ops/machines/aarch64/${hostname}";
+      configPath = "${machineDir}/default.nix";
+      homeManagerPath = "${machineDir}/home_emile.nix";
+    in
+    pkgs.writeShellScriptBin "remote-switch" ''
+      set -euo pipefail
+
+      if [ $# -lt 1 ]; then
+        echo "usage: remote-switch <user@host>" >&2
+        echo "  e.g. remote-switch emile@192.168.178.64" >&2
+        exit 1
+      fi
+      TARGET="$1"
+
+      echo "Building darwin configuration for ${hostname}..."
+      SYSTEM_PATH=$(nix-build "${repoPath}" -A ops.darwin.${hostname}.system --no-out-link --show-trace)
+
+      echo "Copying closure to $TARGET..."
+      nix copy --to "ssh://$TARGET" --no-check-sigs "$SYSTEM_PATH"
+
+      echo "Staging machine config on $TARGET (needed to resolve <darwin-config>)..."
+      ssh "$TARGET" mkdir -p "${machineDir}"
+      scp "${configPath}" "$TARGET:${configPath}"
+      if [ -f "${homeManagerPath}" ]; then
+        scp "${homeManagerPath}" "$TARGET:${homeManagerPath}"
+      fi
+
+      echo "Activating on $TARGET..."
+      ssh -t "$TARGET" "sudo env NIX_PATH='darwin=${darwinPath}:nixpkgs=${nixpkgsPath}:darwin-config=${configPath}' $SYSTEM_PATH/activate"
     '';
 
   updateMachinesFor =
@@ -182,6 +221,7 @@ let
   conf = name: {
     "${name}" = {
       switch = switchScriptFor name;
+      remote-switch = remoteSwitchScriptFor name;
       update-machines = updateMachinesFor name;
       system = (darwinFor name).system;
     };

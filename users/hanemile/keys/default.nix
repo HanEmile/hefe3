@@ -9,4 +9,5 @@ in
 withAll {
   caladan = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPZi43zHEsoWaQomLGaftPE5k0RqVrZyiTtGqZlpWsew emile@caladan";
   caladan-root = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHksIESvpl87sNAAxXSwhp6zn9jX4AG1/yY8PtU+C5qf root@caladan.local";
+  chusuk = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEzLZ56SEgwZZ0OusTdSDDhpMlxSg1zPNdRLuxKOfrR5 emile@chusuk";
 }

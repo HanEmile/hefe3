@@ -52,6 +52,9 @@ in
     (vm "sb1") # standby linux vm
     (vm "sb2") # standby linux vm
     (vm "sb3") # standby linux vm
+    (vm "sb4") # general-purpose linux vm
+    (vm "sb5") # general-purpose linux vm
+    (vm "code") # sandboxed coding-agent vm (isolated virbr3 net)
     (vm "minecraft") # minecraft world (NFS /grave/games/minecraft)
     (vm "factorio") # factorio (NFS /grave/games/factorio)
     (vm "r2wars") # radare2 workspace

@@ -1,0 +1,5 @@
+(library
+ (name ircc_common)
+ (libraries core async_rpc_kernel)
+ (preprocess
+  (pps ppx_jane)))

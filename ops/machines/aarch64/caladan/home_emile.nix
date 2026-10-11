@@ -1,5 +1,32 @@
 { hefe, config, pkgs, lib, unstable, ... }:
 
+let
+  # Track the current upstream release; mirrors the pin in
+  # ops/vms/x86/code/default.nix (nixos-26.05 lags at 1.15.10, nixos-unstable
+  # at 1.18.28). Based on unstable's derivation, which already skips the
+  # build-time smoke test and codesigns the binary on darwin (that's the
+  # SIGKILL fix ~/src/git.emile.space/wallet/shell.nix does manually against
+  # the older 1.15.10 derivation).
+  opencode =
+    let
+      version = "1.19.0";
+      src = unstable.fetchFromGitHub {
+        owner = "anomalyco";
+        repo = "opencode";
+        tag = "v${version}";
+        hash = "sha256-XL76Qpm4GEFEn7Pt7g84sx+djEKnlpTTZXRgXJF3NRs=";
+      };
+    in
+    unstable.opencode.overrideAttrs (old: {
+      inherit version src;
+      passthru = old.passthru // {
+        node_modules = old.passthru.node_modules.overrideAttrs (nmOld: {
+          inherit version src;
+          outputHash = "sha256-o2FEfe3kBNi7trdMnX17Kd6Dm9IFCadET7w0vs+kNhU=";
+        });
+      };
+    });
+in
 {
   home = {
     # The state version is required and should stay at the version you
@@ -318,9 +345,16 @@
     # git-annex
 
     # irc
-    senpai # config in /Users/emile/Library/Application Support/senpai
+    # senpai config in /Users/emile/Library/Application Support/senpai
+    (pkgs.callPackage hefe.ops.pkgs.senpai { })
+    # irssi config in ~/.irssi/config (kept out of the repo: it carries the
+    # soju bouncer password)
+    irssi
+    # weechat config in ~/.config/weechat (kept out of the repo: it carries
+    # the soju bouncer password)
+    weechat
 
-    zed-editor # editor
+    # zed-editor # editor
     # (zed-editor.overrideAttrs (oldAttrs: {
     #   dontStrip = true;
     #   noAuditTmpdir = true;
@@ -330,6 +364,7 @@
     # gemini-cli
     # codex
     claude-code
+    opencode
 
     package-version-server
 

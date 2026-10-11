@@ -29,6 +29,13 @@ let
             syzkaller = final.callPackage hefe.ops.pkgs.syzkaller {};
           })
 
+          # soju: nixpkgs lags upstream releases; track the latest tag so we
+          # get new features (client-cert-auth, etc.) without waiting for a
+          # channel bump.
+          (final: prev: {
+            soju = final.callPackage hefe.ops.pkgs.soju {};
+          })
+
           # late
           (
             final: prev:
@@ -264,6 +271,7 @@ let
       ipam =
         hefe.ops.ipam.default."${name}" or
         hefe.ops.ipam.private."${name}" or
+        hefe.ops.ipam.code."${name}" or
         null;
       target =
         if ipam != null then ipam.v4
@@ -293,39 +301,47 @@ let
       inherit name;
     };
 
+  # Image deploy without ever moving the qcow2 over the network: medano is
+  # the x86_64 builder, so we ship only the .drv, build there (mirrors the
+  # buildOnTarget flow of deployScriptForOpts) and cp the result straight
+  # into the vmpool. (The previous flow realised the multi-GB image into
+  # caladan's store and then scp'd it back up, which took ages.)
   deployImageScriptFor =
     name:
     pkgs.writeShellScriptBin "deploy-image" ''
       set -ue
 
-      echo "[STEP 1/4]: Building qcow2 image for ${name}"
-      export NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1
-      ${pkgs.nix}/bin/nix-build \
-        -A ops.nixos.${name}.image \
-        --system "x86_64-linux" \
-        -j 0 \
-        --cores 0 \
-        --show-trace
-
-      IMG=$(readlink ./result)/${name}.qcow2
-      if [ ! -f "$IMG" ]; then
-        IMG=$(readlink ./result)/nixos.qcow2
-      fi
-      echo "Image at: $IMG"
-      ls -lh "$IMG"
-
-      echo "[STEP 2/4]: Confirming the target VM is not running on medano"
+      echo "[STEP 1/5]: Confirming the target VM is not running on medano"
       if ssh root@medano "virsh domstate ${name} 2>/dev/null" | grep -q running; then
         echo "ERROR: VM '${name}' is running on medano. Shut it down first." >&2
         exit 1
       fi
 
-      echo "[STEP 3/4]: Uploading image as /keep/pools/vmpool/${name}.qcow2.new"
-      ${pkgs.openssh}/bin/scp "$IMG" root@medano:/keep/pools/vmpool/${name}.qcow2.new
+      echo "[STEP 2/5]: Instantiating the image build (no local build)"
+      DRV=$(${pkgs.nix}/bin/nix-instantiate \
+        -A ops.nixos.${name}.image \
+        --system "x86_64-linux" \
+        --show-trace)
+      echo "drv: $DRV"
 
-      echo "[STEP 4/4]: Atomically replacing /keep/pools/vmpool/${name}.qcow2"
-      ssh root@medano \
-        "mv -f /keep/pools/vmpool/${name}.qcow2.new /keep/pools/vmpool/${name}.qcow2"
+      echo "[STEP 3/5]: Shipping the derivation to medano"
+      ${pkgs.nix}/bin/nix copy \
+        --derivation \
+        --to "ssh-ng://root@medano?compress=true" \
+        --no-check-sigs \
+        "$DRV"
+
+      echo "[STEP 4/5]: Building the image on medano"
+      OUT=$(ssh root@medano \
+        "nix-store --realise $DRV" | tail -n 1)
+      echo "built: $OUT"
+
+      echo "[STEP 5/5]: Installing the image as /keep/pools/vmpool/${name}.qcow2 (on medano)"
+      ssh root@medano "set -e; \
+        if [ -f $OUT/${name}.qcow2 ]; then IMG=$OUT/${name}.qcow2; else IMG=$OUT/nixos.qcow2; fi; \
+        cp --sparse=always \"\$IMG\" /keep/pools/vmpool/${name}.qcow2.new; \
+        mv -f /keep/pools/vmpool/${name}.qcow2.new /keep/pools/vmpool/${name}.qcow2; \
+        ls -lh /keep/pools/vmpool/${name}.qcow2"
 
       echo
       echo "Image deployed. Start with: ssh root@medano 'virsh start ${name}'"

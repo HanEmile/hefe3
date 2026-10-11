@@ -24,17 +24,32 @@ let
       ipam = hefe.ops.ipam;
       defaultVms = lib.attrNames (lib.filterAttrs (n: _: n != "medano") ipam.default);
       privateVms = lib.attrNames (lib.filterAttrs (n: _: n != "medano") ipam.private);
-      allVms = defaultVms ++ privateVms;
+      codeVms = lib.attrNames (lib.filterAttrs (n: _: n != "medano") ipam.code);
+      allVms = defaultVms ++ privateVms ++ codeVms;
       ipamLookup = name:
         if ipam.default ? "${name}" then ipam.default."${name}"
         else if ipam.private ? "${name}" then ipam.private."${name}"
+        else if ipam.code ? "${name}" then ipam.code."${name}"
         else throw "status-board: no IPAM for ${name}";
+
+      # logical bridge name per net ("default"/"private"/"code") for the
+      # inventory; the SVG layers in main.go prefix these with "virbr".
+      bridgeFor = name:
+        if ipam.default ? "${name}" then "default"
+        else if ipam.private ? "${name}" then "private"
+        else "code";
+
+      # bridge device name per net for the force-graph view
+      bridgeDevFor = name:
+        if ipam.default ? "${name}" then "virbr0"
+        else if ipam.private ? "${name}" then "virbr1"
+        else "virbr3";
 
       vmInventory = pkgs.writeText "vm-inventory.json" (builtins.toJSON (
         map (n: {
           name = n;
           ip = (ipamLookup n).v4;
-          bridge = if ipam.default ? "${n}" then "default" else "private";
+          bridge = bridgeFor n;
         }) allVms
       ));
 
@@ -126,7 +141,7 @@ let
         vms = map (n: {
           name = n;
           ip = (ipamLookup n).v4;
-          bridge = if ipam.default ? "${n}" then "virbr0" else "virbr1";
+          bridge = bridgeDevFor n;
           ports = portsForVM n;
           backupsEnabled = backupsEnabledForVM n;
           backupPaths = backupPathsForVM n;

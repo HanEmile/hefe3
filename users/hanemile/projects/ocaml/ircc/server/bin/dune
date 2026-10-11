@@ -1,0 +1,7 @@
+(executables
+ (modes byte exe)
+ (names main)
+ (public_names ircc)
+ (libraries ircc_server core core_unix.command_unix core_unix.filename_unix async)
+ (preprocess
+  (pps ppx_jane)))

@@ -51,11 +51,19 @@ in
         # still resolves.
         "emile.space" = tlsify {
           serverAliases = [ "www.emile.space" "medano.emile.space" ];
+          # 301 redirects from old tree-style URLs to new flat URLs.
+          # Regenerate with: python3 ~/emile.space/v2/migrate.py
+          extraConfig = builtins.readFile ./emile.space-redirects.conf;
           locations = {
             "/" = {
               root = "/var/www/emile.space";
               index = "index.html";
               extraConfig = ''
+                # Clean URLs: /blog -> /blog.html if the file exists, then
+                # exact match, then 404. Lets vokobe2 output be served without
+                # the .html suffix in the browser address bar.
+                try_files $uri $uri.html =404;
+
                 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
               '';
             };
@@ -220,6 +228,21 @@ in
           in
           tlsify {
             locations."/".proxyPass = "http://${backend.v4}:${toString backend.ports.pretix}";
+          };
+
+        # --- r2wa.rs (r2wars-web, own domain rather than an emile.space
+        # subdomain - ACME still just works off the vhost name) ---
+        "r2wa.rs" =
+          let
+            backend = hefe.ops.ipam.default.r2wars;
+          in
+          tlsify {
+            # www.r2wa.rs has no DNS record yet (NXDOMAIN) - ACME requests a
+            # single cert covering every name in serverAliases, so including
+            # it here before DNS exists fails issuance for r2wa.rs too. Add
+            # it back once "www.r2wa.rs" resolves (CNAME/A to the same host).
+            # serverAliases = [ "www.r2wa.rs" ];
+            locations."/".proxyPass = "http://${backend.v4}:${toString backend.ports.web}";
           };
 
         # --- irc.emile.space (HTTP/443) ---

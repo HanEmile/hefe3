@@ -67,9 +67,12 @@ let
     amalthea = withDefault { };
     late = withDefault { };
     demo01 = withDefault { };
+    code = withDefault { };
     sb1 = withDefault { };
     sb2 = withDefault { };
     sb3 = withDefault { };
+    sb4 = withDefault { };
+    sb5 = withDefault { };
     minecraft = withDefault { };
     factorio = withDefault { };
     r2wars = withDefault { };

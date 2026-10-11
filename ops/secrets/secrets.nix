@@ -110,6 +110,12 @@ in
   "irc_tls_crt.age" = for [ irc ];
   "irc_tls_key.age" = for [ irc ];
 
+  # ircc: the soju bouncer account password ircc authenticates to soju with
+  # (same account/password senpai already uses, see
+  # ~/Library/Application Support/senpai/senpai.scfg and
+  # ops/vms/x86/irc/README.md).
+  "ircc_bouncer_password.age" = for [ irc ];
+
   # === pretix ===
   "pretix_environment_file.age" = for [ pretix ];
   "pretix_oidc_client_secret.age" = for [ auth ];

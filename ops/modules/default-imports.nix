@@ -9,5 +9,6 @@
   imports = [
     ./ports.nix
     ./makhor.nix
+    ./r2wars-web.nix
   ];
 }

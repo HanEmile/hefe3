@@ -29,6 +29,8 @@ builder.
 | late        | `late.sh` paste service             | - | (tailnet)         | `ops/vms/x86/late/`                             |
 | demo01      | reference / template VM             | - | (tailnet)         | `ops/vms/x86/demo01/`                           |
 | sb1/sb2/sb3 | standby Linux VMs                   | - | (tailnet)         | `ops/vms/x86/sb{1,2,3}/`                        |
+| sb4/sb5     | general-purpose Linux VMs           | - | (tailnet)         | `ops/vms/x86/sb{4,5}/`                          |
+| code        | sandboxed coding agents (virbr3)    | - | (tailnet)         | `ops/vms/x86/code/`                             |
 | minecraft   | Minecraft (UDP 25565 forwarded)     | (DNAT via med.) | (tailnet)         | `ops/vms/x86/minecraft/`                        |
 | factorio    | Factorio (UDP 34197 forwarded)      | (DNAT via med.) | (tailnet)         | `ops/vms/x86/factorio/`                         |
 | r2wars      | r2wars site                         | - | (tailnet)         | `ops/vms/x86/r2wars/`                           |
@@ -36,8 +38,9 @@ builder.
 | arr         | *arr-stack on `rou` private bridge  | 192.168.33.3    | (tailnet)         | `ops/vms/x86/arr/`                              |
 
 Tailnet domain is `pinto-pike.ts.net`. Full IPAM in
-`ops/ipam/default.nix` (default bridge, `private`, `rou`, and
-`tailscale` namespaces).
+`ops/ipam/default.nix` (default bridge, `private`, `rou`, `code`, and
+`tailscale` namespaces). The `code` bridge (virbr3, 192.168.35.0/24) is
+the isolated sandbox net: NAT outbound, east-west blocked on medano.
 
 ## Repo layout
 

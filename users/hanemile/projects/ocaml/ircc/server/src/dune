@@ -1,0 +1,22 @@
+(library
+ (name ircc_server)
+ (libraries
+  async
+  async_ssl
+  async_rpc_websocket
+  cohttp
+  cohttp-async
+  core
+  core_unix
+  ircc_common
+  base64
+  uri
+  unix)
+ (preprocess
+  (pps ppx_jane)))
+
+(rule
+ (targets embedded_files.ml embedded_files.mli)
+ (deps ../../client/main.bc.js ../../client/style.css)
+ (action
+  (bash "%{bin:ocaml-embed-file} %{deps} -output embedded_files")))

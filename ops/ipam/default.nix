@@ -92,6 +92,7 @@
     r2wars = {
       v4 = "192.168.75.22";
       mac = "02:5e:5f:63:af:27";
+      ports.web = 8080;
     };
     irc = {
       v4 = "192.168.75.23";
@@ -101,6 +102,14 @@
       v4 = "192.168.75.24";
       mac = "02:05:7a:d0:72:6a"; # echo "pretix" | md5sum | sed ...
       ports.pretix = 8345;
+    };
+    sb4 = {
+      v4 = "192.168.75.25";
+      mac = "02:bc:2a:a7:59:e5";
+    };
+    sb5 = {
+      v4 = "192.168.75.26";
+      mac = "02:66:08:ea:14:d7";
     };
     # s3 = { v4 = "192.168.75.xx"; mac = ""; };
     # talks = { v4 = "192.168.75.xx"; mac = ""; };
@@ -130,6 +139,18 @@
     rou = {
       v4 = "192.168.34.2";
       mac = "52:54:00:f6:f8:94";
+    };
+  };
+  # Sandboxed coding-agent network (virbr3 on medano). NAT to the outside,
+  # but medano drops east-west traffic into the other bridges.
+  "code" = {
+    medano = {
+      v4 = "192.168.35.1";
+      mac = "52:54:00:c0:de:01";
+    };
+    code = {
+      v4 = "192.168.35.2";
+      mac = "02:78:44:a9:3a:d4";
     };
   };
   "tailscale" = {

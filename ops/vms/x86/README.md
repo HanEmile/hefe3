@@ -81,10 +81,11 @@ similar.
    nix-build -A ops.nixos.newvm.deploy_image && ./result/bin/deploy-image
    ```
 
-   The script (a) builds the qcow2 (delegating to medano as the
-   remote builder for x86_64-linux), (b) refuses to overwrite a running
-   VM's disk, (c) scp's the image as `/keep/pools/vmpool/newvm.qcow2.new`,
-   (d) does an atomic `mv` into place.
+   The script (a) refuses to overwrite a running VM's disk, (b) instantiates
+   the image drv on caladan and ships only the `.drv` to medano, (c) builds
+   the qcow2 natively on medano (no multi-GB round-trip over SSH), and
+   (d) `cp`'s the result to `/keep/pools/vmpool/newvm.qcow2.new` on medano
+   and does an atomic `mv` into place.
 
 6. **Wire the VM into medano** by adding `(vm "newvm")` to
    `ops/machines/x86/medano/default.nix`, then deploy medano:
