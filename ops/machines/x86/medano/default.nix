@@ -150,6 +150,9 @@ in
         2222
       ];
       settings.PasswordAuthentication = false;
+      # disable PAM challenge-response path entirely (2026-10-12 VEX scan:
+      # kept CVE-2007-2768 visible because sshd-no-opie was dropped)
+      settings.KbdInteractiveAuthentication = false;
     };
 
     tailscale = {

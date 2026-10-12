@@ -145,7 +145,16 @@
   };
 
   services = {
-    openssh.enable = true;
+    openssh = {
+      enable = true;
+      settings = {
+        # rou doesn't import vm-base.nix, so these hardenings were missing
+        # (caught by the 2026-10-12 VEX scan: sshd-no-opie /
+        # sshd-no-password-auth statements dropped).
+        PasswordAuthentication = false;
+        KbdInteractiveAuthentication = false;
+      };
+    };
     vnstat.enable = true;
   };
 

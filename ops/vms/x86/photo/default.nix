@@ -48,6 +48,19 @@
     ripgrep
   ];
 
+  # immich 2.7.5 (nixos-26.05) is marked insecure (CVE-2026-53662 Critical,
+  # CVE-2026-59258, CVE-2026-105764 High - 2026-10-12 VEX scan), so take
+  # 3.1.0 from the pinned nixos-unstable instead. Overrides services.immich
+  # .package (default follows pkgs.immich); the module runs the package's
+  # bundled machine-learning component, so server and ML stay in lockstep.
+  nixpkgs.overlays = [
+    (final: prev: {
+      immich = (import hefe.third_party."nixos-unstable" {
+        system = prev.stdenv.hostPlatform.system;
+      }).immich;
+    })
+  ];
+
   services.immich = {
     enable = true;
 
