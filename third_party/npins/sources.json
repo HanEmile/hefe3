@@ -157,6 +157,19 @@
       "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1068089.c043004d1c69/nixexprs.tar.xz",
       "hash": "sha256-PRK1fSEiAcO29DkUoOlsVLGYRK3h1YKVr+qQJB0VcYQ="
     },
+    "nixos-vex": {
+      "type": "Git",
+      "repository": {
+        "type": "GitHub",
+        "owner": "datosh",
+        "repo": "nixos-vex"
+      },
+      "branch": "main",
+      "submodules": false,
+      "revision": "6c6bbba6d30cf474dcf102d555ed8f8957b14c39",
+      "url": "https://github.com/datosh/nixos-vex/archive/6c6bbba6d30cf474dcf102d555ed8f8957b14c39.tar.gz",
+      "hash": "sha256-wm5vgWV+i1pvs140Lv4le+5cjXZONPyo9pn4JP5VJqM="
+    },
     "pyproject.nix": {
       "type": "Git",
       "repository": {

@@ -289,6 +289,55 @@ vmBackups = {
 - Use `backupPrepareCommand` for stateful dumps (postgres on rss,
   miniflux) - runs before the restic snapshot.
 
+## Vulnerability scanning (VEX)
+
+Fleet-wide CVE triage via [nixos-vex](https://github.com/datosh/nixos-vex)
+(pinned in `third_party/npins`, imported for every x86 NixOS host in
+`ops/nixos.nix`). Idea: an OpenVEX feed of triaged CVE statements carries
+conditions (`[nixos-vex:condition=<id>]`); the module evaluates every
+condition against each host's NixOS config and builds a per-host feed keeping
+only the statements that hold. Configs, not running systems.
+
+- **Per-host feed**: `nix-build -A ops.nixos.<host>.vexFeed`
+  (builds `system.build.vexFeed`).
+- **Full scan**: `nix-build -A ops.nixos.<host>.scan && ./result/bin/scan` —
+  realises the toplevel on medano, runs `sbomnix` there, then
+  `grype --vex <feed>`. SBOM + scan output land in `/tmp/hefe-*.json` on
+  medano. grype downloads its vuln DB on demand (needs network).
+- **What got dropped**: statements whose conditions don't hold (their CVEs
+  stay visible in scans):
+  `nix-instantiate --eval --strict -A ops.nixos.<host>.config.nixosVex.dropped --system x86_64-linux`
+  All conditions: `...config.nixosVex.conditions`.
+- Failing conditions also print **warnings at eval time** during normal
+  deploys/builds, so triage debt surfaces without running a scan.
+- **Strict mode**: set `nixosVex.strict = true;` in a host config to make
+  eval fail when a condition stops holding (e.g. after someone re-enables
+  sshd password auth). Off by default fleet-wide.
+
+Ad-hoc tooling: `nix-shell ops/shells/vex` gives `sbomnix`, `grype`, `syft`.
+
+Current fleet snapshot (eval-time): all 34 conditions hold on the VMs
+(`sshd-no-opie`, `sshd-no-password-auth` hold thanks to `vm-base.nix`).
+Hosts that mount the storagebox over CIFS (`medano`, `lampadas`, `mail`,
+every VM with `vmBackups`) fail `fs-cifs-not-mounted` + `netfs-unused` —
+a handful of kernel CVE statements drop there by design. `medano`
+additionally fails `stock-kernel` (pins `linuxPackages_6_12`) and
+`sshd-no-opie` (doesn't set `KbdInteractiveAuthentication = false`).
+
+Caveats:
+
+- **The upstream feed is triaged against nixos-unstable**; the fleet runs
+  nixos-26.05. Versionless `pkg:nix/...` purls still match, but treat
+  `fixed` statements as advisory — the same package version on the stable
+  channel can differ. Review with `grype ... --show-suppressed` before
+  trusting a suppression.
+- Upstream is brand new ("not a high-trust data source yet"); scans are
+  advisory, nothing gates deploys.
+- armv6l **BMCs get no feed** (feed is x86_64-only; they skip the module).
+- hefe-local statements (for CVEs/config the upstream feed doesn't cover)
+  can go in a per-host `nixosVex.feed` override or a hefe feed merged at
+  scan time — not built yet.
+
 ## TLS / certs
 
 Three patterns:
@@ -377,6 +426,7 @@ Three patterns:
 | add a brand-new VM                         | see "Bootstrapping a new VM" above                                       | - |
 | caladan (this Mac)                         | `ops/machines/aarch64/caladan/`, `ops/darwin.nix`                        | `nix-build -A ops.nixos.caladan.deploy && ./result/bin/deploy` (or darwin-rebuild) |
 | status-board scraping / inventory          | `tools/status-board/*.go` + medano module wiring                         | rebuild status-board, redeploy medano                                              |
+| a host's VEX feed / vuln scan              | feed conditions come from the nixos-vex pin (`npins/sources.json`)       | `nix-build -A ops.nixos.<host>.scan && ./result/bin/scan`                         |
 | pinned upstream (nixpkgs, nixvirt, agenix) | `npins/sources.json` via `npins update <name>`                           | fleet rebuild as needed                                                            |
 | a user-side static site / personal project | `users/hanemile/...`                                                     | per-project; e.g. `nix-build -A users.hanemile.emile_space.deploy`                 |
 | an agenix secret                           | `ops/secrets/<file>.age` via `ragenix --edit`                            | redeploy the consumer VM                                                           |

@@ -89,6 +89,14 @@ let
       nixVirtLib.lib = nixVirtOutput.lib;
 
       agenix = (sources."agenix".outPath + "/modules/age.nix");
+
+      # OpenVEX feed module (github.com/datosh/nixos-vex): evaluates the
+      # baseline feed's triage conditions against this system's configuration
+      # and builds a per-host feed (system.build.vexFeed). Statements whose
+      # conditions fail are dropped with an eval warning, keeping the
+      # corresponding CVEs visible in scans. x86_64 hosts only; armv6l BMCs
+      # go through nixosForBmc and don't get a feed.
+      nixosVexModule = sources."nixos-vex".outPath + "/modules";
     in
     import (nixos + "/nixos/lib/eval-config.nix") {
       inherit lib;
@@ -103,6 +111,7 @@ let
         agenix # secrets
         { nixpkgs.pkgs = pkgs; }
         (import ./modules/late-sh.nix)
+        nixosVexModule # OpenVEX feed (system.build.vexFeed)
       ] ++ extraModules;
     };
 
@@ -264,6 +273,56 @@ let
     hostname:
     host_suffix:
     deployScriptForOpts { inherit hostname host_suffix; buildOnTarget = true; };
+
+  # Vulnerability scan for one host (see "Vulnerability scanning" in README):
+  # build the per-host OpenVEX feed, realise the toplevel on medano, then run
+  # sbomnix + grype there with the feed applied. Advisory only: exit code
+  # follows grype's, findings need manual triage.
+  scanScriptFor =
+    name:
+    pkgs.writeShellScriptBin "scan" ''
+      set -ue
+
+      echo "[STEP 1/4]: Building the per-host OpenVEX feed (${name})"
+      ${pkgs.nix}/bin/nix-build \
+        -A ops.nixos.${name}.vexFeed \
+        --system "x86_64-linux" \
+        -j 0 \
+        -o result-vex
+      VEX=$(readlink ./result-vex)
+
+      echo "[STEP 2/4]: Realising the toplevel on medano"
+      DRV=$(${instantiate name})
+      ${pkgs.nix}/bin/nix copy \
+        --derivation \
+        --to "ssh-ng://root@medano?compress=true" \
+        --no-check-sigs \
+        "$DRV"
+      OUT=$(ssh root@medano \
+        "nix-store --realise \"$DRV\"" | tail -n 1)
+      echo "built: $OUT"
+
+      echo "[STEP 3/4]: Building scan tools and shipping everything to medano"
+      TOOLS=$(${pkgs.nix}/bin/nix-build \
+        -E 'let nixos = (import ./third_party {})."nixos-26.05";
+                p = import nixos { system = "x86_64-linux"; };
+            in p.symlinkJoin {
+                 name = "vex-scan-tools";
+                 paths = [ p.sbomnix p.grype ];
+               }' \
+        --system "x86_64-linux" \
+        -j 0 \
+        --no-out-link)
+      ${pkgs.nix}/bin/nix copy \
+        --to "ssh-ng://root@medano?compress=true" \
+        --no-check-sigs \
+        "$VEX" "$TOOLS"
+
+      echo "[STEP 4/4]: sbomnix + grype on medano (feed: $VEX)"
+      ssh root@medano "\
+        $TOOLS/bin/sbomnix $OUT --cdx /tmp/hefe-sbom-${name}.cdx.json && \
+        $TOOLS/bin/grype sbom:/tmp/hefe-sbom-${name}.cdx.json --vex $VEX"
+    '';
 
   deployVmScriptFor =
     name:
@@ -491,13 +550,21 @@ let
   conf = name: type:
     let
       homeModules = homeModulesFor name type;
+      eval = nixosFor hefe.ops."${type}".x86."${name}" homeModules;
     in
     {
     "${name}" =
       {
-        config = (nixosFor hefe.ops."${type}".x86."${name}" homeModules).config;
-        toplevel = (nixosFor hefe.ops."${type}".x86."${name}" homeModules).config.system.build.toplevel;
+        config = eval.config;
+        toplevel = eval.config.system.build.toplevel;
+        # Per-host OpenVEX feed from the nixos-vex module (advisory triage).
+        # Which statements were dropped (conditions not holding) shows up as
+        # eval warnings; inspect with:
+        #   nix-instantiate --eval --strict --json \
+        #     -A ops.nixos.<host>.config.nixosVex.dropped
+        vexFeed = eval.config.system.build.vexFeed;
         build = buildScriptFor "${name}";
+        scan = scanScriptFor name;
         deploy =
           if type == "vms"
           then deployVmScriptFor name
