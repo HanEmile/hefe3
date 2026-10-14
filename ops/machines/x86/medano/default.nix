@@ -54,6 +54,7 @@ in
     (vm "sb3") # standby linux vm
     (vm "sb4") # general-purpose linux vm
     (vm "sb5") # general-purpose linux vm
+    (vm "jules") # minimal linux vm (jules)
     (vm "code") # sandboxed coding-agent vm (isolated virbr3 net)
     (vm "minecraft") # minecraft world (NFS /grave/games/minecraft)
     (vm "factorio") # factorio (NFS /grave/games/factorio)
