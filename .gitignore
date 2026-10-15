@@ -16,4 +16,6 @@ target/
 *.gpr
 *.rep/
 
-tools/paleki
+# local build artifacts / runtime state of tracked tools
+tools/status-board/status-board
+tools/makhor/makhor.db
