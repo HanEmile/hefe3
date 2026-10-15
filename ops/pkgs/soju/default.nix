@@ -21,6 +21,12 @@ buildGoModule rec {
     hash = "sha256-OoFAdHnExm6Li5bTAmS/KdRkkpHPLP321GAYYqByrNI=";
   };
 
+  patches = [
+    # Keep the internal nick-regain MONITOR watch alive when the last
+    # MONITOR-aware downstream disconnects (not yet fixed upstream).
+    ./retain-regain-nick-monitor.patch
+  ];
+
   vendorHash = "sha256-LiTr+ilKYRA3K93RjVGsmWm2jvImmt9YIYTZPtXv6cE=";
 
   nativeBuildInputs = [

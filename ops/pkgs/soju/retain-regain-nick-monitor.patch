@@ -1,0 +1,16 @@
+diff --git a/upstream.go b/upstream.go
+index 202fa2d..0949bfb 100644
+--- a/upstream.go
++++ b/upstream.go
+@@ -2414,6 +2414,11 @@ func (uc *upstreamConn) updateMonitor(ctx context.Context) {
+ 	uc.monitored.ForEach(func(nick string, online bool) {
+ 		if _, ok := seen[uc.network.casemap(nick)]; ok {
+ 			removeAll = false
++		} else if uc.network.casemap(nick) == wantNickCM && !uc.isOurNick(wantNick) && !uc.hasDesiredNick {
++			// We still want to regain our desired nick: keep it
++			// monitored, otherwise we would never notice when it
++			// becomes available again.
++			removeAll = false
+ 		} else {
+ 			removeList = append(removeList, nick)
+ 		}

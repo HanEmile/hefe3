@@ -177,16 +177,43 @@ time). The reliable sequence that avoids ever needing a raw DB edit:
 
 ### Nick auto-regain
 
-Each network has `-nick hanemile`. soju has its own built-in nick-regain
-backoff (retries the desired nick periodically on its own). If a stale
-session is holding the nick and you're logged in (SASL PLAIN or
-EXTERNAL both count), you can also force it immediately as a regular
-client:
+Each network has `-nick hanemile`. How soju regains it:
 
-```
-/msg NickServ GHOST hanemile
-/nick hanemile
-```
+- If the upstream supports MONITOR (libera, hackint), soju puts the
+  desired nick on its MONITOR list and sends a single `NICK
+  <desired>` each time it goes offline. There is **no periodic retry**
+  on such networks, so if the single attempt races another client and
+  loses, soju waits for the next offline event.
+- Only on non-MONITOR upstreams does the 15s-10min backoff timer run.
+
+Gotchas observed:
+
+- **soju bug (fixed locally)**: until 2026-10-13 the "last
+  MONITOR-aware downstream disconnects" optimization in `updateMonitor`
+  sent `MONITOR C`, silently dropping soju's own nick-regain watch -
+  after which nothing noticed the nick going offline, ever. Fix lives
+  in `ops/pkgs/soju/retain-regain-nick-monitor.patch`. Not upstream yet;
+  drop the patch if/when codeberg.org/emersion/soju fixes it.
+- **Remaining upstream wart**: if services force-rename us off the nick
+  (e.g. another session of the same account runs NickServ
+  GHOST/RESTORE-style reclaim, libera SVSNICKs us to the UID-looking
+  `<numeric><id>`), soju's `hasDesiredNick` stays stuck `true` and it
+  won't retry until the upstream reconnects. Workaround:
+  `network update libera -enabled false` then `true`.
+- If a stale session is holding the nick and you're logged in (SASL
+  PLAIN or EXTERNAL both count), force it immediately as a regular
+  client: `/msg NickServ GHOST hanemile` and let soju's MONITOR watch
+  take the nick (don't `/nick` yourself - races soju).
+
+**Case study 2026-10**: `hanemile` on libera was held 2+ days by an
+always-on client at `465e73dff4@2a03:6000:1812:100::1267` (AS60131
+High5/LiteServer NL), logged into the `hanemile` account via SASL and
+auto-reclaiming the nick within seconds whenever kicked (re-auths each
+time per SaslServ). soju can't beat that while it runs - identify and
+disable that client first. The libera NickServ account has two cert
+fingerprints; `5ac1a130...` is this soju's current one
+(SHA-512 of the DER in `sasl_external_cert`), `e4002b2d...` is
+unidentified.
 
 **Rate-limit note**: libera and hackint both have abuse heuristics that
 react to rapid repeated connections/nick changes from the same source
@@ -196,6 +223,37 @@ nick). Don't script rapid-fire reconnect/WHOIS/GHOST loops against them
 - space out test connections and let soju's own backoff do the
 retrying; a single clean `-enabled false`/`true` toggle is fine once
 things have settled.
+
+### Bots on #emile
+
+Three long-running daemons (systemd, `Restart=always`) stay permanently
+joined to `#emile` and post on their own cadence:
+
+| bot | schedule | source |
+|-----|----------|--------|
+| `weatherman` | daily 08:00 Europe/Berlin | api.open-meteo.com (Düsseldorf) |
+| `xkcdbot` | poll every 30min | xkcd.com/info.0.json (state: `/var/lib/xkcdbot/last-seen`) |
+| `tagesschau` | 08:00/16:00/00:00 Europe/Berlin | ard-text.de/mobil/101 (teletext front page, top 3) |
+| `dwdwarn` | poll every 10min | dwd.de warnapp feed, Düsseldorf warn cells 705111001-004 + 105111000 aggregate (state: `/var/lib/dwdwarn/seen.json`) |
+| `diskwatch` | poll every 5min | every VM's + medano's node-exporter `:9100/metrics`, root-fs usage vs 85%/95% thresholds, posts transitions only (state: `/var/lib/diskwatch/state.json`) |
+
+(The older `uptimebot` stays a 5min one-shot timer by design: it normally
+posts nothing for weeks, so permanent channel presence adds noise, not signal.)
+
+All three connect to Ergo's localhost plaintext port. Each binary has a
+`--dry-run` flag (fetch + format only, no connect) and tagesschau has
+`--post-now` (post immediately once joined, then keep running).
+
+**Do not set `#emile` +i.** It silently killed the bots from 2026-10-04
+(when the channel was re-registered during the NixOS-26.05 rebuild churn)
+until 2026-10-13: the bots connected, got `473` on JOIN, and since they
+used to only wait for `366` they hung to a 30s read timeout and exited -
+so no post, and the journal only showed a cryptic i/o timeout. All three
+now fail loudly on JOIN-rejection numerics (`joining #emile failed:
+...Cannot join channel (+i)`), and Ergo rejecting `+I` invex additions on
+this channel with `478` means invite exemptions aren't usable either - so
+the channel must simply not be invite-only. Config default-modes (`+ntC`)
+are the intended state.
 
 ### Downstream client-cert auth (irssi/weechat -> soju): not currently usable
 
