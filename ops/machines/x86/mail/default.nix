@@ -11,18 +11,13 @@
   imports = [
     ./hardware-configuration.nix
     ./mail.nix
+    (import ../../../modules/storagebox.nix { inherit hefe; })
   ];
 
   age = {
     secrets = {
-      mail_emile_space_password = {
-        file = hefe.ops.secrets."mail_emile_space_password.age";
-      };
       storagebox_bx11_restic_password = {
         file = hefe.ops.secrets."storagebox_bx11_restic_password.age";
-      };
-      storagebox_bx11_connection_config = {
-        file = hefe.ops.secrets."storagebox_bx11_connection_config.age";
       };
     };
   };
@@ -37,6 +32,9 @@
     domain = "emile.space";
 
     firewall.enable = true;
+    # 80: ACME http-01 challenges (the mailserver 26.05 module no longer
+    # opens this itself; 25.11 did when its acme-nginx scheme was in use).
+    firewall.allowedTCPPorts = [ 80 ];
 
     useDHCP = false;
     interfaces.ens3.useDHCP = true;
@@ -53,7 +51,22 @@
     openssh.enable = true;
     openssh.settings.PermitRootLogin = "prohibit-password";
 
+    # nginx was implicitly enabled by the mailserver module's (now removed)
+    # acme-nginx scheme; enable it explicitly as it serves the ACME
+    # challenges and the prometheus proxy.
+    nginx.enable = true;
+
     nginx.virtualHosts = {
+      # Answers ACME http-01 challenges for the mail server's own cert.
+      # The nixos-mailserver 26.05 module no longer ships a built-in
+      # acme-nginx scheme; per its setup guide the main nginx does this now.
+      # acmeRoot is required: with the default (null) the cert's webroot
+      # stays null and the acme module refuses to build.
+      "mail.emile.space" = {
+        enableACME = true;
+        acmeRoot = "/var/lib/acme/acme-challenge";
+      };
+
       "prometheus.mail.emile.space" = {
         addSSL = true;
         enableACME = true;
@@ -162,16 +175,6 @@
     };
   };
 
-  fileSystems."/mnt/storagebox-bx11" = {
-    device = "//u331921.your-storagebox.de/backup";
-    fsType = "cifs";
-    options = let
-      conn_config = config.age.secrets."storagebox_bx11_connection_config".path;
-    in [
-      "_netdev,x-systemd.automount,noauto,x-systemd.idle-timeout=60s,x-systemd.device-timeout=5s,x-systemd.mount-timeout=5s,credentials=${conn_config}"
-    ];
-  };
-
   users.users.root = {
     initialHashedPassword = "";
     openssh.authorizedKeys.keys = [
@@ -184,6 +187,13 @@
     defaults.email = "security@emile.space";
     certs."mail.emile.space".email = "security@emile.space";
   };
+
+  # Same mount-namespace gotcha as lampadas (see its default.nix): the
+  # restic unit runs with a private mount namespace that never sees the
+  # storagebox autofs mount, so restic's pre-start failed with
+  # "mkdir /mnt/storagebox-bx11: file exists". RequiresMountsFor activates
+  # the automount and propagates it into the unit's namespace.
+  systemd.services."restic-backups-mail".unitConfig.RequiresMountsFor = "/mnt/storagebox-bx11";
 
   system.stateVersion = "21.11";
 }
