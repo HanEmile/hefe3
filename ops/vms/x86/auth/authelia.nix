@@ -102,9 +102,6 @@
           in
           {
             address = "${host}:${toString port}";
-            # address = "127.0.0.1:${toString config.local.ports.authelia}";
-            # host = "127.0.0.1";
-            # port = config.emile.ports.authelia;
           };
 
         # we're using a file to store the user information
@@ -127,10 +124,6 @@
         storage.local.path = "/var/lib/authelia-main/db.sqlite";
 
         session = {
-          # domain = "sso.emile.space";
-          # expiration = 3600; # 1 hour
-          # inactivity = 300; # 5 minutes
-
           cookies = [
             {
               domain = "emile.space";
@@ -149,8 +142,6 @@
           disable_startup_check = false;
           smtp = {
             address = "smtp://mail.emile.space:587";
-            # host = "mail.emile.space";
-            # port = 587;
 
             timeout = "30s";
             username = "mail@emile.space";

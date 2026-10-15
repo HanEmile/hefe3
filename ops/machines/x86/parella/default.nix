@@ -5,12 +5,9 @@
 # serial console + SSH. Encrypted ZFS (rpool, native encryption) with
 # systemd-boot/UEFI and initrd-ssh remote unlock.
 #
-# Build the installer ISO:
-#   nix-build -A ops.nixos.parella.iso
-#   dd if=./result/iso/*.iso of=/dev/sdX bs=4M status=progress
-#
-# The ISO auto-installs: boot it, SSH in, run `parella-install`, done.
-# After install, subsequent deploys from caladan:
+# Install: see ./README.md (manual install from a stock NixOS installer;
+# the hefe `.iso` builder referenced in older notes no longer exists).
+# Subsequent deploys from caladan:
 #   nix-build -A ops.nixos.parella.deploy && ./result/bin/deploy
 {
   hefe,

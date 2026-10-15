@@ -98,7 +98,8 @@ The deploy builds on parella itself (`buildOnTarget = true` in
 
 ### Prerequisites
 
-- NixOS installer ISO: `nix-build -A ops.nixos.parella.iso`
+- NixOS installer ISO (stock; the hefe `ops.nixos.parella.iso` builder
+  these steps were written against no longer exists)
 - USB stick flashed with the ISO
 - Ethernet cable connected to the B450's rear I/O GbE port
 

@@ -71,11 +71,6 @@
           authorizedKeys = [
             "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPZi43zHEsoWaQomLGaftPE5k0RqVrZyiTtGqZlpWsew emile@caladan"
           ] ++ hefe.users.hanemile.keys.all;
-
-          # postCommands = ''
-          #   zpool import -a
-          #   echo "zfs load-key -a; killall zfs" >> /root/.profile
-          # '';
         };
       };
     };

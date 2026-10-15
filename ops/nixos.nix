@@ -172,8 +172,6 @@ let
       --show-trace
   '';
 
-  # --add-root \
-
   buildScriptFor =
     hostname:
     pkgs.writeShellScriptBin "build" ''
@@ -218,14 +216,6 @@ let
         --verbose \
         "$DRV"
 
-      # echo "[STEP 3/4]: Building on ${target} + setting the profile"
-      # OUT=$(ssh ${sshOpts} root@${target} \
-      #   "nix-store --realise --add-root \"$DRV\"")
-      # echo "built: $OUT"
-      # ssh ${sshOpts} root@${target} \
-      #   nix-env -p /nix/var/nix/profiles/system --set "$OUT"
-
-      # #########################
       echo "[STEP 3/4]: Building on ${target} + setting the profile"
 
       # 1. Build the derivation and extract ONLY the resulting /nix/store/... path
@@ -237,7 +227,6 @@ let
       # 2. Set the system profile using the explicit store path
       ssh ${sshOpts} root@${target} \
         "nix-env -p /nix/var/nix/profiles/system --set \"$OUT\""
-      # #########################
 
       echo "[STEP 4/4]: Switching to configuration on target"
       ssh ${sshOpts} root@${target} \

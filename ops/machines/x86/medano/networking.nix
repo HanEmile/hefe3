@@ -2,10 +2,6 @@
 
 let
   pubv4 = "95.217.35.60";
-  ircVMip = "192.168.75.23";
-
-  httpPort = "80";
-  httpsPort = "80";
   narajVMip = "192.168.75.2";
   vmSubnet = "192.168.75.0/24";
 
@@ -159,7 +155,7 @@ in
 
         # Generated from natFlows above (see let-binding). Editing this
         # source produces the iptables rules below and the JSON file at
-        # /run/nat-flows.json consumed by the status-board NAT visualizer.
+        # /etc/nat-flows.json consumed by the status-board NAT visualizer.
       '' + lib.concatMapStrings mkFlowRules natFlows;
     };
 
@@ -205,6 +201,7 @@ in
               80
               443
               8090 # status-board listens on 192.168.75.1:8090 for naraj
+              9100 # node-exporter, scraped by irc's uptimebot/diskwatch over the bridge
             ];
             allowedUDPPorts = ports;
           };
@@ -246,7 +243,6 @@ in
           allowedTCPPorts = [
             80 # http
             443 # https
-            8080 # Guacamole
           ];
           allowedUDPPorts = [ ];
         };

@@ -1,6 +1,5 @@
 {
   hefe,
-  # pkgs,
   ...
 }:
 { config, pkgs, ... }:
