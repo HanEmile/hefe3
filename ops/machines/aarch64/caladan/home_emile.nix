@@ -1,31 +1,12 @@
 { hefe, config, pkgs, lib, unstable, ... }:
 
 let
-  # Track the current upstream release; mirrors the pin in
-  # ops/vms/x86/code/default.nix (nixos-26.05 lags at 1.15.10, nixos-unstable
-  # at 1.18.28). Based on unstable's derivation, which already skips the
-  # build-time smoke test and codesigns the binary on darwin (that's the
-  # SIGKILL fix ~/src/git.emile.space/wallet/shell.nix does manually against
-  # the older 1.15.10 derivation).
-  opencode =
-    let
-      version = "1.19.0";
-      src = unstable.fetchFromGitHub {
-        owner = "anomalyco";
-        repo = "opencode";
-        tag = "v${version}";
-        hash = "sha256-XL76Qpm4GEFEn7Pt7g84sx+djEKnlpTTZXRgXJF3NRs=";
-      };
-    in
-    unstable.opencode.overrideAttrs (old: {
-      inherit version src;
-      passthru = old.passthru // {
-        node_modules = old.passthru.node_modules.overrideAttrs (nmOld: {
-          inherit version src;
-          outputHash = "sha256-o2FEfe3kBNi7trdMnX17Kd6Dm9IFCadET7w0vs+kNhU=";
-        });
-      };
-    });
+  # OpenCode 2; shared with the code VM, see ops/pkgs/opencode2. Builds via
+  # upstream's own nix recipe shipped in the release tarball (nixpkgs still
+  # ships v1: 26.05 at 1.15.10, unstable at 1.18.28). V1 config in
+  # ~/.config/opencode is read unchanged/migrated by the v2 client; see
+  # https://opencode.ai/v2/docs/migrate-v1/
+  opencode = unstable.callPackage hefe.ops.pkgs.opencode2 { };
 in
 {
   home = {
@@ -339,6 +320,7 @@ in
     # reversing
     ghidra
     radare2
+    (pkgs.callPackage hefe.ops.pkgs.gef { })
 
     # file sync
     syncthing
@@ -347,6 +329,14 @@ in
     # irc
     # senpai config in /Users/emile/Library/Application Support/senpai
     (pkgs.callPackage hefe.ops.pkgs.senpai { })
+
+    # nntp
+    (pkgs.callPackage hefe.ops.pkgs.slrn { })
+    (pkgs.callPackage hefe.ops.pkgs.nntpc { })
+    (pkgs.callPackage hefe.ops.pkgs.nntpd { })
+
+    # games
+    (pkgs.callPackage hefe.ops.pkgs.cataclysm { })
     # irssi config in ~/.irssi/config (kept out of the repo: it carries the
     # soju bouncer password)
     irssi

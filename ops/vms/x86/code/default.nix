@@ -4,28 +4,11 @@
 let
   ipam = hefe.ops.ipam.code.code;
 
-  # pkgs-unstable lags upstream (1.18.28); track the current release here.
-  # The bump needs two hashes: the github src tarball and the bun
-  # install fixed-output (node_modules) hash.
-  opencode =
-    let
-      version = "1.19.0";
-      src = pkgs-unstable.fetchFromGitHub {
-        owner = "anomalyco";
-        repo = "opencode";
-        tag = "v${version}";
-        hash = "sha256-XL76Qpm4GEFEn7Pt7g84sx+djEKnlpTTZXRgXJF3NRs=";
-      };
-    in
-    pkgs-unstable.opencode.overrideAttrs (old: {
-      inherit version src;
-      passthru = old.passthru // {
-        node_modules = old.passthru.node_modules.overrideAttrs (nmOld: {
-          inherit version src;
-          outputHash = "sha256-o2FEfe3kBNi7trdMnX17Kd6Dm9IFCadET7w0vs+kNhU=";
-        });
-      };
-    });
+  # OpenCode 2; shared with caladan's home config, see ops/pkgs/opencode2
+  # (nixpkgs still ships v1). The seeded ~/.config/opencode below is read
+  # unchanged by the v2 client; migration notes:
+  # https://opencode.ai/v2/docs/migrate-v1/
+  opencode = pkgs-unstable.callPackage hefe.ops.pkgs.opencode2 { };
 
   # opencode config from caladan (~/.config/opencode). Contains provider
   # API keys inline, so it must never enter the git tree: read at eval time
