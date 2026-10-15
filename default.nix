@@ -23,10 +23,7 @@ let
       #
       # 1. User SSH keys are set in //users
       # 2. Some personal websites or demo projects are served from there
-      [ "ops" "machines" "x86" "arr" ]
-      [ "ops" "machines" "x86" "caladan" ]
       [ "ops" "machines" "x86" "lampadas" ]
-      [ "ops" "machines" "x86" "naraj" ]
       [ "ops" "machines" "x86" "medano" ]
       [ "ops" "machines" "x86" "lernaeus" ]
       [ "ops" "machines" "x86" "parella" ]
@@ -34,7 +31,7 @@ let
       [ "ops" "machines" "aarch64" "lernaeus-bmc" ]
       [ "ops" "machines" "aarch64" "lankiveil-bmc" ]
       [ "ops" "machines" "aarch64" "parella-bmc" ]
-        [ "ops" "vms" "x86" "md" ]
+      [ "ops" "vms" "x86" "md" ]
         [ "ops" "vms" "x86" "arr" ]
         [ "ops" "vms" "x86" "auth" ]
         [ "ops" "vms" "x86" "naraj" ]

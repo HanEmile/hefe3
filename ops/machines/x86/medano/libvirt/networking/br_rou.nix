@@ -1,4 +1,4 @@
-{ nixvirt, ... }:
+{ nixvirt, hefe, lib, ... }:
 let
   def = import ./def.nix { inherit nixvirt; };
 in
@@ -29,13 +29,13 @@ in
         };
         bridgename = "virbr2";
         prefix = "192.168.34.";
-        hosts = [
-          {
-            name = "rou";
-            mac = "52:54:00:f6:f8:94";
-            ip = "192.168.34.2";
-          }
-        ];
+        # DHCP reservations come from the ipam "rou" namespace, same as
+        # br_default/br_code do for their bridges.
+        hosts = builtins.map (x: {
+          name = x.name;
+          mac = x.value.mac;
+          ip = x.value.v4;
+        }) (lib.attrsets.attrsToList hefe.ops.ipam.rou);
       };
     }
   ]; # end of networks
