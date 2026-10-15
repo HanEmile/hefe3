@@ -31,6 +31,7 @@ in
     hefe.tools.sshrouter.module
 
     (mod "ports.nix")
+    ((import (mod "storagebox.nix")) { inherit hefe; })
     ../../../vms/x86/modules/healthProbes.nix
     (hefe.tools.status-board.module { inherit hefe; })
 
@@ -62,16 +63,11 @@ in
     (vm "irc") # irc
     (vm "pretix") # ticket shop
 
-    # ctf
-
   ];
 
   age.secrets = {
     storagebox_bx11_restic_password = {
       file = hefe.ops.secrets."storagebox_bx11_restic_password.age";
-    };
-    storagebox_bx11_connection_config = {
-      file = hefe.ops.secrets."storagebox_bx11_connection_config.age";
     };
   };
 
@@ -83,23 +79,11 @@ in
         "nosuid"
         "nodev"
         "noexec"
-        "relatime" # normal foo
+        "relatime"
 
         # mount -o remount,hidepid=2 /proc
         "hidepid=2" # this makes sure users can only see their own processes
       ];
-    };
-
-    "/mnt/storagebox-bx11" = {
-      device = "//u331921.your-storagebox.de/backup";
-      fsType = "cifs";
-      options =
-        let
-          conn_config = config.age.secrets."storagebox_bx11_connection_config".path;
-        in
-        [
-          "_netdev,x-systemd.automount,noauto,x-systemd.idle-timeout=60s,x-systemd.device-timeout=5s,x-systemd.mount-timeout=5s,credentials=${conn_config}"
-        ];
     };
   };
 
@@ -124,7 +108,6 @@ in
   environment.systemPackages = with pkgs; [
     vim
     libgbm
-    cifs-utils
 
     # for the networkd-dispatcher service used by tailscale
     ethtool
@@ -159,7 +142,6 @@ in
     tailscale = {
       enable = true;
       extraUpFlags = [ "--ssh --advertise-exit-node" ];
-      # interfaceName = "enp0s31f6";
     };
 
     networkd-dispatcher = {

@@ -31,6 +31,12 @@ let
   hostname = config.networking.hostName;
 in
 {
+  # Provides the CIFS mount + connection-config secret shared with
+  # medano/mail/lampadas.
+  imports = [
+    (import ../../../modules/storagebox.nix { inherit hefe; })
+  ];
+
   options.vmBackups = {
     enable = lib.mkOption {
       type = lib.types.bool;
@@ -81,33 +87,7 @@ in
       storagebox_bx11_restic_password = {
         file = hefe.ops.secrets."storagebox_bx11_restic_password.age";
       };
-      storagebox_bx11_connection_config = {
-        file = hefe.ops.secrets."storagebox_bx11_connection_config.age";
-      };
     };
-
-    # CIFS mount of the Hetzner Storagebox. Lazy automount: the share is only
-    # mounted when restic touches it, then unmounted on idle.
-    fileSystems."/mnt/storagebox-bx11" = {
-      device = "//u331921.your-storagebox.de/backup";
-      fsType = "cifs";
-      options =
-        let
-          conn = config.age.secrets."storagebox_bx11_connection_config".path;
-        in
-        [
-          ("_netdev"
-            + ",x-systemd.automount"
-            + ",noauto"
-            + ",x-systemd.idle-timeout=60s"
-            + ",x-systemd.device-timeout=5s"
-            + ",x-systemd.mount-timeout=5s"
-            + ",credentials=${conn}"
-          )
-        ];
-    };
-
-    environment.systemPackages = [ pkgs.cifs-utils ];
 
     services.restic.backups."${hostname}" = {
       timerConfig = {
