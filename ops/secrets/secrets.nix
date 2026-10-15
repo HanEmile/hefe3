@@ -4,19 +4,14 @@ let
   # be executed in this directory and obviously doesn't know about hefe
   hanemile = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPZi43zHEsoWaQomLGaftPE5k0RqVrZyiTtGqZlpWsew emile@caladan";
 
-  # corrino is an admin, so we can deploy from corrino
-  corrino = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGHcyg+yw1fwTfpbN1meNluaTXNcl6w1LIL0kz5Kan8I root@corrino";
-
   admins = [
     hanemile
-    corrino
   ];
 
   # hosts
   medano = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDo2MqY7BD6rd/L3UURx/2kTuHMC7V7WmW74bCsejChq root@medano";
   mail = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGY7/xWbF1+VO6+tGB5IHMr8RHne1A9eEtJvqaPU/dck root@mail";
   lampadas = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAbvlQjEsZO4hsfdUwhVQnxYkxyoRiVxkPGlJO2hzMOl root@lampadas";
-  lernaeus = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOASVDM+HusQY7btHM76V0HyllczztxRESaQMnL1PnFi root@lernaeus";
 
   # vms
   arr = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFCQ5JRwEr8LUmWtMR/Gue/bSiXJxyIk4dKyDi1s2M7o root@arr";
@@ -27,7 +22,7 @@ let
   photo = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIITS9LszO4+ASdxvys9I5R58+3uwLzb1RwDopLU7JLlI root@photo";
   amalthea = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID5EeR1ZbLxodwNhUKP9hARMZjf5MH3OuTZ+zGToO3ZH root@amalthea";
 
-  # new VM host keys (bootstrapped via image-flow)
+  # newer VM host keys (bootstrapped via the image flow)
   naraj    = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJawJxofA1dSc9vuc3Phv4rmRcZ2QYe21AqvmQHYXJYd root@naraj";
   git      = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDpPrG4aH7MRlTlctbEDl9Om7kd71S3s5mPYf8XkPRrf root@git";
   miki     = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOysZe9m8ERyTTtoIRx5IPOPM8VXX3FoN+I4kanzNtdy root@miki";
@@ -35,7 +30,6 @@ let
   rss      = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAB1LLVc5yi7M9Tmf3iYkweNWf6Rhcmz1BihmAqt+n1s root@rss";
   tmp      = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICrSItCIigpmQLpRForEznBHJprcx82BQeeweRmtQ7Pt root@tmp";
   late     = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJVF84a4bUbSEzdUe/6E+3QarQtekMt9Od8QfVU5h9tb root@nixos";
-  demo01   = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIuR2E3bQYK6nszaVZ5zgIXjnTj3vH56W6tIbFGtEPOS root@demo01";
 
   # new VMs added 2026-05-24
   sb1       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKphV2m4+5F2hCMTv121SXQHKxdsnP0O1BNwRCKAfhAe root@sb1";
@@ -46,17 +40,14 @@ let
   r2wars    = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExKIrQADDElPIh3jARxGrRtEsjUlXcWyhCk/bkT47nC root@r2wars";
   pretix    = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOiliYol3IXFGpQAEpKqFK0QN6qa/RDnzGNCqW/TG/uz root@pretix";
   irc       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF5pt9Yq/wc/jQOCQ8K7IMB+aGUN7/LSZazWGTLdXcvR root@irc";
-  # allHosts = [ medano arr ];
 
-  # convinience function: the hosts themselves and all admins should be able to access the host
+  # convenience function: the hosts themselves and all admins should be
+  # able to access the secret
   for = hosts: {
     publicKeys = hosts ++ admins;
   };
 in
 {
-  # === medano ===
-  "guacamole_user_mapping_xml.age" = for [ medano ];
-
   # === arr ===
   "mullvad_famous_hog_priv.age" = for [ rou ];
 
@@ -89,10 +80,6 @@ in
   # === social ===
   "gotosocial_environment_file.age" = for [ social ];
   "gotosocial_oidc_client_secret.age" = for [ auth social ];
-
-  # === amalthea ===
-  "amalthea_oidc_client_password.age" = for [ amalthea ];
-  "amalthea_immich_api_key.age" = for [ amalthea ];
 
   # === lampadas ===
   "immich_secrets_file.age" = for [ lampadas ];
