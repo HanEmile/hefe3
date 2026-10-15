@@ -43,23 +43,39 @@ let
   # services.healthProbes.probes that machine already defines
   # (health_probe_up{name=...} lines in the same /metrics body) without
   # redeclaring a single URL here.
-  metricsVMs = [
-    "amalthea" "arr" "auth" "code" "data" "demo01" "factorio" "git" "late"
-    "md" "miki" "minecraft" "naraj" "photo" "pretix" "r2wars" "rou" "rss"
-    "sb1" "sb2" "sb3" "sb4" "sb5" "social" "tmp"
-  ];
+  #
+  # The list is derived from the IPAM namespaces (default + private + rou +
+  # code), minus medano (added explicitly below) and irc itself (scraped via
+  # 127.0.0.1 below), so VMs are picked up automatically once they're in IPAM.
+  metricsVMs =
+    let
+      ipam = hefe.ops.ipam;
+      allNames = lib.unique (
+        builtins.attrNames ipam.default
+        ++ builtins.attrNames ipam.private
+        ++ builtins.attrNames ipam.rou
+        ++ builtins.attrNames ipam.code
+      );
+    in
+    builtins.sort builtins.lessThan (lib.subtractLists [ "medano" "irc" ] allNames);
 
   metricsTargets = map
     (name: {
       kind = "metrics";
       inherit name;
-      url = "http://${name}.${tsDomain}:9100/metrics";
+      # Tailscale blocks VM->VM TCP (ts-ping passes, http doesn't - tailnet
+      # ACLs outside this repo); the medano bridge is the reliable transport
+      # for anything hosted there. Fall back to tailnet for non-IPAM hosts.
+      url =
+        if builtins.hasAttr name hefe.ops.ipam.default
+        then "http://${hefe.ops.ipam.default.${name}.v4}:9100/metrics"
+        else "http://${name}.${tsDomain}:9100/metrics";
     })
     metricsVMs
   ++ [
     # irc is this VM itself; no tailscale hop needed.
     { kind = "metrics"; name = "irc"; url = "http://127.0.0.1:9100/metrics"; }
-    { kind = "metrics"; name = "medano"; url = "http://medano.${tsDomain}:9100/metrics"; }
+    { kind = "metrics"; name = "medano"; url = "http://${hefe.ops.ipam.default.medano.v4}:9100/metrics"; }
   ];
 
   # lampadas (home NAS): on the tailnet, but which ports are actually
@@ -82,6 +98,26 @@ let
 
   uptimebotTargets = pkgs.writeText "uptimebot-targets.json"
     (builtins.toJSON (metricsTargets ++ pingTargets ++ mailTargets));
+
+  # diskwatch only reuses the node-exporter subset (its binary ignores the
+  # "kind" field); hosts on medano's virbr0 bridge are polled via their
+  # bridge IP (tailnet cross-VM :9100 TCP is blocked by tailnet ACLs while
+  # tailscale ping works; uptimebot's all-false baseline shows this has
+  # always been broken from here). rou/arr (virbr1) and code (sandboxed
+  # virbr3) stay on tailnet names and are expected to stay unreachable.
+  diskwatchTargets =
+    let
+      ipam = hefe.ops.ipam.default;
+    in
+    pkgs.writeText "diskwatch-targets.json"
+      (builtins.toJSON (map
+        (t: t // {
+          url =
+            if builtins.hasAttr t.name ipam
+            then "http://${ipam.${t.name}.v4}:9100/metrics"
+            else t.url;
+        })
+        metricsTargets));
 in
 {
   imports = [
@@ -350,54 +386,96 @@ in
   };
 
   # ---------------------------------------------------------------------------
-  # weatherman - posts a daily Düsseldorf forecast to #emile
+  # Channel bots - long-running daemons that stay joined to #emile:
+  #   weatherman posts a daily Düsseldorf forecast at 08:00 Europe/Berlin,
+  #   xkcdbot    posts new xkcd comics as they're published (30min poll),
+  #   tagesschau posts the top three tagesschau stories at 08:00/16:00/00:00
+  #   Europe/Berlin,
+  #   dwdwarn    posts DWD weather warnings for Düsseldorf as they're issued
+  #              (10min poll against warn cells 705111001-004 + 105111000),
+  #   diskwatch  posts fleet disk-usage transitions over 85%/95% (5min poll of
+  #              every VM's + medano's node-exporter).
+  # Each reconnects on failure (Restart=always) and the binaries themselves
+  # fail loudly if the channel is unjoinable (403/471/473/474/475). Do not
+  # set #emile +i again: that silently killed the bots in Oct 2026 (Ergo
+  # rejects +I invex additions on it with 478, so invite exemptions are not
+  # an option).
   # ---------------------------------------------------------------------------
   systemd.services.weatherman = {
     description = "Post the daily Düsseldorf forecast to #emile";
     after = [ "ergochat.service" ];
     wants = [ "ergochat.service" ];
+    wantedBy = [ "multi-user.target" ];
     serviceConfig = {
-      Type = "oneshot";
       DynamicUser = true;
       ExecStart = "${pkgs.callPackage hefe.ops.pkgs.weatherman { }}/bin/weatherman --server 127.0.0.1:${toString ergoPlainPort} --channel '#emile'";
       # wttr^Wopen-meteo is on the public internet; needs outbound DNS + HTTPS.
       RestrictAddressFamilies = [ "AF_INET" "AF_INET6" ];
+      Restart = "always";
+      RestartSec = "10s";
     };
   };
 
-  systemd.timers.weatherman = {
-    description = "Daily #emile forecast";
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      OnCalendar = "*-*-* 08:00:00 Europe/Berlin";
-      Persistent = true;
-      AccuracySec = "1min";
-    };
-  };
-
-  # ---------------------------------------------------------------------------
-  # xkcdbot - posts new xkcd comics to #emile as they're published
-  # ---------------------------------------------------------------------------
   systemd.services.xkcdbot = {
     description = "Post new xkcd comics to #emile";
     after = [ "ergochat.service" ];
     wants = [ "ergochat.service" ];
+    wantedBy = [ "multi-user.target" ];
     serviceConfig = {
-      Type = "oneshot";
       DynamicUser = true;
       StateDirectory = "xkcdbot";
       ExecStart = "${pkgs.callPackage hefe.ops.pkgs.xkcdbot { }}/bin/xkcdbot --server 127.0.0.1:${toString ergoPlainPort} --channel '#emile' --state /var/lib/xkcdbot/last-seen";
       RestrictAddressFamilies = [ "AF_INET" "AF_INET6" ];
+      Restart = "always";
+      RestartSec = "10s";
     };
   };
 
-  systemd.timers.xkcdbot = {
-    description = "Poll xkcd for a new comic";
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      OnCalendar = "*:0/30";
-      Persistent = true;
-      AccuracySec = "1min";
+  systemd.services.tagesschau = {
+    description = "Post the top three tagesschau stories to #emile";
+    after = [ "ergochat.service" ];
+    wants = [ "ergochat.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      DynamicUser = true;
+      ExecStart = "${pkgs.callPackage hefe.ops.pkgs.tagesschau { }}/bin/tagesschau --server 127.0.0.1:${toString ergoPlainPort} --channel '#emile'";
+      # tagesschau.de is on the public internet; needs outbound DNS + HTTPS.
+      RestrictAddressFamilies = [ "AF_INET" "AF_INET6" ];
+      Restart = "always";
+      RestartSec = "10s";
+    };
+  };
+
+  systemd.services.dwdwarn = {
+    description = "Post DWD weather warnings for Düsseldorf to #emile";
+    after = [ "ergochat.service" ];
+    wants = [ "ergochat.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      DynamicUser = true;
+      StateDirectory = "dwdwarn";
+      ExecStart = "${pkgs.callPackage hefe.ops.pkgs.dwdwarn { }}/bin/dwdwarn --server 127.0.0.1:${toString ergoPlainPort} --channel '#emile' --state /var/lib/dwdwarn/seen.json";
+      # dwd.de is on the public internet; needs outbound DNS + HTTPS.
+      RestrictAddressFamilies = [ "AF_INET" "AF_INET6" ];
+      Restart = "always";
+      RestartSec = "10s";
+    };
+  };
+
+  systemd.services.diskwatch = {
+    description = "Post fleet disk-usage alerts to #emile";
+    after = [ "ergochat.service" ];
+    wants = [ "ergochat.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      DynamicUser = true;
+      StateDirectory = "diskwatch";
+      ExecStart = "${pkgs.callPackage hefe.ops.pkgs.diskwatch { }}/bin/diskwatch --server 127.0.0.1:${toString ergoPlainPort} --channel '#emile' --targets ${diskwatchTargets} --state /var/lib/diskwatch/state.json";
+      # Polls node-exporter across the tailnet; plain HTTP, no DNS beyond
+      # tailscale's MagicDNS.
+      RestrictAddressFamilies = [ "AF_INET" "AF_INET6" ];
+      Restart = "always";
+      RestartSec = "10s";
     };
   };
 

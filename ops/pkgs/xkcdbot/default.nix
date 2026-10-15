@@ -20,10 +20,10 @@ buildGoModule (finalAttrs: {
   meta = {
     description = "Posts new xkcd comics to an IRC channel as they're published";
     longDescription = ''
-      Polls xkcd's latest-comic JSON endpoint and posts to an IRC channel via
-      a minimal raw-protocol connect/join/privmsg/quit whenever the comic
-      number advances past the last one seen (tracked in a state file),
-      meant to be run periodically from a systemd timer.
+      Polls xkcd's latest-comic JSON endpoint every 30min and posts to an IRC
+      channel whenever the comic number advances past the last one seen
+      (tracked in a state file), staying joined to the channel continuously
+      as a long-running daemon.
     '';
     homepage = "https://github.com/HanEmile/hefe3/tree/main/ops/pkgs/xkcdbot";
     license = lib.licenses.mit;

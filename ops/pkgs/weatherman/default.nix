@@ -21,8 +21,8 @@ buildGoModule (finalAttrs: {
     description = "Posts a daily Düsseldorf forecast to an IRC channel";
     longDescription = ''
       Fetches a forecast from the Open-Meteo API and posts it to an IRC
-      channel via a minimal raw-protocol connect/join/privmsg/quit, meant to
-      be run once a day from a systemd timer.
+      channel once a day at 08:00 Europe/Berlin, staying joined to the
+      channel continuously as a long-running daemon.
     '';
     homepage = "https://github.com/HanEmile/hefe3/tree/main/ops/pkgs/weatherman";
     license = lib.licenses.mit;
