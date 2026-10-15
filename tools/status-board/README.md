@@ -13,6 +13,11 @@ Internal dashboard for the medano fleet. One Go binary, no external deps.
   recent snapshot file).
 - Renders an inline SVG showing the traffic flow:
   internet → medano nginx → bridges (default, private, rou) → VMs.
+- `/graph` (`forcegraph.go`): force-directed topology view of bridges,
+  VMs and their bidirectional traffic, fed from the nix-generated
+  `/etc/status-board-graph.json`.
+- `/nat` (`natviz.go`): NAT flow visualizer for medano's `natFlows`
+  (DNAT/hairpin/SNAT), fed from the nix-generated `/etc/nat-flows.json`.
 
 ## Build
 
@@ -30,6 +35,12 @@ Run by the NixOS module at `tools.status-board.module`, imported from
 | `STATUS_BOARD_INVENTORY` | (required) | path to a JSON file `[{name, ip, bridge}, ...]` |
 | `STATUS_BOARD_LISTEN` | `127.0.0.1:8090` | bind address:port |
 | `STATUS_BOARD_STORAGEBOX` | `/mnt/storagebox-bx11/backup` | base dir of restic repos |
+| `STATUS_BOARD_GRAPH` | (optional) | path to `status-board-graph.json` for the `/graph` view |
+| `STATUS_BOARD_NAT_JSON` | (optional) | path to `nat-flows.json` for the `/nat` view |
+
+`check-contrast.sh` extracts the colour palette from `main.go`'s inline
+`<style>` block and verifies each foreground/background pair against
+WCAG 2.1 AA contrast ratios.
 
 ## Output sample
 

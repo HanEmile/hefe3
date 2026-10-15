@@ -3,8 +3,8 @@
     "host": "mail.emile.space",
     "port": 587,
     "user": "mail@emile.space",
-    "password": "abc",
+    "password_file": "/path/to/password.txt",
     "from": "noreply@emile.space",
-    "user_tls": true,
+    "user_tls": true
   }
 }

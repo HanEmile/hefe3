@@ -1,7 +1,7 @@
 # hefe3
 
 NixOS monorepo for the emile.space fleet. One Hetzner host (`medano`)
-hypervises ~23 libvirt VMs; two more bare-metal machines (`lampadas`,
+hypervises ~27 libvirt VMs; two more bare-metal machines (`lampadas`,
 the `mail` host) and the Hetzner Storagebox sit outside. `caladan`
 (this Mac) is the dev/deploy box: every `nix-build` and `deploy`
 in here originates from caladan and uses medano as the remote x86_64
@@ -36,6 +36,9 @@ builder.
 | r2wars      | r2wars site                         | - | (tailnet)         | `ops/vms/x86/r2wars/`                           |
 | rou         | VPN exit (private bridge)           | 192.168.33.2    | (tailnet)         | `ops/vms/x86/rou/`                              |
 | arr         | *arr-stack on `rou` private bridge  | 192.168.33.3    | (tailnet)         | `ops/vms/x86/arr/`                              |
+| irc         | Ergo + soju (IRC)                   | - | (tailnet)         | `ops/vms/x86/irc/`                              |
+| pretix      | pretix ticket shop                  | - | (tailnet)         | `ops/vms/x86/pretix/`                           |
+| jules       | minimal linux VM (jules)            | - | (tailnet)         | `ops/vms/x86/jules/`                            |
 
 Tailnet domain is `pinto-pike.ts.net`. Full IPAM in
 `ops/ipam/default.nix` (default bridge, `private`, `rou`, `code`, and
@@ -47,10 +50,9 @@ the isolated sandbox net: NAT outbound, east-west blocked on medano.
 ```
 hefe3/
   default.nix                  readTree entry; allowlists users/ paths per host
-  deploy_all.sh                sequential fleet deploy (best-effort)
-  deploy.sh, install.sh        legacy single-host scripts
-  npins/                       npins-managed third-party pins (sources.nix)
-  third_party/                 thin wrapper around npins for use in readTree
+  deploy_all.sh                whole-fleet VM deploy (result-<vm> outlinks, -P 4)
+  install.sh                   minimal bare-metal NixOS install runbook
+  third_party/                 npins pins (npins/sources.json) + readTree wrapper
   ops/
     ipam/                      SINGLE SOURCE OF TRUTH for VM IPs+MACs+ports
     acl/                       per-host users/groups, derived from //users/*/keys
@@ -79,8 +81,7 @@ hefe3/
     hanemile/                  dotfiles, emacs, emile_space site, keys/, projects/, reversing/
 ```
 
-Companion docs (do not duplicate here):
-`MIGRATION.md`, `CORRINO-DECOMMISSION.md`, `NAMECHEAP-EMILE-SPACE.md`.
+Companion doc: `TROUBLESHOOT.md` (live debugging notes; do not duplicate here).
 
 ## Deploy commands
 
@@ -104,7 +105,7 @@ nix-build -A users.hanemile.emile_space.deploy && ./result/bin/deploy
 # Status-board binary (consumed by the medano module)
 nix-build -A tools.status-board.package
 
-# Whole fleet, sequential
+# All VMs under ops/vms/x86, 4 at a time
 ./deploy_all.sh
 ```
 
@@ -403,10 +404,8 @@ Three patterns:
 - `deploy-image` refuses to overwrite a running VM's disk
   (libvirt holds the file open; silent swap = corrupted state).
   `virsh shutdown <vm>` first, redeploy, `virsh start <vm>`.
-- `MIGRATION.md`, `CORRINO-DECOMMISSION.md`,
-  `NAMECHEAP-EMILE-SPACE.md` exist for
-  history / one-shot procedures - read them, don't duplicate
-  here.
+- `TROUBLESHOOT.md` holds live debugging notes - read it, don't
+  duplicate it here.
 - caladan's `/etc/nix/machines` contains exactly one builder line
   pointing at medano. If that breaks (medano down, key rotated)
   every deploy stalls. Check it before debugging deeper.
