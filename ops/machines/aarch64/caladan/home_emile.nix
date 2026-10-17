@@ -182,6 +182,9 @@ in
     exiftool
     unstable.mpv
 
+    # photo (darktable fork)
+    (pkgs.callPackage hefe.ops.pkgs.ansel { })
+
     # VCS
     tig
 
