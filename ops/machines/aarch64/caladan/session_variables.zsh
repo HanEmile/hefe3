@@ -12,14 +12,15 @@ export PROMPT="; "		# minimal prompt
 #export RPROMPT="%F{green}%/%F{reset}"
 export RPROMPT='${SSH_CONNECTION:+%m } $(parse_git_branch) %F{green}%/%F{reset} %D{%K:%M:%S}'
 
-# Reset the prompt, so we get the time the command was executed
-# in the rprompt. A single second was to much, as it also breaks all the
-# prompt suggestions, 5 seconds seems quite sensible, and you can just hit
-# `TAB` yet another time if you want to see the suggestions again
-TMOUT=60
-TRAPALRM() {
+# Refresh the prompt exactly once, when a command is submitted, so the
+# time in the rprompt is the time the command was actually executed.
+# No timer (TMOUT/TRAPALRM): an async `zle reset-prompt` fires at
+# arbitrary moments and clobbers fzf / completion menus / suggestions.
+reset-prompt-accept-line() {
   zle reset-prompt
+  zle .accept-line
 }
+zle -N accept-line reset-prompt-accept-line
 
 export VI_MODE_SET_CURSOR=true
 
@@ -55,6 +56,10 @@ if [ -n "${commands[fzf-share]}" ]; then
   source "$(fzf-share)/key-bindings.zsh"
   source "$(fzf-share)/completion.zsh"
 fi
+
+FZF_DEFAULT_COMMAND="fd . $HOME"
+FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+FZF_ALT_C_COMMAND="fd -t d . $HOME"
 
 if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
   . '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
