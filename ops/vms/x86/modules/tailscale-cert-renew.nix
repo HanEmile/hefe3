@@ -57,23 +57,44 @@ in
       path = [ pkgs.tailscale pkgs.coreutils ];
       script = ''
         set -eu
+        failed=0
         mkdir -p ${certDir}
         chmod 0750 ${certDir}
         ${lib.concatMapStringsSep "\n" (host: ''
           echo "Renewing ${host}..."
-          ${pkgs.tailscale}/bin/tailscale cert \
-            --cert-file ${certDir}/${host}.crt \
-            --key-file  ${certDir}/${host}.key \
-            ${host}
-          chown root:nginx ${certDir}/${host}.crt ${certDir}/${host}.key
-          chmod 0640      ${certDir}/${host}.crt ${certDir}/${host}.key
+          # tailscaled needs a moment after (re)start to fetch its netmap
+          # (fails fast with "no netmap available"); retry before giving up.
+          attempt=0
+          rc=1
+          while [ $attempt -lt 12 ]; do
+            if ${pkgs.tailscale}/bin/tailscale cert \
+                --cert-file ${certDir}/${host}.crt \
+                --key-file  ${certDir}/${host}.key \
+                ${host}; then
+              rc=0
+              break
+            fi
+            attempt=$((attempt + 1))
+            sleep 10
+          done
+          if [ $rc -ne 0 ]; then
+            echo "Giving up on ${host} after 12 attempts" >&2
+            failed=1
+          else
+            chown root:nginx ${certDir}/${host}.crt ${certDir}/${host}.key
+            chmod 0640      ${certDir}/${host}.crt ${certDir}/${host}.key
+          fi
         '') cfg.hostnames}
         ${lib.optionalString cfg.reloadNginx ''
           # Best-effort reload (skipped on cold boot when nginx isn't up yet).
+          # --no-block: when this oneshot is part of an nginx (re)start
+          # transaction (Before=nginx.service), a blocking reload queues
+          # behind that transaction and deadlocks with it.
           if systemctl is-active --quiet nginx.service; then
-            systemctl reload nginx.service || true
+            systemctl reload --no-block nginx.service || true
           fi
         ''}
+        exit "$failed"
       '';
       serviceConfig = {
         Type = "oneshot";
