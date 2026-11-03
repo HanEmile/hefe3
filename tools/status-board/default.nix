@@ -25,23 +25,29 @@ let
       defaultVms = lib.attrNames (lib.filterAttrs (n: _: n != "medano") ipam.default);
       privateVms = lib.attrNames (lib.filterAttrs (n: _: n != "medano") ipam.private);
       codeVms = lib.attrNames (lib.filterAttrs (n: _: n != "medano") ipam.code);
-      allVms = defaultVms ++ privateVms ++ codeVms;
+      # lampadas is a real machine, not a libvirt VM: include it so its
+      # restic repos (the immich library!) show up in the Backups tab and
+      # its node-exporter feeds the kernel/disk/RAM views.
+      allVms = defaultVms ++ privateVms ++ codeVms ++ [ "lampadas" ];
       ipamLookup = name:
         if ipam.default ? "${name}" then ipam.default."${name}"
         else if ipam.private ? "${name}" then ipam.private."${name}"
         else if ipam.code ? "${name}" then ipam.code."${name}"
+        else if name == "lampadas" then ipam.tailscale.lampadas
         else throw "status-board: no IPAM for ${name}";
 
       # logical bridge name per net ("default"/"private"/"code") for the
       # inventory; the SVG layers in main.go prefix these with "virbr".
       bridgeFor = name:
-        if ipam.default ? "${name}" then "default"
+        if name == "lampadas" then "ts"
+        else if ipam.default ? "${name}" then "default"
         else if ipam.private ? "${name}" then "private"
         else "code";
 
       # bridge device name per net for the force-graph view
       bridgeDevFor = name:
-        if ipam.default ? "${name}" then "virbr0"
+        if name == "lampadas" then "tailscale0"
+        else if ipam.default ? "${name}" then "virbr0"
         else if ipam.private ? "${name}" then "virbr1"
         else "virbr3";
 
@@ -57,9 +63,18 @@ let
       # Some VMs aren't in ops.nixos (sb1..3 are bare bootstraps). For those,
       # we fall back to an empty list and rely on the vm-base default
       # (node-exporter 9100 on enp1s0).
+      # arr's config imports a gitignored ./private.nix - evaluating it from
+      # a clean fleet checkout fails outright, breaking medano's own eval
+      # (this module evaluates every VM's config). Never force arr's config;
+      # fall back to generic defaults for it here.
+      skipConfigEval = [ "arr" ];
+      safeEvalVM = name:
+        if builtins.elem name skipConfigEval then null
+        else hefe.ops.nixos."${name}" or null;
+
       portsForVM = name:
         let
-          n = hefe.ops.nixos."${name}" or null;
+          n = safeEvalVM name;
           fw = if n != null then n.config.networking.firewall else null;
           generic = if fw != null then fw.allowedTCPPorts else [];
           enp1 = if fw != null && fw.interfaces ? enp1s0
@@ -69,12 +84,14 @@ let
         in lib.unique (generic ++ enp1 ++ tail);
 
       backupsEnabledForVM = name:
-        let n = hefe.ops.nixos."${name}" or null;
-        in if n == null then false
-           else (n.config.vmBackups.enable or false);
+        if name == "lampadas" then true
+        else
+          let n = safeEvalVM name;
+          in if n == null then false
+             else (n.config.vmBackups.enable or false);
 
       backupPathsForVM = name:
-        let n = hefe.ops.nixos."${name}" or null;
+        let n = safeEvalVM name;
         in if n == null then []
            else (n.config.vmBackups.paths or []);
 
@@ -89,6 +106,33 @@ let
             repo = "/mnt/storagebox-bx11/backup/${name}";
           }
         ] else [];
+
+      # Per-path -> target wiring (what the Backups tab renders).
+      # VMs: every vmBackups path lives in the one storagebox repo.
+      # lampadas: one repo per BACKUP JOB, some mirrored to medano's grave
+      # pool by restic-copy-grave.timer (ops/machines/x86/medano).
+      lampadasJobs = hefe.ops.nixos.lampadas.config.services.restic.backups;
+      graveMirroredJobs = [ "photos" "immich-data" ];
+      backupPathTargetsForVM = name:
+        if name == "lampadas" then lib.concatLists (lib.mapAttrsToList
+          (jobName: job:
+            map (p: {
+              path = p;
+              targets = [
+                {
+                  kind = "restic";
+                  label = "storagebox-bx11";
+                  repo = job.repository;
+                }
+              ] ++ lib.optional (lib.elem jobName graveMirroredJobs) {
+                kind = "restic";
+                label = "medano-grave";
+                repo = "/grave/restic/${jobName}";
+              };
+            }) job.paths
+          ) lampadasJobs)
+        else map (p: { path = p; targets = backupTargetsForVM name; })
+          (backupPathsForVM name);
 
       # Hand-edited cross-VM relationships. We can't reliably derive these
       # from per-VM evaluation because they cross OIDC, NFS, restic, etc.
@@ -146,6 +190,7 @@ let
           backupsEnabled = backupsEnabledForVM n;
           backupPaths = backupPathsForVM n;
           backupTargets = backupTargetsForVM n;
+          backupPathTargets = backupPathTargetsForVM n;
         }) allVms;
         # Static list of ZFS pools to scrape via `zpool list -Hp` at runtime.
         zpools = [ "bpool" "rpool" "grave" ];
@@ -189,6 +234,10 @@ let
           User = "root";
           StateDirectory = "status-board";
           StateDirectoryMode = "0750";
+          # ~1 core sustained instead of multi-core spikes per collect round;
+          # together with the 6-way scrape fan-out and 60s interval this
+          # keeps the dashboard cheap on an already-overcommitted host.
+          CPUQuota = "100%";
         };
       };
     };

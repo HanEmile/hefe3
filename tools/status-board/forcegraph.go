@@ -31,6 +31,16 @@ type vmEntry struct {
 	BackupsEnabled bool           `json:"backupsEnabled"`
 	BackupPaths    []string       `json:"backupPaths"`
 	BackupTargets  []targetEntry  `json:"backupTargets"`
+	// Optional per-path target wiring; when present it wins over the
+	// paths x targets cross-product in backupViewFor (needed for hosts
+	// with one repo per backup job, e.g. lampadas, and multi-target
+	// mirrors like storagebox + grave).
+	BackupPathTargets []pathTargetEntry `json:"backupPathTargets"`
+}
+
+type pathTargetEntry struct {
+	Path    string        `json:"path"`
+	Targets []targetEntry `json:"targets"`
 }
 
 // targetEntry: per-VM backup target. List-shaped to allow adding a second

@@ -11,7 +11,6 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -142,6 +141,7 @@ type VMStat struct {
 	Restic    Restic
 	Backups   BackupView
 	Capacity  Capacity
+	Kernel    string // booted kernel release, e.g. "6.12.108" ("" when unreachable)
 
 	// Extra metrics for the Overview tab. Zero when not reachable.
 	Load1     float64
@@ -181,6 +181,9 @@ var (
 	backupsEnabled = map[string]bool{}
 	backupPaths    = map[string][]string{}
 	backupTargets  = map[string][]BackupTarget{}
+	// Per-path target wiring from the graph data (backupPathTargets); wins
+	// over the paths x targets cross-product when present.
+	explicitPathTargets = map[string][]BackupPath{}
 	zfsPoolNames   []string
 	listenAddr    = "127.0.0.1:8090"
 	storageboxDir = "/mnt/storagebox-bx11"
@@ -197,9 +200,11 @@ var (
 		Ts     time.Time
 	}{}
 
-	// Cache the last scrape so the SSE handler doesn't fan out collectAll()
-	// on every connected client tick. collectAllLocked serializes refreshes.
+	// Cache the last scrape so request handlers never touch the fleet
+	// itself. collectMu serializes collect rounds (TryLock); cacheMu only
+	// guards the short pointer swap on publication.
 	collectMu      sync.Mutex
+	cacheMu        sync.RWMutex
 	cachedVMs      []VMStat
 	cachedSB       Storagebox
 	cachedZPools   []Zpool
@@ -230,22 +235,46 @@ func appendSample(s sample) {
 }
 
 // Read recent samples for a given (vm, kind). Returns chronological slice.
-func readSamples(vm, kind string, sinceHours float64) []sample {
+// sampleIndex is built ONCE per collect round; forecastDaysToFull used to
+// re-read and JSON-unmarshal the entire (multi-MB) samples.jsonl twice per
+// VM per round - the actual reason rounds took 30-60s of solid CPU.
+var (
+	sampleIndexMu sync.Mutex
+	sampleIndex   map[string][]sample // key: vm+"|"+kind
+)
+
+func buildSampleIndex() {
 	f, err := os.Open(samplesPath)
 	if err != nil {
-		return nil
+		return
 	}
 	defer f.Close()
-	cutoff := time.Now().Add(-time.Duration(sinceHours) * time.Hour).Unix()
+	idx := map[string][]sample{}
 	scan := bufio.NewScanner(f)
 	scan.Buffer(make([]byte, 0, 4096), 1024*1024)
-	var out []sample
 	for scan.Scan() {
 		var s sample
 		if err := json.Unmarshal(scan.Bytes(), &s); err != nil {
 			continue
 		}
-		if s.Vm != vm || s.Kind != kind || s.Ts < cutoff {
+		idx[s.Vm+"|"+s.Kind] = append(idx[s.Vm+"|"+s.Kind], s)
+	}
+	sampleIndexMu.Lock()
+	sampleIndex = idx
+	sampleIndexMu.Unlock()
+}
+
+func readSamples(vm, kind string, sinceHours float64) []sample {
+	sampleIndexMu.Lock()
+	idx := sampleIndex
+	sampleIndexMu.Unlock()
+	if idx == nil {
+		return nil
+	}
+	cutoff := time.Now().Add(-time.Duration(sinceHours) * time.Hour).Unix()
+	var out []sample
+	for _, s := range idx[vm+"|"+kind] {
+		if s.Ts < cutoff {
 			continue
 		}
 		out = append(out, s)
@@ -350,6 +379,82 @@ func fetchMetrics(ip string) (map[string][]metricRow, error) {
 }
 
 func virshState() map[string]VirshInfo {
+	// One libvirt round-trip for every domain instead of 27 sequential
+	// `virsh dominfo` forks (~1.5s each - 33-48s per collect round).
+	if state := virshStateDomstats(); len(state) > 0 {
+		return state
+	}
+	log.Printf("collect: domstats empty, falling back to slow per-VM dominfo")
+	return virshStateDominfo()
+}
+
+// virshStateDomstats: `virsh domstats --list-all --state --balloon --vcpu`
+// prints "Domain: '<name>'" sections of key=value lines for ALL domains.
+var domstatStates = map[string]string{
+	"0": "no state", "1": "running", "2": "blocked", "3": "paused",
+	"4": "shutdown", "5": "shut off", "6": "crashed", "7": "pmsuspended",
+}
+
+func virshStateDomstats() map[string]VirshInfo {
+	state := map[string]VirshInfo{}
+	out, err := exec.Command("virsh", "domstats", "--list-all", "--state", "--balloon", "--vcpu").Output()
+	if err != nil {
+		return state
+	}
+	var cur *VirshInfo
+	var name string
+	flush := func() {
+		if cur != nil && name != "" {
+			state[name] = *cur
+		}
+		cur, name = nil, ""
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			flush()
+			continue
+		}
+		if strings.HasPrefix(line, "Domain:") {
+			flush()
+			name = strings.Trim(strings.TrimSpace(strings.TrimPrefix(line, "Domain:")), "'\"")
+			cur = &VirshInfo{}
+			continue
+		}
+		if cur == nil {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		k, v := strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
+		switch k {
+		case "state.state":
+			if s, ok := domstatStates[v]; ok {
+				cur.State = s
+			}
+		case "balloon.current":
+			if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+				cur.UsedMemKiB = n
+			}
+		case "balloon.maximum":
+			if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+				cur.MaxMemKiB = n
+			}
+		case "vcpu.current":
+			if cur.VCPUs == "" {
+				cur.VCPUs = v
+			} else {
+				cur.VCPUs += "/" + v
+			}
+		}
+	}
+	flush()
+	return state
+}
+
+func virshStateDominfo() map[string]VirshInfo {
 	state := map[string]VirshInfo{}
 	out, err := exec.Command("virsh", "list", "--all", "--name").Output()
 	if err != nil {
@@ -450,18 +555,9 @@ func resticFor(vm string) Restic {
 		r.AgeHours = time.Since(latest).Hours()
 		r.OldestHours = time.Since(oldest).Hours()
 	}
-	// 'du -shx' over the storagebox CIFS mount stalls under concurrent load
-	// (one du per VM in parallel during a page render = wedged mount). Wrap
-	// in a short context so a slow scan doesn't hold the entire dashboard
-	// hostage.
-	ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
-	defer cancel()
-	if out, err := exec.CommandContext(ctx, "du", "-shx", filepath.Join(repo, "data")).Output(); err == nil {
-		fields := strings.Fields(string(out))
-		if len(fields) > 0 {
-			r.Size = fields[0]
-		}
-	}
+	// Size comes from the 6-hourly background walk (backupsizes.go) - a live
+	// du over the CIFS storagebox always blew any page-render-safe timeout.
+	r.Size = repoSizeStr(repo)
 	return r
 }
 
@@ -516,14 +612,7 @@ func scanTargetRepo(t BackupTarget) BackupTarget {
 		t.AgeHours = time.Since(latest).Hours()
 		t.OldestHours = time.Since(oldest).Hours()
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
-	defer cancel()
-	if out, err := exec.CommandContext(ctx, "du", "-shx", filepath.Join(t.Repo, "data")).Output(); err == nil {
-		fields := strings.Fields(string(out))
-		if len(fields) > 0 {
-			t.Size = fields[0]
-		}
-	}
+	t.Size = repoSizeStr(t.Repo)
 	return t
 }
 
@@ -535,6 +624,23 @@ func scanTargetRepo(t BackupTarget) BackupTarget {
 func backupViewFor(vm string) BackupView {
 	bv := BackupView{Configured: backupsEnabled[vm]}
 	if !bv.Configured {
+		return bv
+	}
+	// explicit per-path target wiring (lampadas jobs, grave mirrors, ...)
+	if pts, ok := explicitPathTargets[vm]; ok && len(pts) > 0 {
+		scanned := map[string]BackupTarget{}
+		for _, bp := range pts {
+			out := BackupPath{Path: bp.Path}
+			for _, t := range bp.Targets {
+				st, seen := scanned[t.Repo]
+				if !seen {
+					st = scanTargetRepo(t)
+					scanned[t.Repo] = st
+				}
+				out.Targets = append(out.Targets, st)
+			}
+			bv.Paths = append(bv.Paths, out)
+		}
 		return bv
 	}
 	paths := backupPaths[vm]
@@ -764,10 +870,26 @@ func collectVM(vm VM) VMStat {
 				st.TSUp = true
 			}
 		}
+
+		// Booted kernel release ("6.12.108") for the freshness table.
+		for _, row := range metrics["node_uname_info"] {
+			st.Kernel = row.Labels["release"]
+			break
+		}
 	}
 	st.Capacity = capacityFor(vm.Name, metrics)
+	tR := time.Now()
 	st.Restic = resticFor(vm.Name)
 	st.Backups = backupViewFor(vm.Name)
+	if d := time.Since(tR); d > 500*time.Millisecond {
+		log.Printf("collect: slow restic scan %s: %s", vm.Name, d.Round(time.Millisecond))
+	}
+	// Explicit per-path wiring (lampadas & friends) has no single per-name
+	// repo - roll the header summary up from the real per-path scans
+	// instead of probing a repo that will never exist.
+	if len(explicitPathTargets[vm.Name]) > 0 {
+		st.Restic = rollupRestic(st.Backups)
+	}
 	// best-effort: record this scrape for trend fitting (only if VM is reachable
 	// and we got real numbers).
 	now := time.Now().Unix()
@@ -781,20 +903,76 @@ func collectVM(vm VM) VMStat {
 }
 
 func collectAll() ([]VMStat, map[string]VirshInfo) {
+	tV := time.Now()
 	virsh := virshState()
+	defer func() {
+		log.Printf("collect: virshState=%s", time.Since(tV).Round(time.Millisecond))
+	}()
+	// Bound the fan-out: an unbounded round (27 parallel HTTP scrapes + the
+	// surrounding forks) is what made each collect a multi-core spike; pacing
+	// to a handful at a time flattens it at ~1 core for a bit longer per round.
+	sem := make(chan struct{}, 6)
 	var wg sync.WaitGroup
 	results := make([]VMStat, len(inventory))
 	for i, vm := range inventory {
 		wg.Add(1)
+		sem <- struct{}{}
 		go func(i int, vm VM) {
-			defer wg.Done()
+			defer func() { <-sem; wg.Done() }()
+			ts := time.Now()
 			results[i] = collectVM(vm)
+			if d := time.Since(ts); d > 2*time.Second {
+				log.Printf("collect: slow vm %s: %s", vm.Name, d.Round(time.Millisecond))
+			}
 			results[i].Virsh = virsh[vm.Name]
 		}(i, vm)
 	}
 	wg.Wait()
 	sort.Slice(results, func(i, j int) bool { return results[i].Name < results[j].Name })
 	return results, virsh
+}
+
+// rollupRestic folds a per-path BackupView into the Restic summary the
+// header/badge code consumes: snapshot counts summed across the DISTINCT
+// repos, age and bucket driven by the stalest target, size summed from the
+// raw sizer cache.
+func rollupRestic(bv BackupView) Restic {
+	r := Restic{Configured: bv.Configured, Exists: "no"}
+	if len(bv.Paths) == 0 {
+		return r
+	}
+	seen := map[string]bool{}
+	var totalBytes int64
+	for _, p := range bv.Paths {
+		for _, t := range p.Targets {
+			if seen[t.Repo] {
+				continue
+			}
+			seen[t.Repo] = true
+			if t.Exists != "yes" {
+				continue
+			}
+			r.Exists = "yes"
+			r.Snapshots += t.Snapshots
+			r.Last24h += t.Last24h
+			r.Last7d += t.Last7d
+			r.Last30d += t.Last30d
+			r.Older += t.Older
+			if t.AgeHours > r.AgeHours {
+				r.AgeHours = t.AgeHours // header shows the STALEST target
+			}
+			if t.OldestHours > r.OldestHours {
+				r.OldestHours = t.OldestHours
+			}
+			repoSizesMu.RLock()
+			totalBytes += repoSizes[t.Repo]
+			repoSizesMu.RUnlock()
+		}
+	}
+	if totalBytes > 0 {
+		r.Size = humanBytes(totalBytes)
+	}
+	return r
 }
 
 // computeFleet aggregates per-VM metrics into a fleet overview.
@@ -862,30 +1040,49 @@ func resticBucket(r Restic) string {
 // refresh runs collectAll() and stashes the result in the package-level cache.
 // Serialized by collectMu so we never run two scrapes concurrently.
 func refresh() ([]VMStat, Storagebox, []Zpool, fleetOverview) {
-	collectMu.Lock()
+	// Serialize rounds with a short critical section: the expensive work
+	// runs UNLOCKED so HTTP handlers (serving whatever is cached) never
+	// park behind a 20-40s collect round.
+	if !collectMu.TryLock() {
+		// a round is already running - serve the existing cache
+		cacheMu.RLock()
+		defer cacheMu.RUnlock()
+		return cachedVMs, cachedSB, cachedZPools, cachedFleet
+	}
 	defer collectMu.Unlock()
+	t0 := time.Now()
+	buildSampleIndex()
 	vms, _ := collectAll()
+	t1 := time.Now()
 	sb := storageboxStatus()
+	t2 := time.Now()
 	zp := zpoolsStatus()
 	fl := computeFleet(vms)
+	log.Printf("collect round: collectAll=%s storagebox=%s zpools=%s total=%s",
+		t1.Sub(t0).Round(time.Millisecond), t2.Sub(t1).Round(time.Millisecond),
+		time.Since(t2).Round(time.Millisecond), time.Since(t0).Round(time.Millisecond))
+	cacheMu.Lock()
 	cachedVMs = vms
 	cachedSB = sb
 	cachedZPools = zp
 	cachedFleet = fl
 	cachedAt = time.Now()
+	cacheMu.Unlock()
 	return vms, sb, zp, fl
 }
 
-// cachedOrRefresh returns the cached scrape if it's <maxAge old, else triggers a refresh.
+// cachedOrRefresh returns the cached scrape; the background loop keeps it
+// fresh. Handlers never wait for a collect in flight (a stale-but-instant
+// render beats a 40s one); only a totally unprimed cache does a live round.
 func cachedOrRefresh(maxAge time.Duration) ([]VMStat, Storagebox, []Zpool, fleetOverview) {
-	collectMu.Lock()
-	if !cachedAt.IsZero() && time.Since(cachedAt) < maxAge {
-		v, s, z, f := cachedVMs, cachedSB, cachedZPools, cachedFleet
-		collectMu.Unlock()
+	cacheMu.RLock()
+	fresh := !cachedAt.IsZero() && (maxAge <= 0 || time.Since(cachedAt) < maxAge)
+	v, s, z, f := cachedVMs, cachedSB, cachedZPools, cachedFleet
+	cacheMu.RUnlock()
+	if fresh {
 		return v, s, z, f
 	}
-	collectMu.Unlock()
-	return refresh()
+	return refresh() // non-blocking if a round already runs (TryLock inside)
 }
 
 // --------- SVG network flow ----------
@@ -1650,7 +1847,7 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
       <div class="card {{ if gt (pct .MemUsedSum .MemTotalSum) 90.0 }}bad{{ else if gt (pct .MemUsedSum .MemTotalSum) 75.0 }}warn{{ end }}">
         <div class="title">RAM</div>
         <div class="big" id="ov-mem">{{ printf "%.1f GiB" (gb .MemUsedSum) }} / {{ printf "%.1f GiB" (gb .MemTotalSum) }}</div>
-        <div class="sub"><span id="ov-mempct">{{ printf "%.1f%%" (pct .MemUsedSum .MemTotalSum) }}</span> used across {{ .VMsReachable }}/{{ .VMsTotal }} reachable VMs</div>
+        <div class="sub"><span id="ov-mempct">{{ printf "%.1f%%" (pct .MemUsedSum .MemTotalSum) }}</span> in-guest used across {{ .VMsReachable }}/{{ .VMsTotal }} reachable VMs (excl. guest page cache; host RSS differs - KSM + cache, see htop)</div>
       </div>
       <div class="card {{ if gt (pct .FsUsedSum .FsTotalSum) 90.0 }}bad{{ else if gt (pct .FsUsedSum .FsTotalSum) 75.0 }}warn{{ end }}">
         <div class="title">disk (fleet rollup)</div>
@@ -1673,6 +1870,13 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
         <div class="sub">{{ .BackupsOff }} repos not configured</div>
       </div>
       {{ end }}
+      {{ if .Kernels }}
+      <div class="card {{ if gt .KernelBad 0 }}bad{{ else if gt .KernelWarn 0 }}warn{{ end }}">
+        <div class="title">kernel freshness</div>
+        <div class="big">{{ .KernelOK }} current · {{ .KernelWarn }} behind · {{ .KernelBad }} stale</div>
+        <div class="sub">{{ if .FleetUp }}last nightly upgrade {{ .FleetUp.FinishedAt }} ({{ .FleetUp.Pin }}){{ else }}no nightly-upgrade data yet{{ end }}</div>
+      </div>
+      {{ end }}
       {{ range .ZPools }}
       <div class="card {{ capCls .UsedPct }}">
         <div class="title">zpool {{ .Name }}</div>
@@ -1681,6 +1885,27 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
       </div>
       {{ end }}
     </div>
+
+    {{ if .Kernels }}
+    <h2 style="margin-top:24px">system freshness</h2>
+    <table>
+      <thead><tr>
+        <th>host</th><th>booted kernel</th><th>upstream latest</th>
+        <th>behind</th><th>nightly upgrade</th>
+      </tr></thead>
+      <tbody>
+      {{- range .Kernels }}
+      <tr>
+        <td class="mono">{{ .Name }}</td>
+        <td class="mono">{{ .Kernel }}{{ if .EOL }} <span class="badge bad">eol</span>{{ end }}</td>
+        <td class="mono">{{ if .Latest }}{{ .Latest }}{{ else }}<span class="badge off">n/a</span>{{ end }}</td>
+        <td>{{ if ge .Behind 0 }}<span class="badge {{ .Level }}">{{ .Behind }}</span>{{ else }}<span class="badge off">n/a</span>{{ end }}</td>
+        <td>{{ if .FleetUp }}<span class="badge {{ if eq .FleetUp "ok" }}ok{{ else if eq .FleetUp "fail" }}bad{{ else }}off{{ end }}">{{ .FleetUp }}</span>{{ else }}-{{ end }}</td>
+      </tr>
+      {{- end }}
+      </tbody>
+    </table>
+    {{ end }}
   </section>
 
   <section class="tab" id="tab-nat" data-tab="nat">
@@ -2021,6 +2246,54 @@ type pageData struct {
 	SB         Storagebox
 	ZPools     []Zpool
 	Fleet      fleetOverview
+	// Kernel freshness + last nightly fleet-upgrade run (kernelorg.go)
+	Kernels    []KernelRow
+	KernelOK   int
+	KernelWarn int
+	KernelBad  int
+	FleetUp    *FleetStatus
+}
+
+// kernelRows builds the freshness table from the current scrape + the
+// kernel.org cache, merging in per-host upgrade outcomes when available.
+func kernelRows(vms []VMStat, fleet *FleetStatus) (rows []KernelRow, ok, warn, bad int) {
+	fleetUp := map[string]string{}
+	if fleet != nil {
+		for _, h := range fleet.Hosts {
+			switch {
+			case h.Deployed == "fail", h.Rebooted == "fail", h.BackUp == "fail":
+				fleetUp[h.Name] = "fail"
+			case h.Deployed == "ok":
+				fleetUp[h.Name] = "ok"
+			default:
+				fleetUp[h.Name] = "skip"
+			}
+		}
+	}
+	for _, vm := range vms {
+		if vm.Kernel == "" {
+			continue
+		}
+		row := freshnessFor(vm.Name, vm.Kernel, fleetUp[vm.Name])
+		switch row.Level {
+		case "ok":
+			ok++
+		case "warn":
+			warn++
+		case "bad":
+			bad++
+		}
+		rows = append(rows, row)
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		// worst first, then name
+		lvl := map[string]int{"bad": 0, "warn": 1, "unknown": 2, "ok": 3}
+		if lvl[rows[i].Level] != lvl[rows[j].Level] {
+			return lvl[rows[i].Level] < lvl[rows[j].Level]
+		}
+		return rows[i].Name < rows[j].Name
+	})
+	return rows, ok, warn, bad
 }
 
 func handle(w http.ResponseWriter, r *http.Request) {
@@ -2028,7 +2301,9 @@ func handle(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	vms, sb, zp, fl := cachedOrRefresh(2 * time.Second)
+	vms, sb, zp, fl := cachedOrRefresh(30 * time.Second)
+	fleet := loadFleetStatus()
+	rows, kOK, kWarn, kBad := kernelRows(vms, fleet)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	page.Execute(w, pageData{
 		Now:        time.Now().Format("2006-01-02 15:04:05"),
@@ -2038,7 +2313,50 @@ func handle(w http.ResponseWriter, r *http.Request) {
 		SB:         sb,
 		ZPools:     zp,
 		Fleet:      fl,
+		Kernels:    rows,
+		KernelOK:   kOK,
+		KernelWarn: kWarn,
+		KernelBad:  kBad,
+		FleetUp:    fleet,
 	})
+}
+
+// apiSummary is the compact machine-readable fleet view the nightly report
+// script (syswatch --say on lampadas) renders into IRC lines.
+type apiSummary struct {
+	Now     string `json:"now"`
+	Backups struct {
+		OK, Warn, Bad, Off int `json:",omitempty"`
+	} `json:"backups"`
+	StaleRepos []string         `json:"stale_repos"` // names of warn/bad restic repos
+	Kernels    []KernelRow      `json:"kernels"`
+	FleetUp    *FleetStatus     `json:"fleet_upgrade,omitempty"`
+	VMsDown    []string         `json:"vms_down"`
+}
+
+func apiSummaryHandler(w http.ResponseWriter, r *http.Request) {
+	vms, _, _, fl := cachedOrRefresh(30 * time.Second)
+	fleet := loadFleetStatus()
+	rows, _, _, _ := kernelRows(vms, fleet)
+	var s apiSummary
+	s.Now = time.Now().Format(time.RFC3339)
+	s.Kernels = rows
+	s.FleetUp = fleet
+	s.Backups.OK = fl.BackupsOK
+	s.Backups.Warn = fl.BackupsWarn
+	s.Backups.Bad = fl.BackupsBad
+	s.Backups.Off = fl.BackupsOff
+	for _, vm := range vms {
+		if !vm.Reachable && vm.Virsh.State == "running" {
+			s.VMsDown = append(s.VMsDown, vm.Name)
+		}
+		b := resticBucket(vm.Restic)
+		if vm.Restic.Configured && (b == "warn" || b == "bad") {
+			s.StaleRepos = append(s.StaleRepos, vm.Name)
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(s)
 }
 
 // events streams JSON snapshots of the fleet state every 5 seconds via SSE.
@@ -2056,7 +2374,7 @@ func eventsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Accel-Buffering", "no")
 
 	send := func() bool {
-		vms, sb, zp, fl := cachedOrRefresh(4 * time.Second)
+		vms, sb, zp, fl := cachedOrRefresh(45 * time.Second)
 		pd := pageData{
 			Now:    time.Now().Format("2006-01-02 15:04:05"),
 			VMs:    vms,
@@ -2111,13 +2429,44 @@ func main() {
 				tgts = append(tgts, BackupTarget{Kind: t.Kind, Label: t.Label, Repo: t.Repo})
 			}
 			backupTargets[v.Name] = tgts
+			if len(v.BackupPathTargets) > 0 {
+				pts := make([]BackupPath, 0, len(v.BackupPathTargets))
+				for _, pt := range v.BackupPathTargets {
+					bp := BackupPath{Path: pt.Path}
+					for _, t := range pt.Targets {
+						bp.Targets = append(bp.Targets, BackupTarget{Kind: t.Kind, Label: t.Label, Repo: t.Repo})
+					}
+					pts = append(pts, bp)
+				}
+				explicitPathTargets[v.Name] = pts
+			}
 		}
 		zfsPoolNames = g.Zpools
 	} else {
 		log.Printf("graph data not loaded: %v (backups/zfs gauges will be limited)", err)
 	}
+	startKernelFetcher()
+	startRepoSizer()
+	// Background collector: one collect round every 30s, handlers serve the
+	// cache. Before this every page view / SSE client could trigger a full
+	// collect (27 `virsh dominfo` forks + 27 HTTP scrapes + CIFS walks +
+	// SVG/JSON rebuild) every 2 SECONDS - tens of cores while the dashboard
+	// was open (2026-11-01).
+	go func() {
+		interval := 60 * time.Second
+		if env := os.Getenv("STATUS_BOARD_COLLECT_INTERVAL"); env != "" {
+			if d, err := time.ParseDuration(env); err == nil && d >= 10*time.Second {
+				interval = d
+			}
+		}
+		for {
+			refresh()
+			time.Sleep(interval)
+		}
+	}()
 	log.Printf("status-board listening on %s (inventory: %d VMs, %d zpools, %d backups configured)", listenAddr, len(inventory), len(zfsPoolNames), len(backupsEnabled))
 	http.HandleFunc("/events", eventsHandler)
+	http.HandleFunc("/api/summary.json", apiSummaryHandler)
 	http.HandleFunc("/", handle)
 	log.Fatal(http.ListenAndServe(listenAddr, nil))
 }
