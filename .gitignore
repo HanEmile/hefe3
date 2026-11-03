@@ -3,6 +3,11 @@ result-*
 system
 system-*
 .DS_Store
+TODO.md
+
+# internal security scan results - must never be committed
+*vex-scan*
+*.openvex.json
 
 # rust / build outputs
 target/
