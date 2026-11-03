@@ -22,6 +22,144 @@ in
   # derivations (RPi 1 BMC images) via transparent emulation.
   boot.binfmt.emulatedSystems = [ "armv6l-linux" ];
 
+  # Kernel Samepage Merging: dedupe identical pages across the ~27 identical
+  # NixOS guests (91 GiB allocated on 62 GiB RAM, rely on overcommit).
+  hardware.ksm.enable = true;
+
+  # --- stability: host sshd must survive guest CPU/IO/memory storms --------
+  # All qemu processes live in machine.slice; cgroup weights only matter
+  # under contention, so idle guests still get 100% CPU, but a saturated
+  # host can never starve sshd/networking (2026-11-01 incident: every VM's
+  # sshd became unresponsive while the host was pegged).
+  systemd.services.sshd.serviceConfig = {
+    CPUWeight = 1000;
+    IOWeight = 1000;
+    MemoryMin = "256M";
+  };
+  # Roll back automatically if a new generation breaks ssh after a reboot -
+  # essential for the unattended 2am fleet reboots. Failed-unit check off:
+  # the host runs specialised one-shots whose transient failures are normal.
+  generationCanary = {
+    enable = true;
+    checkFailedUnits = false;
+  };
+
+  # machine.slice is implicit in systemd (no unit file shipped), so defining
+  # it outright is safe and collects every guest under these limits.
+  # Default weight elsewhere is 100. Under full contention the ~27 guests
+  # share ~1/3 of the CPU, the host keeps the rest; idle guests unaffected.
+  systemd.units."machine.slice".text = ''
+    [Slice]
+    CPUWeight=40
+    IOWeight=40
+  '';
+
+  # --- fleet-upgrade: unlock lampadas after its nightly self-reboot --------
+  # lampadas' fleet-self-upgrade arms this over ssh right before rebooting;
+  # we then poll for its initrd sshd (tailnet, port 22, root shell =
+  # cryptsetup-askpass) and pipe the LUKS passphrase in.
+  age.secrets.fleet_unlock_lampadas_ed25519 = {
+    file = hefe.ops.secrets."fleet_unlock_lampadas_ed25519.age";
+    mode = "0600";
+  };
+  age.secrets.lampadas_luks_passphrase = {
+    file = hefe.ops.secrets."lampadas_luks_passphrase.age";
+    mode = "0400";
+  };
+  # Second copy of lampadas' backup repos on grave (2026-11-01: the status
+  # page only ever showed the small metadata repo; the ~430 GiB immich
+  # library had exactly ONE copy, on the bx11). bx11 and medano are both
+  # Hetzner-side, so pulling snapshots over the storagebox CIFS mount is
+  # far cheaper than a home-uplink re-upload. Copy runs daily and only
+  # transfers chunks that are new since the last run.
+  systemd.services.restic-copy-grave = {
+    description = "restic copy lampadas repos from the storagebox onto /grave";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    unitConfig.RequiresMountsFor = "/mnt/storagebox-bx11";
+    path = with pkgs; [ restic util-linux coreutils ];
+    serviceConfig = {
+      Type = "oneshot";
+      Nice = 19;
+      IOWeight = 20;
+      TimeoutStartSec = "12h"; # first seed of ~430 GiB takes a while
+    };
+    script = ''
+      set -euo pipefail
+      export RESTIC_PASSWORD_FILE=${config.age.secrets.storagebox_bx11_restic_password.path}
+      # the from-repo (storagebox) uses the same password; restic needs it
+      # named explicitly when --from-repo is in play
+      export RESTIC_FROM_PASSWORD_FILE=$RESTIC_PASSWORD_FILE
+      findmnt /mnt/storagebox-bx11 >/dev/null 2>&1 || ls /mnt/storagebox-bx11 >/dev/null 2>&1
+      mkdir -p /grave/restic
+      for r in photos immich-data; do
+        src=/mnt/storagebox-bx11/backup/$r
+        dst=/grave/restic/$r
+        [ -d "$src/snapshots" ] || { echo "SKIP: no source repo $src"; continue; }
+        if [ ! -d "$dst" ]; then
+          echo "init $dst (chunker params must match for restic copy)"
+          restic -r "$dst" init --copy-chunker-params --from-repo "$src"
+        fi
+        echo "copy $r -> $dst"
+        restic -r "$dst" copy --from-repo "$src"
+      done
+      echo done
+    '';
+  };
+  systemd.timers.restic-copy-grave = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "*-*-* 05:15:00";
+      Persistent = true;
+      RandomizedDelaySec = "30min";
+    };
+  };
+
+  systemd.services.fleet-unlock-lampadas = {
+    description = "feed lampadas' LUKS passphrase to its initrd sshd";
+    serviceConfig = {
+      Type = "oneshot";
+      TimeoutStartSec = "30min";
+      StateDirectory = "fleet";
+    };
+    path = with pkgs; [ openssh netcat-gnu coreutils ];
+    script = ''
+      set -u
+      HOST=${hefe.ops.ipam.tailscale.lampadas.v4}
+      KEY=${config.age.secrets.fleet_unlock_lampadas_ed25519.path}
+      PASS=$(cat ${config.age.secrets.lampadas_luks_passphrase.path})
+      if [ "$PASS" = "REPLACE_ME" ]; then
+        echo "lampadas_luks_passphrase.age still contains REPLACE_ME; not watching"
+        exit 1
+      fi
+      deadline=$(( $(date +%s) + 1500 ))
+      while [ "$(date +%s)" -lt "$deadline" ]; do
+        if nc -z -w 3 "$HOST" 22 2>/dev/null; then
+          # initrd sshd is up; cryptsetup-askpass (the initrd root shell)
+          # reads the passphrase from the tty stdin, forwards it to the
+          # waiting cryptsetup and the session ends when boot continues.
+          if printf '%s\n' "$PASS" | ssh -tt -o ConnectTimeout=10 \
+               -o StrictHostKeyChecking=accept-new \
+               -o UserKnownHostsFile=/var/lib/fleet/unlock_known_hosts \
+               -i "$KEY" -p 22 "root@$HOST"; then
+            echo "passphrase delivered to lampadas initrd"
+            exit 0
+          fi
+        fi
+        sleep 10
+      done
+      echo "timed out waiting for lampadas initrd"
+      exit 1
+    '';
+  };
+
+  # Scan faster than the conservative defaults (100 pages / 20ms) so a full
+  # pass over ~58 GiB of guest RAM takes minutes, not an hour.
+  systemd.tmpfiles.rules = [
+    "w /sys/kernel/mm/ksm/pages_to_scan    - - - - 2000"
+    "w /sys/kernel/mm/ksm/sleep_millisecs  - - - - 10"
+  ];
+
   imports = [
     (import ./boot.nix (args1 // args2))
     ./networking.nix
@@ -34,6 +172,8 @@ in
     ((import (mod "storagebox.nix")) { inherit hefe; })
     ../../../vms/x86/modules/healthProbes.nix
     (hefe.tools.status-board.module { inherit hefe; })
+
+    (import (mod "generation-canary.nix"))
 
     (vm "naraj") # general nginx router
     (vm "rou") # route VPN traffic
@@ -100,7 +240,13 @@ in
       users = aclconf.users // {
         # Just manually adding this here as a sort of "safeguard", I don't want
         # to accidentally remove the key from the ACL and be stuck without a con
-        root.openssh.authorizedKeys.keys = hefe.users.hanemile.keys.all;
+        root.openssh.authorizedKeys.keys = hefe.users.hanemile.keys.all ++ [
+          # root@lampadas reaches root@medano for the nightly fleet-upgrade
+          # (distributed nix builds, fleet-unlock-lampadas arming). The
+          # secrets.nix "lampadas" pubkey is the host key (user lampadas
+          # login); this one is root@lampadas' interactive key.
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIARD1yc+6LpvGg5JcFc2jDFBv3kKRLXeNYqqFnCmAHkZ root@lampadas"
+        ];
       };
       groups = aclconf.groups;
     };
