@@ -1,0 +1,30 @@
+( devices )
+|00 @System &vector $2 &pad $6 &r $2 &g $2 &b $2
+|10 @Console &vector $2 &read $1 &pad $5 &write $1 &error $1
+|20 @Screen &vector $2 &width $2 &height $2 &auto $1 &pad $1 &x $2 &y $2 &addr $2 &pixel $1 &sprite $1
+
+( macro: print a character to standard output )
+%EMIT { .Console/write DEO } ( character -- )
+
+( print a digit )
+%PRINTDIGIT { #30 ADD EMIT } ( number -- )
+
+( print a newline )
+%NL { #0a EMIT } ( -- )
+
+
+( main program )
+|0100
+      ( set system colors )
+      #2ce9 .System/r DEO2
+      #01c0 .System/g DEO2
+      #2ce5 .System/b DEO2
+
+      LIT "h EMIT
+      LIT "e EMIT
+      LIT "l EMIT
+      LIT "l EMIT
+      LIT "o EMIT
+	  #05 PRINTDIGIT
+	  NL
+

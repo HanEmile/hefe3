@@ -1,0 +1,19 @@
+( devices )
+|10 @Console &vector $2 &read $1 &pad $5 &write $1 &error $1
+
+( macro: print a character to standard output )
+%EMIT { .Console/write DEO } ( character -- )
+
+( macro: print a digit (number 00-09 on the stack) to standard output )
+%PRINT-DIGIT { #30 ADD EMIT } ( number -- )
+
+( macro: print a newline )
+%NL { #0a EMIT } ( -- )
+
+
+( main program )
+|0100 #00 PRINT-DIGIT
+      #05 PRINT-DIGIT
+      #09 PRINT-DIGIT
+      NL
+      BRK
