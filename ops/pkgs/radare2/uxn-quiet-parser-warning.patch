@@ -1,0 +1,20 @@
+--- a/libr/asm/asm.c	2026-10-23 21:08:14
++++ b/libr/asm/asm.c	2026-10-23 21:08:14
+@@ -417,7 +417,7 @@
+ 		}
+ 	}
+ 	if (!found) {
+-		R_LOG_WARN ("Cannot find asm.parser for %s", name);
++		R_LOG_DEBUG ("Cannot find asm.parser for %s", name);
+ 		RAsmPlugin *pcur = R_UNWRAP3 (a, cur, plugin);
+ 		if (pcur && pcur->meta.name) {
+ 			if (r_str_startswith (pcur->meta.name, "null")) {
+@@ -428,7 +428,7 @@
+ 		r_list_foreach (a->libstore->plugins, iter, aps) {
+ 			RAsmPlugin *h = aps->plugin;
+ 			if (r_str_startswith (h->meta.name, "null")) {
+-				R_LOG_INFO ("Fallback to null");
++				R_LOG_DEBUG ("Fallback to null");
+ 				useparser (a, aps);
+ 				return false;
+ 			}

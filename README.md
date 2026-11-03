@@ -59,7 +59,9 @@ hefe3/
     nixos.nix                  build + deployScriptForOpts machinery (see below)
     darwin.nix                 caladan (nix-darwin)
     lib/                       mkVmImage.nix etc.
-    pkgs/                      local nix packages (makhor, ...)
+    pkgs/                      local nix packages (makhor, radare2, ...);
+                               update_all.sh runs every pkgs/*/update.sh
+                               (bump + build-check + rollback on failure)
     shells/                    nix-shell envs
     modules/                   shared NixOS modules (late-sh, ...)
     machines/aarch64/caladan/  caladan host config

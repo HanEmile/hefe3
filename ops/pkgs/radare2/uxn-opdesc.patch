@@ -1,0 +1,10 @@
+--- a/libr/asm/d/meson.build	2026-10-23 21:16:41
++++ b/libr/asm/d/meson.build	2026-10-23 21:16:41
+@@ -33,6 +33,7 @@
+   'stm8',
+   'tms320',
+   'tricore',
++  'uxn',
+   'v810',
+   'v850',
+   'vax',

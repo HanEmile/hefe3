@@ -322,7 +322,9 @@ in
 
     # reversing
     ghidra
-    radare2
+    # local build with the full plugin set (nixpkgs' meson build lacks the
+    # uxn arch plugin, see //ops/pkgs/radare2/package.nix)
+    hefe.ops.pkgs.radare2
     (pkgs.callPackage hefe.ops.pkgs.gef { })
 
     # file sync
@@ -361,7 +363,7 @@ in
 
     package-version-server
 
-    (pkgs.callPackage hefe.ops.pkgs.uxn2 {})
+    hefe.ops.pkgs.uxn2
 
     # (uxn.overrideAttrs (oldAtrrs: {
     #   version = "main";

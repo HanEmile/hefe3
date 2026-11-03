@@ -1,0 +1,20 @@
+--- a/libr/meson.build	2026-10-23 20:02:22
++++ b/libr/meson.build	2026-10-23 20:02:22
+@@ -140,6 +140,7 @@
+ # default plugins if none is defined
+ if get_option('plugins') == ''
+   arch_plugins += [
++    'uxn',
+     '6502',
+     '6502_cs',
+     '8051',
+--- a/libr/arch/meson.build	2026-10-23 20:02:22
++++ b/libr/arch/meson.build	2026-10-23 20:02:22
+@@ -14,6 +14,7 @@
+   'p/pic/pic_midrange.c',
+   'p/pic/pic_baseline.c',
+   'p/pic/pic_pic18.c',
++  'p/uxn/plugin.c',
+   'p/chip8/plugin.c',
+   'p/bpf/plugin.c',
+   'p/bpf_cs/plugin.c',
