@@ -17,6 +17,10 @@ let
   hostname = config.networking.hostName;
 in
 {
+  imports = [
+    ../../modules/generation-canary.nix
+  ];
+
   boot.loader.grub.enable = true;
   boot.loader.grub.device = "/dev/sda";
 
@@ -27,8 +31,19 @@ in
   users = let
     aclconf = with acl; (usersForHost host."${hostname}");
   in {
-    users = aclconf.users;
     groups = aclconf.groups;
+    # fleet-upgrade deploys VMs from lampadas - root@lampadas' key reaches
+    # VMs through this base module; careful merging, not // at top level.
+    users = aclconf.users // {
+      root = (aclconf.users.root or {}) // {
+        openssh.authorizedKeys.keys =
+          # KEEP existing fleet/acl root keys! The first version of this
+          # concat clobbered them (2026-11-03 lockout, restored via lampadas).
+          (aclconf.users.root.openssh.authorizedKeys.keys or []) ++ [
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIARD1yc+6LpvGg5JcFc2jDFBv3kKRLXeNYqqFnCmAHkZ root@lampadas"
+          ];
+      };
+    };
   };
 
   environment.systemPackages = with pkgs; [
@@ -105,10 +120,34 @@ in
     gc = {
       automatic = true;
       dates = "weekly";
-      options = "--delete-older-than 14d";
+      # The small appliances have 5-6 GiB roots where two generations of a
+      # fat /nix/store barely fit (minecraft/pretix/rss were at 84-95% full,
+      # 2026-11-01) - rotate a bit more aggressively.
+      options = "--delete-older-than 7d";
     };
     settings = {
       auto-optimise-store = true;
     };
   };
+
+  # Same story: uncapped journals were ~500 MiB per VM on 5 GiB roots.
+  services.journald.extraConfig = ''
+    SystemMaxUse=100M
+    MaxFileSec=1week
+  '';
+
+  # --- stability: stay ssh-able even when something inside the VM runs wild --
+  # Self-healing: kill runaway user-session cgroups under sustained memory
+  # pressure (PSI) instead of letting a job (build, scanner, agent) wedge
+  # the whole VM - 2026-11-01: social's sshd could no longer send a banner.
+  systemd.oomd.enable = true;
+  # sshd is never reclaimed and always wins CPU/IO under contention.
+  systemd.services.sshd.serviceConfig = {
+    MemoryMin = "64M";
+    CPUWeight = 1000;
+    IOWeight = 1000;
+  };
+
+  # Roll back automatically if a new generation breaks ssh/health at boot.
+  generationCanary.enable = true;
 }
