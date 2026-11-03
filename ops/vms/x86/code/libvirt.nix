@@ -11,6 +11,11 @@ import ../libvirt-base.nix { inherit nixvirt; } {
   interfaces = [ "virbr3" ];
 
   # the main vm disk
-  # cd /keep/pools/vmpool && qemu-img create -f qcow2 code.qcow2 80G
+  # created 60G, grown to 120G on 2026-10-21 after /tmp (agent scratch)
+  # filled it. Grow procedure (reboot REQUIRED: disk sits on ata1; qemu
+  # can't notify an AHCI guest of capacity changes):
+  #   host:  sudo virsh blockresize code sda 120G
+  #   guest: echo ", +" | sudo sfdisk -N 1 --no-reread /dev/sda
+  #          sudo partx -u /dev/sda && sudo resize2fs /dev/sda1
   vmdisk = /keep/pools/vmpool/code.qcow2;
 }

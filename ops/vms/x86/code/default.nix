@@ -39,6 +39,15 @@ in
   # agents drive nix themselves (nix build/develop in throwaway worktrees)
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
+  # Agent scratch fills /tmp fast (25G of checkouts filled the then-60G
+  # root on 2026-10-21); the systemd default of 10d is too slow for this
+  # box even after the disk grew to 120G. Clean all of /tmp after 3d.
+  # (Conflicts with systemd's vendor `q /tmp 1777 root root 10d` lose to
+  # this entry in /etc/tmpfiles.d.)
+  systemd.tmpfiles.rules = [
+    "q /tmp 1777 root root 3d"
+  ];
+
   # mosh server + UDP 60000-61000 in the firewall (reach it via tailscale)
   programs.mosh.enable = true;
 
@@ -79,4 +88,27 @@ in
   services.healthProbes.probes = [
     { name = "node-exporter"; url = "http://${ipam.v4}:9100/metrics"; }
   ];
+
+  # Rust debug+incremental target dirs regrow to ~35 GiB within a week of
+  # audit scanning (2026-11-01: 119G disk at 94%). A full rebuild takes
+  # ~10-20min of CPU in an otherwise idle sandbox, deps stay in ~/.cargo.
+  # Weekly wipe, nice to keep build-hour interference minimal.
+  systemd.services.cargo-clean = {
+    description = "wipe rust target dirs (debug/incremental build caches)";
+    serviceConfig = {
+      Type = "oneshot";
+      User = "emile";
+      Nice = 19;
+    };
+    script = ''
+      ${pkgs.coreutils}/bin/rm -rf /home/emile/solana-audit-rs/target
+    '';
+  };
+  systemd.timers.cargo-clean = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "Sun *-*-* 04:30:00";
+      Persistent = true;
+    };
+  };
 }
