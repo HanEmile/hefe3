@@ -112,6 +112,18 @@ in
   # SALT=<random> (optional, used to hash passwords)
   "r2wars_web_environment_file.age" = for [ r2wars ];
 
+  # === fleet-upgrade (nightly auto-update, ops/modules/fleet-upgrade.nix) ===
+  # initrd ssh keys for the mutual LUKS/ZFS unlock between the two hosts;
+  # the keypairs only ever exist as these age files.
+  "fleet_unlock_medano_ed25519.age" = for [ lampadas ]; # lampadas unlocks medano
+  "fleet_unlock_lampadas_ed25519.age" = for [ medano ]; # medano unlocks lampadas
+  # Filled by hand (ragenix):
+  #   cd ops/secrets
+  #   ragenix -e medano_zfs_passphrase.age    # medano's ZFS passphrase
+  #   ragenix -e lampadas_luks_passphrase.age # lampadas' LUKS passphrase
+  "medano_zfs_passphrase.age" = for [ lampadas ];
+  "lampadas_luks_passphrase.age" = for [ medano ];
+
   # === backups ===
   "storagebox_bx11_restic_password.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea late sb1 sb2 sb3 minecraft factorio r2wars irc pretix ];
 
