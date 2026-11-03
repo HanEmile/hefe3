@@ -2,8 +2,8 @@
 // node-exporter /metrics endpoints) and posts level transitions to an IRC
 // channel, staying joined to the channel continuously (systemd keeps it
 // alive). The minimal persistent-IRC plumbing below is shared, copy-pasted,
-// with weatherman/xkcdbot/tagesschau/dwdwarn: keep them in sync or factor
-// properly one day.
+// with weatherman/xkcdbot/tagesschau/dwdwarn/syswatch: keep them in sync or
+// factor properly one day.
 package main
 
 import (

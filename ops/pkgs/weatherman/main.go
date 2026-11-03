@@ -1,7 +1,8 @@
 // weatherman posts a daily Düsseldorf forecast to an IRC channel and stays
 // joined to that channel continuously (systemd keeps it alive). The minimal
-// persistent-IRC plumbing below is shared, copy-pasted, with xkcdbot and
-// the tagesschau bot: keep the three in sync or factor properly one day.
+// persistent-IRC plumbing below is shared, copy-pasted, with xkcdbot, the
+// tagesschau bot, dwdwarn, diskwatch and syswatch: keep them in sync or
+// factor properly one day.
 package main
 
 import (

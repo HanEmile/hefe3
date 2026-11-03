@@ -236,13 +236,17 @@ joined to `#emile` and post on their own cadence:
 | `tagesschau` | 08:00/16:00/00:00 Europe/Berlin | ard-text.de/mobil/101 (teletext front page, top 3) |
 | `dwdwarn` | poll every 10min | dwd.de warnapp feed, Düsseldorf warn cells 705111001-004 + 105111000 aggregate (state: `/var/lib/dwdwarn/seen.json`) |
 | `diskwatch` | poll every 5min | every VM's + medano's node-exporter `:9100/metrics`, root-fs usage vs 85%/95% thresholds, posts transitions only (state: `/var/lib/diskwatch/state.json`) |
+| `syswatch` | poll every 5min, **runs on lampadas** (see `//ops/machines/x86/lampadas`) | lampadas-local `systemctl` + `/proc`: restic-backups-* failed/stale (>26h without success), other failed units, fs free space at 15/10/5/3/2/1%, MemAvailable <10%/5%, load15/core >2/4, posts transitions only (state: `/var/lib/syswatch/state.json` on lampadas) |
 
 (The older `uptimebot` stays a 5min one-shot timer by design: it normally
 posts nothing for weeks, so permanent channel presence adds noise, not signal.)
 
-All three connect to Ergo's localhost plaintext port. Each binary has a
-`--dry-run` flag (fetch + format only, no connect) and tagesschau has
-`--post-now` (post immediately once joined, then keep running).
+The irc-local bots connect to Ergo's localhost plaintext port. syswatch is
+the exception: lampadas's tailnet ACLs don't reach this VM, so it connects
+through the public ingress `ircs://irc.emile.space:6697` with `--tls`.
+Each binary has a `--dry-run` flag (probe + format only, no connect) and
+tagesschau has `--post-now` (post immediately once joined, then keep
+running).
 
 **Do not set `#emile` +i.** It silently killed the bots from 2026-10-04
 (when the channel was re-registered during the NixOS-26.05 rebuild churn)

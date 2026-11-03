@@ -394,7 +394,11 @@ in
   #   dwdwarn    posts DWD weather warnings for Düsseldorf as they're issued
   #              (10min poll against warn cells 705111001-004 + 105111000),
   #   diskwatch  posts fleet disk-usage transitions over 85%/95% (5min poll of
-  #              every VM's + medano's node-exporter).
+  #              every VM's + medano's node-exporter),
+  #   syswatch   runs ON lampadas (//ops/machines/x86/lampadas), not here:
+  #              posts its backup failures/stale runs, failed units and
+  #              disk/mem/load threshold crossings, connecting via the public
+  #              ircs ingress (tailnet ACLs block lampadas->irc).
   # Each reconnects on failure (Restart=always) and the binaries themselves
   # fail loudly if the channel is unjoinable (403/471/473/474/475). Do not
   # set #emile +i again: that silently killed the bots in Oct 2026 (Ergo

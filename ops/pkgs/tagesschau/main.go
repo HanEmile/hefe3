@@ -2,8 +2,9 @@
 // 08:00, 16:00 and 00:00 Europe/Berlin and stays joined to that channel
 // continuously (systemd keeps it alive). Headlines are scraped from the ARD
 // Text teletext front page (https://www.ard-text.de/mobil/101). The minimal
-// persistent-IRC plumbing below is shared, copy-pasted, with weatherman and
-// xkcdbot: keep the three in sync or factor properly one day.
+// persistent-IRC plumbing below is shared, copy-pasted, with weatherman,
+// xkcdbot, dwdwarn, diskwatch and syswatch: keep them in sync or factor
+// properly one day.
 package main
 
 import (
@@ -27,10 +28,13 @@ import (
 const overviewURL = "https://www.ard-text.de/mobil/101"
 const linkPrefix = "https://www.ard-text.de/mobil/"
 
-// Posting times, local, and how many top stories to post.
+// Posting times, local, and how many top stories to post. The 10s grace
+// offset keeps the 08:00 post clear of weatherman, which fires at exactly
+// 08:00:00 into the same channel (the two would interleave otherwise).
 const postLocName = "Europe/Berlin"
 
 var postHours = []int{8, 16, 0}
+const postDelaySec = 10
 const topN = 3
 
 // Headline links look like:
@@ -218,7 +222,7 @@ func nextDelay(loc *time.Location) time.Duration {
 	for day := 0; day <= 1; day++ {
 		d := now.AddDate(0, 0, day)
 		for _, h := range postHours {
-			t := time.Date(d.Year(), d.Month(), d.Day(), h, 0, 0, 0, loc)
+			t := time.Date(d.Year(), d.Month(), d.Day(), h, 0, postDelaySec, 0, loc)
 			if t.After(now) && (best.IsZero() || t.Before(best)) {
 				best = t
 			}
@@ -237,7 +241,12 @@ func postOnce(b *bot) {
 		log.Printf("not joined yet, top stories not posted")
 		return
 	}
-	// One message per story: just the headline title, no link.
+	// One "===" marker line, then one message per story (just the titles).
+	if !b.privmsg("===") {
+		log.Printf("not joined, nothing posted")
+		return
+	}
+	time.Sleep(300 * time.Millisecond)
 	for i, s := range stories {
 		if !b.privmsg(s[0]) {
 			log.Printf("lost join mid-post on story %d", i+1)
@@ -261,6 +270,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("fetching top stories: %v", err)
 		}
+		fmt.Println("===")
 		for _, s := range stories {
 			fmt.Println(s[0])
 		}

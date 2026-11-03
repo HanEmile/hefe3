@@ -1,8 +1,8 @@
 // dwdwarn posts active Deutscher-Wetterdienst warnings for Düsseldorf to an
 // IRC channel as they are issued, staying joined to the channel continuously
 // (systemd keeps it alive). The minimal persistent-IRC plumbing below is
-// shared, copy-pasted, with weatherman/xkcdbot/tagesschau/diskwatch: keep
-// them in sync or factor properly one day.
+// shared, copy-pasted, with weatherman/xkcdbot/tagesschau/diskwatch/
+// syswatch: keep them in sync or factor properly one day.
 package main
 
 import (

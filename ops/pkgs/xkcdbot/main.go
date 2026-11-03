@@ -1,7 +1,8 @@
 // xkcdbot posts new xkcd comics to an IRC channel and stays joined to that
 // channel continuously (systemd keeps it alive). The minimal persistent-IRC
-// plumbing below is shared, copy-pasted, with weatherman and the tagesschau
-// bot: keep the three in sync or factor properly one day.
+// plumbing below is shared, copy-pasted, with weatherman, the tagesschau
+// bot, dwdwarn, diskwatch and syswatch: keep them in sync or factor
+// properly one day.
 package main
 
 import (
