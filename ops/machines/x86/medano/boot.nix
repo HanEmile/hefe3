@@ -70,6 +70,10 @@
           # public ssh key used for login
           authorizedKeys = [
             "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPZi43zHEsoWaQomLGaftPE5k0RqVrZyiTtGqZlpWsew emile@caladan"
+            # fleet-upgrade: lampadas feeds the ZFS passphrases through the
+            # initrd sshd during the nightly 2am reboot (fleet-upgrade.nix).
+            # Key-only, no shell needed beyond the unlock flow.
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICD1tQPma3w8gUuHmwXouVI7O+ynPuOQbbmUAI/mmJHF fleet-upgrade-lampadas-initrd"
           ] ++ hefe.users.hanemile.keys.all;
         };
       };
