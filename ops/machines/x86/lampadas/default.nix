@@ -51,6 +51,14 @@ in
     ../../../modules/makhor.nix
     (import ../../../modules/storagebox.nix { inherit hefe; })
 
+    # Nightly fleet auto-upgrade (02:00 fleet + 03:30 self, 08:00 report),
+    # with the mutual LUKS/ZFS unlock dance against medano.
+    (import ../../../modules/fleet-upgrade.nix { inherit hefe; })
+
+    # generation canary: same safety net as the fleet VMs - a reboot that
+    # breaks ssh rolls back instead of stranding the LUKS box in the dark.
+    (import ../../../modules/generation-canary.nix)
+
     # Immich
     (import ./immich.nix (args1 // args2))
 
@@ -138,7 +146,12 @@ in
           enable = true;
           port = 22;
           hostKeys = [ "/initrd_ssh_host_key_ed25519" ];
-          authorizedKeys = emile_keys;
+          authorizedKeys = emile_keys ++ [
+            # fleet-upgrade: medano feeds the LUKS passphrase when lampadas
+            # reboots itself during the nightly run (fleet-unlock-lampadas
+            # watcher on medano, see ops/modules/fleet-upgrade.nix)
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII5wbIU/e6bumXnR3Zq9yZ/zxUOQrNMW6JMdp34ffizg fleet-upgrade-medano-initrd"
+          ];
         };
         postCommands = ''
           echo 'cryptsetup-askpass' > /root/.profile
@@ -735,6 +748,89 @@ in
   systemd.services."restic-backups-photos".unitConfig.RequiresMountsFor = "/mnt/storagebox-bx11";
   systemd.services."restic-backups-immich-data".unitConfig.RequiresMountsFor = "/mnt/storagebox-bx11";
   systemd.services."restic-backups-homeassistant".unitConfig.RequiresMountsFor = "/mnt/storagebox-bx11";
+
+  # syswatch: posts lampadas anomaly alerts to #emile (emilespace Ergo):
+  # restic-backups-*.service failed or with no successful run in >26h,
+  # other failed systemd units, filesystems crossing the 15/10/5/3/2/1%-free
+  # thresholds, MemAvailable < 10%/5%, 15min loadavg > 2/4 per core.
+  #
+  # Born 2026-10-28 from discovering that a stranded exclusive restic lock
+  # (a 2026-07-22 prune hung on the storagebox CIFS mount and went
+  # SIGKILL-immune in D-state) had silently kept the immich-data and
+  # homeassistant repos snapshot-less for ~3 months while the nightly
+  # timers kept firing into the lock. 3 months of new photos were
+  # unprotected and nobody noticed - this bot is the noticing mechanism.
+  #
+  # Unlike the irc-VM bots (which connect to Ergo's localhost plaintext
+  # port) this one comes in via the public ingress
+  # (ircs://irc.emile.space:6697, same path soju's emilespace upstream
+  # takes): lampadas's tailnet ACLs don't reach the irc VM (verified
+  # 2026-10-28: tailscale reports "no matching peer" for it). All probes are
+  # local and need no credentials: unit state via `systemctl` over the
+  # system bus works fine from a DynamicUser, disk/mem/load come from /proc.
+  systemd.services.syswatch = {
+    description = "Post lampadas system anomaly alerts to #emile";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+    # systemctl on PATH for the failed-unit / backup-unit queries.
+    path = [ config.systemd.package ];
+    serviceConfig = {
+      DynamicUser = true;
+      StateDirectory = "syswatch";
+      ExecStart = "${pkgs.callPackage hefe.ops.pkgs.syswatch { }}/bin/syswatch --tls --server irc.emile.space:6697 --channel '#emile'";
+      # AF_UNIX for the D-Bus systemctls, AF_INET/AF_INET6 for IRC + DNS.
+      RestrictAddressFamilies = [ "AF_UNIX" "AF_INET" "AF_INET6" ];
+      Restart = "always";
+      RestartSec = "10s";
+    };
+  };
+
+  # Nightly fleet auto-upgrade (02:00 VMs+medano, 03:30 lampadas itself,
+  # 08:00 IRC report). Requires root@lampadas to be able to ssh root@medano
+  # (its default key is already authorized there) and a git checkout key with
+  # pull access to the hefe3 repo at fleetUpgrade.checkoutDir.
+  fleetUpgrade.enable = true;
+
+  generationCanary = {
+    enable = true;
+    checkFailedUnits = false;
+  };
+
+  # needed by the fleet-upgrade deploy scripts (nix copy/nix command syntax);
+  # off by default and absent here until 2026-11-03 when it killed 03:30
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
+  # The VM deploy scripts hardcode `-j 0` (never build locally), expecting a
+  # distributed builder - absent here, every fleet build failed with
+  # "local builds are disabled (max-jobs = 0)" (2026-11-03). medano is the
+  # fleet's builder; root@lampadas' default key is authorized on it.
+  nix.distributedBuilds = true;
+  nix.buildMachines = [
+    {
+      # "medano-root" alias (ops/modules/fleet-upgrade.nix): the bare
+      # "medano" alias is User lampadas in root's stale ~/.ssh/config.
+      hostName = "medano-root";
+      system = "x86_64-linux";
+      protocol = "ssh-ng";
+      sshUser = "root";
+      sshKey = "/root/.ssh/id_ed25519";
+      maxJobs = 12;
+      speedFactor = 4;
+      supportedFeatures = [ "nixos-test" "benchmark" "big-parallel" "kvm" ];
+    }
+  ];
+
+  # Let status-board (medano) scrape lampadas over the tailnet so the
+  # dashboard gets its kernel/disk/RAM rows like every VM has.
+  services.prometheus.exporters.node = {
+    enable = true;
+    listenAddress = hefe.ops.ipam.tailscale.lampadas.v4;
+    port = 9100;
+    # keep it light - no "processes" collector on a real workload host
+    enabledCollectors = [ "systemd" "logind" ];
+  };
+  networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 9100 ];
 
   # Disable offloads on whichever interface(s) are bound to r8168, resolved at
   # runtime. (A previous version hardcoded enp2s0, which does not exist on this
