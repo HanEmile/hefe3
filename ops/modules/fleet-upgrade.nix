@@ -182,6 +182,9 @@ in
         Nice = 10;
       };
       environment = {
+        # systemd leaves HOME empty; git then never sees the safe.directory
+        # exception in /root/.gitconfig and refuses the checkout otherwise
+        HOME = "/root";
         FLEET_CHECKOUT = cfg.checkoutDir;
         FLEET_REPO_URL = cfg.repoUrl;
         FLEET_MEDANO = cfg.medanoSsh;
