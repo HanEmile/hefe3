@@ -259,7 +259,10 @@ if [ "${DEPLOYED[medano]}" = ok ] && kernel_changed medano; then
       echo "   waiting for $EXPECTED_VMS VMs to autostart"
       deadline=$(( $(date +%s) + 900 ))
       while [ "$(date +%s)" -lt "$deadline" ]; do
+        # failing ssh prints "0" (from the grep) plus "0" (error fallback):
+        # keep only the first line to avoid "0\n0: integer expected"
         got=$(ssh -o BatchMode=yes medano-root 'virsh list --name | grep -c .' 2>/dev/null || echo 0)
+        got=${got%%$'\n'*}
         [ "$got" -ge "$EXPECTED_VMS" ] && break
         sleep 15
       done

@@ -156,7 +156,12 @@ in
           User root
           Port 2222
           IdentityFile ${config.age.secrets.fleet_unlock_medano_ed25519.path}
+          # Same IP:port serves either main sshd or the initrd sshd; their
+          # host keys differ, and a stale entry for the main key kills the
+          # unlock attempt (2026-11-04). Keep a dedicated known_hosts just
+          # for the initrd.
           StrictHostKeyChecking accept-new
+          UserKnownHostsFile /var/lib/fleet/medano-initrd_known_hosts
     '' + vmSshConfig;
 
     age.secrets = {
