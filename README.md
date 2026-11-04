@@ -28,8 +28,6 @@ builder.
 | amalthea    | Immich frontend / sync              | - | (tailnet)         | `ops/vms/x86/amalthea/`                         |
 | late        | `late.sh` paste service             | - | (tailnet)         | `ops/vms/x86/late/`                             |
 | demo01      | reference / template VM             | - | (tailnet)         | `ops/vms/x86/demo01/`                           |
-| sb1/sb2/sb3 | standby Linux VMs                   | - | (tailnet)         | `ops/vms/x86/sb{1,2,3}/`                        |
-| sb4/sb5     | general-purpose Linux VMs           | - | (tailnet)         | `ops/vms/x86/sb{4,5}/`                          |
 | code        | sandboxed coding agents (virbr3)    | - | (tailnet)         | `ops/vms/x86/code/`                             |
 | minecraft   | Minecraft (UDP 25565 forwarded)     | (DNAT via med.) | (tailnet)         | `ops/vms/x86/minecraft/`                        |
 | factorio    | Factorio (UDP 34197 forwarded)      | (DNAT via med.) | (tailnet)         | `ops/vms/x86/factorio/`                         |

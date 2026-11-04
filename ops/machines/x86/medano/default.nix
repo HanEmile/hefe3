@@ -115,6 +115,29 @@ in
     };
   };
 
+  # The photo VM's media library lives on this NFS-backed zfs dataset; the VM
+  # itself is disposable, so the pictures live solely here. Backup holes get
+  # noticed eventually - this one survived at 67 GiB until 2026-11-03.
+  services.restic.backups."grave-photos" = {
+    repository = "/mnt/storagebox-bx11/backup/grave-photos";
+    initialize = true;
+    passwordFile = config.age.secrets.storagebox_bx11_restic_password.path;
+    paths = [ "/grave/photos" ];
+    timerConfig = {
+      OnCalendar = "*-*-* 04:20:00";
+      Persistent = true;
+      RandomizedDelaySec = "30min";
+    };
+    pruneOpts = [
+      "--keep-daily 7"
+      "--keep-weekly 5"
+      "--keep-monthly 12"
+      "--keep-yearly 15"
+    ];
+    backupPrepareCommand = "${pkgs.util-linux}/bin/findmnt /mnt/storagebox-bx11 > /dev/null || ls /mnt/storagebox-bx11 > /dev/null";
+  };
+  systemd.services."restic-backups-grave-photos".unitConfig.RequiresMountsFor = "/mnt/storagebox-bx11";
+
   systemd.services.fleet-unlock-lampadas = {
     description = "feed lampadas' LUKS passphrase to its initrd sshd";
     serviceConfig = {
@@ -190,11 +213,6 @@ in
     (vm "amalthea") # astrophotography
     (vm "late") # community
     (vm "demo01") # image-bootstrap demo VM
-    (vm "sb1") # standby linux vm
-    (vm "sb2") # standby linux vm
-    (vm "sb3") # standby linux vm
-    (vm "sb4") # general-purpose linux vm
-    (vm "sb5") # general-purpose linux vm
     (vm "jules") # minimal linux vm (jules)
     (vm "code") # sandboxed coding-agent vm (isolated virbr3 net)
     (vm "minecraft") # minecraft world (NFS /grave/games/minecraft)

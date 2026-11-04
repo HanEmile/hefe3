@@ -119,11 +119,15 @@ in
   nix = {
     gc = {
       automatic = true;
-      dates = "weekly";
+      # Daily: the nightly fleet-upgrade (02:00) pulls a fresh multi-GiB
+      # closure per VM; a weekly cadence let a single deploy wave fill the
+      # tiny 5-9 GiB roots to 100% (rss/sb/minecraft/... 2026-11-03).
+      dates = "daily";
       # The small appliances have 5-6 GiB roots where two generations of a
-      # fat /nix/store barely fit (minecraft/pretix/rss were at 84-95% full,
-      # 2026-11-01) - rotate a bit more aggressively.
-      options = "--delete-older-than 7d";
+      # fat /nix/store barely fit. With nightly deploys, retaining a week of
+      # generations pins several closures at once - three days still leaves
+      # the previous generation around for rollbacks, without hoarding.
+      options = "--delete-older-than 3d";
     };
     settings = {
       auto-optimise-store = true;

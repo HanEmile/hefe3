@@ -1122,8 +1122,7 @@ func buildSVG(vms []VMStat) template.HTML {
 	// with a small "internal" tag, dangling off their bridge.
 	internalOnly := map[string]bool{
 		"miki": true, "late": true, "social": true,
-		"demo01": true, "sb1": true, "sb2": true, "sb3": true,
-		"sb4": true, "sb5": true, "code": true,
+		"demo01": true, "code": true,
 	}
 
 	// Index VMStat by name so we can colour the VM boxes.

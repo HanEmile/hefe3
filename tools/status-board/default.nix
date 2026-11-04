@@ -60,8 +60,8 @@ let
       ));
 
       # Per-VM open ports: union of generic + per-interface lists.
-      # Some VMs aren't in ops.nixos (sb1..3 are bare bootstraps). For those,
-      # we fall back to an empty list and rely on the vm-base default
+      # Some VMs aren't in ops.nixos. For those, we fall back to an empty
+      # list and rely on the vm-base default
       # (node-exporter 9100 on enp1s0).
       # arr's config imports a gitignored ./private.nix - evaluating it from
       # a clean fleet checkout fails outright, breaking medano's own eval

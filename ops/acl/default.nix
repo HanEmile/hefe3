@@ -64,11 +64,6 @@ let
     late = withDefault { };
     demo01 = withDefault { };
     code = withDefault { };
-    sb1 = withDefault { };
-    sb2 = withDefault { };
-    sb3 = withDefault { };
-    sb4 = withDefault { };
-    sb5 = withDefault { };
     jules = withDefault {
       jules = [ [
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEJKB/LrKGTpjvMBv0b9414popN+qjqP8FE+Byr4kceK jules.hansmaennel@gmail.com"
