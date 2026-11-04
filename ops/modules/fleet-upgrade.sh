@@ -154,11 +154,12 @@ if [ ! -d "$FLEET_CHECKOUT/.git" ]; then
 fi
 
 cd "$FLEET_CHECKOUT"
-# a previous dry run / crash may leave the worktree dirty (npins edits) -
-# reset BEFORE checkout, otherwise checkout -B refuses and 'set -e' kills
-# the whole run before the results trap even exists (observed 2026-11-03).
+# This checkout is a throwaway - dirty worktrees AND stale untracked cruft
+# (rsync leftovers, half-built binaries) must never kill the run, so clean
+# hard before switching (otherwise checkout -B aborts, observed 2026-11-04).
 git fetch -q origin main
 git reset -q --hard HEAD
+git clean -fdx
 git checkout -q -B fleet-auto origin/main
 
 NPINS="npins --directory third_party/npins"
