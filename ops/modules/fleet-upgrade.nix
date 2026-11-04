@@ -85,6 +85,8 @@ let
           User root
           Port ${toString (sshPortOf name)}
           ProxyJump medano-root
+          # first-contact failures abort BatchMode nix copies otherwise
+          StrictHostKeyChecking accept-new
     '') vms;
 
   syswatch = pkgs.callPackage hefe.ops.pkgs.syswatch { };

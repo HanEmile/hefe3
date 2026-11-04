@@ -60,8 +60,8 @@ then
   TUNNEL_PID=$!
   sleep 3
   if SUMMARY=$(curl -fs --max-time 20 http://127.0.0.1:18099/api/summary.json 2>/dev/null); then
-    STALE=$(echo "$SUMMARY" | jq -r '.stale_repos | join(" ")')
-    DOWN=$(echo "$SUMMARY" | jq -r '.vms_down | join(" ")')
+    STALE=$(echo "$SUMMARY" | jq -r '(.stale_repos // []) | join(" ")')
+    DOWN=$(echo "$SUMMARY" | jq -r '(.vms_down // []) | join(" ")')
     BOK=$(echo "$SUMMARY" | jq '.backups.OK')
     BBAD=$(echo "$SUMMARY" | jq '.backups.Bad + .backups.Warn')
     say "backups: $BOK repos fresh$( [ "$BBAD" != "0" ] && echo ", $BBAD stale/failing: $STALE" )"
