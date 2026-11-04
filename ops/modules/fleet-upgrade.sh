@@ -238,10 +238,12 @@ if [ "${DEPLOYED[medano]}" = ok ] && kernel_changed medano; then
       BACKUP[medano]=fail
       say "fleet-upgrade: medano rebooted but I CANNOT UNLOCK ZFS (passphrase secret not filled in - see secrets.nix)"
     else
-      # zfs reads passphrases from the pty; force one with -tt, pipe both pools.
-      # Same passphrase for grave + rpool today; two lines, one per pool.
-      if printf '%s\n%s\n' "$PASS" "$PASS" | ssh -o ConnectTimeout=10 -tt medano-initrd \
-           'zpool import -a; zfs load-key -a; killall zfs' >>"$LOG" 2>&1; then
+      # stdin, NOT a pty: '-tt' swallows piped lines into tty echo and hangs
+      # the prompt reader; plain ssh + per-pool 'zfs load-key <pool>' reads
+      # stdin reliably. 'import' may rc!=0 when pools are already up.
+      if printf '%s\n%s\n' "$PASS" "$PASS" | ssh -o ConnectTimeout=10 medano-initrd \
+           'zpool import -a || true; zfs load-key grave; zfs load-key rpool; killall zfs; echo unlocked' \
+           >>"$LOG" 2>&1; then
         echo "   unlock command delivered"
       else
         echo "   unlock ssh failed (may still have worked)"
