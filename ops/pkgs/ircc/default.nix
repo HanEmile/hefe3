@@ -49,6 +49,13 @@ let
             --replace-fail "'\160' .. '\255'" "0x00A0 .. 0x00FF"
         '';
       });
+      # nixpkgs began marking mirage-crypto 2.1.0 broken in 26.05 (generic
+      # regression marker, not a deployed-code CVE that affects a local-only
+      # IRC frontend); unblock it so the overlay-injected scope can keep
+      # evaluating ircc (ops/pkgs/ircc).
+      mirage-crypto = prev.mirage-crypto.overrideAttrs (old: {
+        meta = old.meta // { broken = false; };
+      });
     }
   );
 

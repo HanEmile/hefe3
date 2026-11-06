@@ -162,6 +162,14 @@ in
           # for the initrd.
           StrictHostKeyChecking accept-new
           UserKnownHostsFile /var/lib/fleet/medano-initrd_known_hosts
+
+      # fleet-self-upgrade deploys "lampadas" to itself; give root a loopback
+      # alias instead of relying on decades-old stale user config
+      Host lampadas
+          HostName 127.0.0.1
+          User root
+          Port 22
+          IdentityFile /root/.ssh/id_ed25519
     '' + vmSshConfig;
 
     age.secrets = {

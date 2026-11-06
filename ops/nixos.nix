@@ -29,6 +29,18 @@ let
             syzkaller = final.callPackage hefe.ops.pkgs.syzkaller {};
           })
 
+          # mirage-crypto 2.1.0 got a blanket `broken` flag in 26.05 that
+          # blocks ANY system pulling OCaml packages via ocaml-ng (icw.ircc
+          # build via ops/pkgs/ircc). Generic 26.05 marker, not a supported
+          # runtime issue for our local frontend (no renderer exposures).
+          (final: prev: {
+            ocamlPackages_5_2 = prev.ocamlPackages_5_2.overrideScope (_: p: {
+              mirage-crypto = p.mirage-crypto.overrideAttrs (old: {
+                meta = old.meta // { broken = false; };
+              });
+            });
+          })
+
           # soju: nixpkgs lags upstream releases; track the latest tag so we
           # get new features (client-cert-auth, etc.) without waiting for a
           # channel bump.
