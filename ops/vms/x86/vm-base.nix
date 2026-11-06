@@ -39,7 +39,13 @@ in
         openssh.authorizedKeys.keys =
           # KEEP existing fleet/acl root keys! The first version of this
           # concat clobbered them (2026-11-03 lockout, restored via lampadas).
-          (aclconf.users.root.openssh.authorizedKeys.keys or []) ++ [
+          (
+            # 'attr.path or D ++ X' parses as 'attr.path or (D ++ X)' meaning
+            # keys stayed acl-only when the attr existed - the missing parens
+            # are why lampadas' key was absent on newly-deployed VMs
+            # (2026-11-06).
+            aclconf.users.root.openssh.authorizedKeys.keys or []
+          ) ++ [
             "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIARD1yc+6LpvGg5JcFc2jDFBv3kKRLXeNYqqFnCmAHkZ root@lampadas"
           ];
       };
