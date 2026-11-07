@@ -341,6 +341,12 @@ let
       hostname = name;
       sshTarget = target;
       sshJump = "medano";
+      # The two-hop view (evaluate locally, realise via medano, copy closure
+      # back) keeps breaking nightly in ssh/known_hosts/driver races.
+      # Build on the target instead - same flow medano has always used.
+      # Skinnier VMs (1 GiB) fetch ~everything from the cache anyway, so
+      # local RAM is never the constraint.
+      buildOnTarget = true;
     };
 
   imageFor =
