@@ -26,13 +26,22 @@ builder.
 | rss         | Miniflux (tailscale-only)           | - | 100.70.149.84     | `ops/vms/x86/rss/`                              |
 | tmp         | scratch                             | - | (tailnet)         | `ops/vms/x86/tmp/`                              |
 | amalthea    | Immich frontend / sync              | - | (tailnet)         | `ops/vms/x86/amalthea/`                         |
-| late        | `late.sh` paste service             | - | (tailnet)         | `ops/vms/x86/late/`                             |
 | demo01      | reference / template VM             | - | (tailnet)         | `ops/vms/x86/demo01/`                           |
 | code        | sandboxed coding agents (virbr3)    | - | (tailnet)         | `ops/vms/x86/code/`                             |
 | minecraft   | Minecraft (UDP 25565 forwarded)     | (DNAT via med.) | (tailnet)         | `ops/vms/x86/minecraft/`                        |
 | factorio    | Factorio (UDP 34197 forwarded)      | (DNAT via med.) | (tailnet)         | `ops/vms/x86/factorio/`                         |
 | r2wars      | r2wars site                         | - | (tailnet)         | `ops/vms/x86/r2wars/`                           |
 | rou         | VPN exit (private bridge)           | 192.168.33.2    | (tailnet)         | `ops/vms/x86/rou/`                              |
+
+## Removed VMs
+
+- **`late` (2026-11-08)** — decommissioned by owner decision. Live domain
+  undefined; qcow2 preserved at `/keep/pools/vmpool/retired/late.qcow2`
+  in case it ever wants a resurrection. Code refs purged
+  (`ops/vms/x86/late/`, `ops/modules/late-sh.nix`, ipam/acl/secrets/
+  key entries). The storagebox restic repo
+  `/mnt/storagebox-bx11/backup/late` remains intact for history;
+  delete it manually when retention says so.
 | arr         | *arr-stack on `rou` private bridge  | 192.168.33.3    | (tailnet)         | `ops/vms/x86/arr/`                              |
 | irc         | Ergo + soju (IRC)                   | - | (tailnet)         | `ops/vms/x86/irc/`                              |
 | pretix      | pretix ticket shop                  | - | (tailnet)         | `ops/vms/x86/pretix/`                           |
@@ -61,7 +70,7 @@ hefe3/
                                update_all.sh runs every pkgs/*/update.sh
                                (bump + build-check + rollback on failure)
     shells/                    nix-shell envs
-    modules/                   shared NixOS modules (late-sh, ...)
+    modules/                   shared NixOS modules
     machines/aarch64/caladan/  caladan host config
     machines/x86/medano/       hypervisor (networking.nix has natFlows)
     machines/x86/lampadas/     off-site bare-metal
@@ -215,7 +224,7 @@ Hetzner). Internally:
    naraj, auth, md,    rou, arr        rou
    git, data, miki,
    photo, social, rss,
-   tmp, amalthea, late,
+   tmp, amalthea,
    demo01, sb{1,2,3},
    minecraft, factorio,
    r2wars

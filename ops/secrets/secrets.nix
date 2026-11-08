@@ -29,7 +29,6 @@ let
   social   = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDnX+fYOAQSoMxkH6W+JeP81kSdKhsf+BZnBU9XsfCHg root@social";
   rss      = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAB1LLVc5yi7M9Tmf3iYkweNWf6Rhcmz1BihmAqt+n1s root@rss";
   tmp      = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICrSItCIigpmQLpRForEznBHJprcx82BQeeweRmtQ7Pt root@tmp";
-  late     = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJVF84a4bUbSEzdUe/6E+3QarQtekMt9Od8QfVU5h9tb root@nixos";
 
   # new VMs added 2026-05-24
   minecraft = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA/0Vc34WKHLyJYcZ2KF98PX7A+L5BC0JqLz/5doKDe1 root@minecraft";
@@ -122,11 +121,11 @@ in
   "lampadas_luks_passphrase.age" = for [ medano ];
 
   # === backups ===
-  "storagebox_bx11_restic_password.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea late minecraft factorio r2wars irc pretix ];
+  "storagebox_bx11_restic_password.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea minecraft factorio r2wars irc pretix ];
 
   # The config bx11 connection config contains this:
   # username=u331921
   # domain=u331921.your-storagebox.de
   # password=...
-  "storagebox_bx11_connection_config.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea late minecraft factorio r2wars irc pretix ];
+  "storagebox_bx11_connection_config.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea minecraft factorio r2wars irc pretix ];
 }

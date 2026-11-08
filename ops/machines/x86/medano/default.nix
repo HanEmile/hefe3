@@ -211,7 +211,6 @@ in
     (vm "social") # gotosocial
     (vm "tmp") # tmpfile host
     (vm "amalthea") # astrophotography
-    (vm "late") # community
     (vm "demo01") # image-bootstrap demo VM
     (vm "jules") # minimal linux vm (jules)
     (vm "code") # sandboxed coding-agent vm (isolated virbr3 net)

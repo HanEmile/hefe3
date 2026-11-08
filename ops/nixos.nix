@@ -48,28 +48,6 @@ let
             soju = final.callPackage hefe.ops.pkgs.soju {};
           })
 
-          # late
-          (
-            final: prev:
-            let
-              lateShSrc = sources."late-sh".outPath + "/default.nix";
-              rustMinimalPlatform =
-                let
-                  platform = pkgs.rust-bin.stable.latest.minimal;
-                in
-                pkgs.makeRustPlatform {
-                  rustc = platform;
-                  cargo = platform;
-                };
-            in
-            {
-              late-sh = pkgs.callPackage lateShSrc {
-                rustPlatform = rustMinimalPlatform;
-                gitRev = "main";
-              };
-            }
-          )
-
           # rust
           (import (sources."rust-overlay"))
 
@@ -122,7 +100,6 @@ let
         nixVirtModule # virtualisation
         agenix # secrets
         { nixpkgs.pkgs = pkgs; }
-        (import ./modules/late-sh.nix)
         nixosVexModule # OpenVEX feed (system.build.vexFeed)
       ] ++ extraModules;
     };
