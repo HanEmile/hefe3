@@ -114,9 +114,12 @@ in
     };
 
     defaultGateway = "95.217.35.1";
+    # "enp0s31f6" was stale from an older interface naming; on this box the
+    # NIC answers as eno1 and the gateway life-cycle silently dropped any
+    # IPv6 default route at boot because of the mismatch (2026-11-09).
     defaultGateway6 = {
       address = "fe80::1";
-      interface = "enp0s31f6";
+      interface = "eno1";
     };
 
     nameservers = [ "8.8.8.8" ];
@@ -146,12 +149,33 @@ in
           proto = "tcp";
           sourcePort = ircBouncerPort;
         }
+        # Kubo swarm on the nomos VM (192.168.75.17) — tcp + quic. The VM
+        # announces these public addrs via services.nomos.ipfs.announce so
+        # published Trust Anchor state is dialable from the public DHT.
+        {
+          destination = "192.168.75.17:4001";
+          proto = "tcp";
+          sourcePort = 4001;
+        }
+        {
+          destination = "192.168.75.17:4001";
+          proto = "udp";
+          sourcePort = 4001;
+        }
       ];
 
       extraCommands = ''
         # Allow web traffic from VMs to host (used by status-board upstream)
         iptables -I INPUT 1 -i virbr0 -p tcp --dport 80 -j ACCEPT
         iptables -I INPUT 1 -i virbr0 -p tcp --dport 443 -j ACCEPT
+
+        # Kubo swarm on the nomos VM (192.168.75.17). The DNAT half comes from
+        # networking.nat.forwardPorts above; mkFlowRules only generates FORWARD
+        # accepts for naraj-destined flows, so this one needs them explicitly.
+        iptables -I FORWARD 1 -i eno1 -o virbr0 -d 192.168.75.17 -p tcp --dport 4001 -j ACCEPT
+        iptables -I FORWARD 1 -i eno1 -o virbr0 -d 192.168.75.17 -p udp --dport 4001 -j ACCEPT
+        iptables -I FORWARD 1 -i virbr0 -o eno1 -s 192.168.75.17 -p tcp --sport 4001 -j ACCEPT
+        iptables -I FORWARD 1 -i virbr0 -o eno1 -s 192.168.75.17 -p udp --sport 4001 -j ACCEPT
 
         # Generated from natFlows above (see let-binding). Editing this
         # source produces the iptables rules below and the JSON file at
@@ -249,6 +273,33 @@ in
       };
 
       extraCommands = ''
+        # Private ULA over the bridge for v6-stable gatewaying of naraj
+        # (naraj uses 2a01:4f9:2b:2d45::2 as its public v6 face; medano
+        # still owns ::1 itself - 2026-11-09).
+        ${pkgs.iproute2}/bin/ip -6 addr replace fdc6:7a0f:c0ff::1/64 dev virbr0
+        ${pkgs.iproute2}/bin/ip -6 route replace 2a01:4f9:2b:2d45::2/128 dev virbr0
+        ${pkgs.iproute2}/bin/ip -6 neigh replace proxy 2a01:4f9:2b:2d45::2 dev eno1
+        # and bridge the public 80/443 hit through to naraj's v6, mirroring
+        # the v4 NAT arrangement
+        ${pkgs.iptables}/bin/ip6tables -C INPUT -i virbr0 -p tcp --dport 80 -j ACCEPT 2>/dev/null \
+          || ${pkgs.iptables}/bin/ip6tables -I INPUT 1 -i virbr0 -p tcp --dport 80 -j ACCEPT
+        ${pkgs.iptables}/bin/ip6tables -C INPUT -i virbr0 -p tcp --dport 443 -j ACCEPT 2>/dev/null \
+          || ${pkgs.iptables}/bin/ip6tables -I INPUT 1 -i virbr0 -p tcp --dport 443 -j ACCEPT
+        ${pkgs.iptables}/bin/ip6tables -C INPUT -i virbr0 -p tcp --dport 6697 -j ACCEPT 2>/dev/null \
+          || ${pkgs.iptables}/bin/ip6tables -I INPUT 1 -i virbr0 -p tcp --dport 6697 -j ACCEPT
+        ${pkgs.iptables}/bin/ip6tables -t nat -C PREROUTING -i eno1 -p tcp --dport 80 -j DNAT \
+          --to-destination [2a01:4f9:2b:2d45::2]:80 2>/dev/null \
+          || ${pkgs.iptables}/bin/ip6tables -t nat -I PREROUTING -i eno1 -p tcp --dport 80 -j DNAT \
+            --to-destination [2a01:4f9:2b:2d45::2]:80
+        ${pkgs.iptables}/bin/ip6tables -t nat -C PREROUTING -i eno1 -p tcp --dport 443 -j DNAT \
+          --to-destination [2a01:4f9:2b:2d45::2]:443 2>/dev/null \
+          || ${pkgs.iptables}/bin/ip6tables -t nat -I PREROUTING -i eno1 -p tcp --dport 443 -j DNAT \
+            --to-destination [2a01:4f9:2b:2d45::2]:443
+        ${pkgs.iptables}/bin/ip6tables -t nat -C PREROUTING -i eno1 -p tcp --dport 6697 -j DNAT \
+          --to-destination [2a01:4f9:2b:2d45::2]:6697 2>/dev/null \
+          || ${pkgs.iptables}/bin/ip6tables -t nat -I PREROUTING -i eno1 -p tcp --dport 6697 -j DNAT \
+            --to-destination [2a01:4f9:2b:2d45::2]:6697
+        # (no v4-style SNAT needed - replies route back through it default)
         # Remove all existing custom FORWARD rules for virbr0
         iptables -D FORWARD -i eno1 -o virbr0 -j ACCEPT 2>/dev/null || true
         iptables -D FORWARD -i virbr0 -o eno1 -j ACCEPT 2>/dev/null || true

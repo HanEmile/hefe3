@@ -19,6 +19,17 @@ in
   # 6697 is the native irc port
   networking.firewall.interfaces."enp1s0".allowedTCPPorts = [ 80 443 6697 ];
 
+  # IPv6 front door: ::2 of the on-link Hetzner block is this VM's public
+  # identity; fdc6:7a0f:c0ff::/64 exists solely to give it a stable next hop
+  # back through medano's bridge (no link-local MAC juggling, 2026-11-09).
+  # Update emile.space AAAA (and wildcards it serves) to point at ::2
+  # public-facing. Only reachable once medano's ip6tables DNAT is declared.
+  networking.interfaces."enp1s0".ipv6.addresses = [
+    { address = "2a01:4f9:2b:2d45::2"; prefixLength = 64; }
+    { address = "fdc6:7a0f:c0ff::2"; prefixLength = 64; }
+  ];
+  networking.defaultGateway6 = { address = "fdc6:7a0f:c0ff::1"; interface = "enp1s0"; };
+
   systemd.tmpfiles.rules = [
     "d /var/www/emile.space 0755 nginx nginx - -"
   ];
@@ -82,6 +93,18 @@ in
           tlsify {
             locations."/" = {
               proxyPass = "http://${backend.v4}:${toString backend.ports.backend}";
+              proxyWebsockets = true;
+            };
+          };
+
+        # --- nomoi (NOMOI administration appliance) ---
+        "nomoi.emile.space" =
+          let
+            backend = hefe.ops.ipam.default.nomos;
+          in
+          tlsify {
+            locations."/" = {
+              proxyPass = "http://${backend.v4}:${toString backend.ports.platform}";
               proxyWebsockets = true;
             };
           };
