@@ -273,13 +273,13 @@ in
       };
 
       extraCommands = ''
-        # Private ULA over the bridge for v6-stable gatewaying of naraj
-        # (naraj uses 2a01:4f9:2b:2d45::2 as its public v6 face; medano
-        # still owns ::1 itself - 2026-11-09).
-        ${pkgs.iproute2}/bin/ip -6 addr replace fdc6:7a0f:c0ff::1/64 dev virbr0
-        ${pkgs.iproute2}/bin/ip -6 route replace 2a01:4f9:2b:2d45::2/128 dev virbr0
-        ${pkgs.iproute2}/bin/ip -6 neigh replace proxy 2a01:4f9:2b:2d45::2 dev eno1
-        # and bridge the public 80/443 hit through to naraj's v6, mirroring
+        # NOTE: the virbr0-side v6 plumbing (ULA address, route to naraj's
+        # public v6, NDP proxy) lives in systemd.services.medano-forward-fixup,
+        # NOT here: this script runs before virbr0 exists at boot, and libvirt
+        # marks the bridge disable_ipv6=1 - both hard-fail `ip -6 ... dev
+        # virbr0` and killed the WHOLE firewall at boot, taking the public
+        # ingress down with it (2026-11-11 incident).
+        # Bridge the public 80/443 hit through to naraj's v6, mirroring
         # the v4 NAT arrangement
         ${pkgs.iptables}/bin/ip6tables -C INPUT -i virbr0 -p tcp --dport 80 -j ACCEPT 2>/dev/null \
           || ${pkgs.iptables}/bin/ip6tables -I INPUT 1 -i virbr0 -p tcp --dport 80 -j ACCEPT
@@ -344,6 +344,25 @@ in
         # Bare `iptables ...` calls (from mkFlowRules) need iptables on PATH.
         export PATH=${pkgs.iptables}/bin:$PATH
         IPT=${pkgs.iptables}/bin/iptables
+        IP=${pkgs.iproute2}/bin/ip
+
+        # virbr0-side v6 plumbing for naraj's public v6 front door (moved
+        # out of firewall.extraCommands after the 2026-11-11 incident, see
+        # the comment there). Right after libvirtd starts the bridge may
+        # not exist yet - wait; libvirt also forces disable_ipv6=1 on its
+        # bridges, so re-enable v6 before programming addresses on it.
+        for _ in $(${pkgs.coreutils}/bin/seq 1 60); do
+          "$IP" link show virbr0 >/dev/null 2>&1 && break
+          ${pkgs.coreutils}/bin/sleep 1
+        done
+        "$IP" link show virbr0 >/dev/null # fail loudly if it never appears
+        ${pkgs.procps}/bin/sysctl -q -w net.ipv6.conf.virbr0.disable_ipv6=0
+        # Private ULA over the bridge for v6-stable gatewaying of naraj
+        # (naraj uses 2a01:4f9:2b:2d45::2 as its public v6 face; medano
+        # still owns ::1 itself - 2026-11-09).
+        "$IP" -6 addr replace fdc6:7a0f:c0ff::1/64 dev virbr0
+        "$IP" -6 route replace 2a01:4f9:2b:2d45::2/128 dev virbr0
+        "$IP" -6 neigh replace proxy 2a01:4f9:2b:2d45::2 dev eno1
 
         # General virbr0 <-> eno1 forwarding (mirrors firewall.extraCommands).
         "$IPT" -D FORWARD -i eno1 -o virbr0 -j ACCEPT 2>/dev/null || true

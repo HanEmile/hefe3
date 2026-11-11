@@ -238,15 +238,31 @@ if [ "${DEPLOYED[medano]}" = ok ] && kernel_changed medano; then
       BACKUP[medano]=fail
       say "fleet-upgrade: medano rebooted but I CANNOT UNLOCK ZFS (passphrase secret not filled in - see secrets.nix)"
     else
-      # stdin, NOT a pty: '-tt' swallows piped lines into tty echo and hangs
-      # the prompt reader; plain ssh + per-pool 'zfs load-key <pool>' reads
-      # stdin reliably. 'import' may rc!=0 when pools are already up.
-      if printf '%s\n%s\n' "$PASS" "$PASS" | ssh -o ConnectTimeout=10 medano-initrd \
-           'zpool import -a || true; zfs load-key grave; zfs load-key rpool; killall zfs; echo unlocked' \
-           >>"$LOG" 2>&1; then
+      # One ssh session PER POOL: without a tty, `zfs load-key` reads stdin
+      # via glibc getpass(), which drains the whole pipe in a single read().
+      # Piping "PASS\nPASS\n" into one session fed BOTH lines to the first
+      # prompt (grave) and left the second prompt (rpool) reading EOF ->
+      # "Key load error: encryption failure" -> medano sat locked in the
+      # initrd all night (2026-11-11).
+      # 'import' may rc!=0 when pools are already up; killall has no target
+      # if the console prompt already exited - both are fine.
+      unlock_ok=yes
+      ssh -o ConnectTimeout=10 medano-initrd 'zpool import -a || true' >>"$LOG" 2>&1 || true
+      for pool in grave rpool; do
+        if ! printf '%s\n' "$PASS" | ssh -o ConnectTimeout=10 medano-initrd \
+             "zfs load-key $pool" >>"$LOG" 2>&1; then
+          echo "   zfs load-key $pool FAILED"
+          unlock_ok=no
+        fi
+      done
+      # the console-side 'zfs load-key -a' prompt blocks stage-1; stage-1's
+      # retry loop then notices the keys and proceeds with boot.
+      ssh -o ConnectTimeout=10 medano-initrd 'killall zfs || true' >>"$LOG" 2>&1 || true
+      if [ "$unlock_ok" = yes ]; then
         echo "   unlock command delivered"
       else
-        echo "   unlock ssh failed (may still have worked)"
+        ERR[medano]="zfs load-key failed during initrd unlock (see $LOG)"
+        say "fleet-upgrade: medano rebooted but ZFS LOAD-KEY FAILED - MANUAL UNLOCK NEEDED"
       fi
     fi
   else
