@@ -36,6 +36,7 @@ let
   r2wars    = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExKIrQADDElPIh3jARxGrRtEsjUlXcWyhCk/bkT47nC root@r2wars";
   pretix    = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOiliYol3IXFGpQAEpKqFK0QN6qa/RDnzGNCqW/TG/uz root@pretix";
   irc       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF5pt9Yq/wc/jQOCQ8K7IMB+aGUN7/LSZazWGTLdXcvR root@irc";
+  nomos     = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGNxa+HIP6DG+oDf/BhdBwCLTN9UNE34a/loCjELMm6c root@nomos";
 
   # convenience function: the hosts themselves and all admins should be
   # able to access the secret
@@ -121,11 +122,11 @@ in
   "lampadas_luks_passphrase.age" = for [ medano ];
 
   # === backups ===
-  "storagebox_bx11_restic_password.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea minecraft factorio r2wars irc pretix ];
+  "storagebox_bx11_restic_password.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea minecraft factorio r2wars irc pretix nomos ];
 
   # The config bx11 connection config contains this:
   # username=u331921
   # domain=u331921.your-storagebox.de
   # password=...
-  "storagebox_bx11_connection_config.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea minecraft factorio r2wars irc pretix ];
+  "storagebox_bx11_connection_config.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea minecraft factorio r2wars irc pretix nomos ];
 }

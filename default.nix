@@ -46,6 +46,7 @@ let
         [ "ops" "vms" "x86" "amalthea" ]
         [ "ops" "vms" "x86" "late" ]
         [ "ops" "vms" "x86" "demo01" ]
+        [ "ops" "vms" "x86" "nomos" ]
         [ "ops" "vms" "x86" "code" ]
         [ "ops" "vms" "x86" "jules" ]
         [ "ops" "vms" "x86" "minecraft" ]

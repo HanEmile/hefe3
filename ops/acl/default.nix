@@ -62,6 +62,7 @@ let
     data = withDefault { };
     amalthea = withDefault { };
     demo01 = withDefault { };
+    nomos = withDefault { };
     code = withDefault { };
     jules = withDefault {
       jules = [ [

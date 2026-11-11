@@ -27,6 +27,7 @@ builder.
 | tmp         | scratch                             | - | (tailnet)         | `ops/vms/x86/tmp/`                              |
 | amalthea    | Immich frontend / sync              | - | (tailnet)         | `ops/vms/x86/amalthea/`                         |
 | demo01      | reference / template VM             | - | (tailnet)         | `ops/vms/x86/demo01/`                           |
+| nomos       | NOMOI verifier (kubo + nomos serve) | - | (tailnet)         | `ops/vms/x86/nomos/`                            |
 | code        | sandboxed coding agents (virbr3)    | - | (tailnet)         | `ops/vms/x86/code/`                             |
 | minecraft   | Minecraft (UDP 25565 forwarded)     | (DNAT via med.) | (tailnet)         | `ops/vms/x86/minecraft/`                        |
 | factorio    | Factorio (UDP 34197 forwarded)      | (DNAT via med.) | (tailnet)         | `ops/vms/x86/factorio/`                         |

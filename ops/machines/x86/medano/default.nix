@@ -212,6 +212,7 @@ in
     (vm "tmp") # tmpfile host
     (vm "amalthea") # astrophotography
     (vm "demo01") # image-bootstrap demo VM
+    (vm "nomos") # NOMOI verifier (ipfs + nomos serve)
     (vm "jules") # minimal linux vm (jules)
     (vm "code") # sandboxed coding-agent vm (isolated virbr3 net)
     (vm "minecraft") # minecraft world (NFS /grave/games/minecraft)
