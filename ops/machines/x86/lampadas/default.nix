@@ -69,7 +69,19 @@ in
     # drops and logs diagnostics. See file header.
     (import ./tailscale-watchdog.nix (args1 // args2))
 
+    # MikroTik R11e-LR8 LoRa concentrator card (mPCIe->USB, /dev/lora8):
+    # toolkit + web UI + Semtech UDP forwarder towards TTN.
+    (import ../../../modules/lora8.nix { inherit hefe; })
+
   ];
+
+  services.lora8 = {
+    enable = true;
+    # Semtech UDP on TTN V3 (EU). Gateway EUI = MCU bridge UID shown in the
+    # web UI; register it at https://eu1.cloud.thethings.network/console
+    # as "Legacy Semtech UDP packet forwarder".
+    lns = "eu1.cloud.thethings.network:1700";
+  };
 
   hardware.fancontrol = {
     enable = true;
@@ -182,7 +194,7 @@ in
 
     firewall.allowedTCPPorts = [
       5201 # iperf
-      8080 # filebrowser web
+      8080 # filebrowser web / lora8 UI
 
       # for NFSv3; view with `rpcinfo -p`
       111
@@ -235,6 +247,9 @@ in
         extraGroups = [
           "wheel"
           "samba-guest"
+          # read/write access to serial devices (MikroTik R11e-LR8 LoRa
+          # concentrator on the mPCIe->USB adapter, /dev/ttyACM*)
+          "dialout"
         ];
         openssh.authorizedKeys.keys = emile_keys;
       };
@@ -262,6 +277,12 @@ in
     "d /data/public 0755 samba-guest samba-guest"
     "d /data/time_machine 0755 emile users"
   ];
+
+  # MikroTik R11e-LR8 LoRa concentrator (SX1301 + on-board USB<->SPI STM32
+  # bridge): stable device name and group access for the dialout group.
+  services.udev.extraRules = ''
+    SUBSYSTEM=="tty", ATTRS{idVendor}=="2cd2", ATTRS{idProduct}=="020a", SYMLINK+="lora8", GROUP="dialout", MODE="0660"
+  '';
 
   environment = {
     systemPackages = with pkgs; [
@@ -459,6 +480,18 @@ in
       port = 9090;
       retentionTime = "365d";
       listenAddress = hefe.ops.ipam."tailscale".lampadas.v4;
+
+      scrapeConfigs = [
+        {
+          # lora8 LoRa concentrator driver (ops/modules/lora8.nix) -
+          # bridge state, RX counters, noise floor, TTN link health.
+          job_name = "lora8";
+          scrape_interval = "15s";
+          static_configs = [
+            { targets = [ "127.0.0.1:8080" ]; }
+          ];
+        }
+      ];
     };
 
     avahi = {
