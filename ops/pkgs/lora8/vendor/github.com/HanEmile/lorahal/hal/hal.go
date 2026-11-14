@@ -12,7 +12,7 @@ import (
 	"math"
 	"time"
 
-	"emile.space/lora8/internal/com"
+	"github.com/HanEmile/lorahal/bridge"
 )
 
 // Hardware constants (from loragw_hal.h)
@@ -196,7 +196,7 @@ func b2i(b bool) int32 {
 
 // Hal drives one concentrator.
 type Hal struct {
-	c         *com.Bridge
+	c         *bridge.Bridge
 	started   bool
 	MCUUid    [8]byte
 	MCUFWUsed uint32
@@ -247,7 +247,7 @@ func DefaultTxGainLUT() TxGainLUT {
 // Connect opens the bridge, checks MCU bridge firmware compatibility and the
 // SX1301 chip version.
 func Connect(path string) (*Hal, error) {
-	br, err := com.Open(path)
+	br, err := bridge.Open(path)
 	if err != nil {
 		return nil, err
 	}

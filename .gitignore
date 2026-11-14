@@ -24,3 +24,6 @@ target/
 # local build artifacts / runtime state of tracked tools
 tools/status-board/status-board
 tools/makhor/makhor.db
+
+# lora8 working plan is kept local-only (not tracked), per owner decision
+ops/pkgs/lora8/PLAN.md

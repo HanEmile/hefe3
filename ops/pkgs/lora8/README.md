@@ -52,6 +52,38 @@ udev rule (`ops/machines/x86/lampadas/default.nix`) symlinking the card to
   nix; the RX log is an in-memory ring). If that ever changes, follow the
   `storageboxBackup` pattern in `ops/machines/x86/lampadas/default.nix`.
 
+## Mesh mode (Meshtastic listener, best-effort)
+
+The UI's **mesh** checkbox (concentrator card) switches the active preset to
+`gw.MeshWatch()`: a Meshtastic EU868 **Long Fast** listener. Long Fast is the
+Meshtastic factory default preset, so an unmodified EU868 node transmits on a
+single static channel:
+
+| parameter | value | source (meshtastic/firmware) |
+|---|---|---|
+| SF / BW / CR | SF11 / 250 kHz / 4/5 | `src/mesh/MeshRadio.h`, `modemPresetToParams()` (LONG_FAST fallback arm: sf=11, bw=250, cr=5) |
+| sync word | `0x2B` | `src/mesh/RadioLibInterface.h` (`const uint8_t syncWord = 0x2b`) |
+| center freq | **869.525 MHz** | `src/mesh/RadioInterface.cpp`: EU_868 region {869.4–869.65 MHz}, one 250 kHz slot → `freqStart + BW/2` |
+| preamble | 16 syms, explicit header, CRC on | `src/mesh/RadioInterface.h` (`preambleLengthDefault = 16`) |
+
+Radio 1 is moved to 869.2 MHz so 869.525 lands at IF +325 kHz on the std IF8
+modem (|IF|+BW/2 = 450 kHz ≤ 500 kHz window). The multi-SF chains stay up;
+radio 0's TTN plan is untouched (rf1's multi channels are no longer TTN-valid
+while mesh is on — the toggle is opt-in).
+
+**Caveat — sync word.** The SX1301 only knows two preamble-sync modes,
+LoRaWAN *public* (≈0x34) and *private* (≈0x12), selected by
+`lorawan_public` (picoGW `FRAME_SYNCH_PEAK1/2_POS` pairs 3/4 vs 1/2).
+Meshtastic's 0x2B matches **neither**. Mesh mode uses private as the
+least-off setting: the demodulators usually still lock on the preamble
+correlator for medium/strong signals, but weak packets and some header/CRC
+validations will be missed or fail. Treat mesh decode as opportunistic
+sniffing, not a gateway. The payload inspector guesses the 16-byte
+Meshtastic header (`src/mesh/RadioInterface.h` `PacketHeader`: to/from/id
+LE32, flags, channel hash, next_hop, relay_node) and shows node IDs; the
+AES-CTR(channel-PSK)-encrypted `Data` protobuf itself is displayed raw, with
+plaintext extraction only for the rare unencrypted frame.
+
 ## TTN recipe
 
 1. Register at https://eu1.cloud.thethings.network/console (free).

@@ -5,151 +5,207 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>lora8 // R11e-LR8</title>
 <style>
-  :root { --bg:#0f1419; --panel:#1a2129; --border:#2d3943; --fg:#c8d3dc; --dim:#6b7a88; --acc:#58a6ff; --ok:#3fb950; --bad:#f85149; }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.45 ui-monospace,Menlo,monospace; }
-  header { padding:10px 18px; border-bottom:1px solid var(--border); display:flex; gap:16px; align-items:baseline; }
-  header h1 { font-size:16px; margin:0; color:var(--acc); }
-  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:12px; padding:12px; }
-  .card { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:12px; }
-  .card h2 { margin:0 0 10px; font-size:13px; text-transform:uppercase; color:var(--dim); letter-spacing:.08em; }
-  label { display:block; color:var(--dim); font-size:12px; margin-top:8px; }
-  input, select, button { background:#0d1117; color:var(--fg); border:1px solid var(--border); border-radius:5px; padding:5px 8px; font:inherit; }
+  :root { --bg:#090e13; --panel:#101820; --border:#2c3a48; --fg:#e6edf3; --dim:#7d8b9c; --acc:#4cc2ff; --ok:#39d353; --bad:#ff6a5e; --warn:#e3b341; --dim2:#48525e; }
+  * { box-sizing:border-box; border-radius:0 !important; }
+  html,body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:12px/1.4 ui-monospace,Menlo,monospace; overflow:hidden; }
+
+  #app { display:grid; height:100vh; grid-template-rows:34px minmax(0,1fr); }
+  #topbar { display:flex; align-items:center; gap:14px; padding:0 12px; border-bottom:1px solid var(--border); background:var(--panel); }
+  #topbar h1 { font-size:13px; margin:0; color:var(--acc); }
+  #topbar .spacer { flex:1; }
+  .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--bad); margin-right:4px; }
+  .dot.on { background:var(--ok); }
+  .dot.warn { background:var(--warn); }
+  .topkv { color:var(--dim); white-space:nowrap; }
+  .topkv b { color:var(--fg); font-weight:normal; }
+  #msg { color:var(--bad); font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  #cols { display:grid; grid-template-columns:270px minmax(0,1fr) 300px; min-height:0; }
+  .col { min-height:0; overflow-y:auto; border-right:1px solid var(--border); padding:6px; }
+  .col:last-child { border-right:none; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:6px 8px; margin-bottom:6px; }
+  .card h2 { margin:0 0 4px; font-size:10px; text-transform:uppercase; color:var(--dim); letter-spacing:.08em; display:flex; align-items:center; gap:6px; }
+  .card h2 .tools { margin-left:auto; }
+  .card h2 .tools button { margin:0; padding:0 4px; font-size:10px; line-height:16px; }
+  .kv { display:flex; justify-content:space-between; gap:8px; padding:1px 0; }
+  .kv span:first-child { color:var(--dim); }
+  .kv b { font-weight:normal; }
+  label { display:block; color:var(--dim); font-size:10px; margin-top:4px; }
+  input, select, button { background:#0d1117; color:var(--fg); border:1px solid var(--border); border-radius:4px; padding:3px 6px; font:inherit; }
   input { width:100%; }
-  .row { display:flex; gap:8px; flex-wrap:wrap; }
-  .row > div { flex:1; min-width:90px; }
-  button { cursor:pointer; margin-top:10px; background:#1f2b36; border-color:#3d4956; }
+  button { cursor:pointer; background:#1c2833; border-color:#3d4956; }
   button:hover { border-color:var(--acc); color:var(--acc); }
   button.danger:hover { border-color:var(--bad); color:var(--bad); }
-  table { width:100%; border-collapse:collapse; font-size:12px; }
-  th { text-align:left; color:var(--dim); padding:3px 6px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--panel); }
-  td { padding:3px 6px; border-bottom:1px solid #20272f; vertical-align:top; word-break:break-all; }
-  .status { display:flex; gap:18px; flex-wrap:wrap; }
-  .kv { min-width:100px; }
-  .kv b { display:block; font-weight:normal; color:var(--dim); font-size:11px; }
-  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; background:var(--bad); }
-  .dot.on { background:var(--ok); }
-  #frames { max-height:460px; overflow-y:auto; }
-  #msg { color:var(--bad); padding:0 12px; white-space:pre-wrap; }
-  .wide { grid-column:1/-1; }
-  .barrow { display:flex; align-items:center; gap:8px; margin:2px 0; font-size:11px; }
-  .barrow .lbl { width:110px; color:var(--dim); text-align:right; }
-  .bar { height:10px; background:var(--acc); border-radius:2px; min-width:1px; transition:width .3s; }
-  .bar.noise { background:#4a7c59; }
-  .barrow .val { color:var(--dim); }
-  /* frames table + filter */
-  #filterRow { display:flex; gap:8px; align-items:center; }
+  .btnrow { display:flex; gap:4px; margin-top:5px; }
+  .btnrow button { flex:1; padding:3px 4px; font-size:11px; }
+  .row { display:flex; gap:4px; }
+  .row > div { flex:1; min-width:0; }
+  .row label { margin-top:3px; }
+  select, input { padding:2px 5px; }
+
+  /* frames main */
+  #frameswrap { display:flex; flex-direction:column; min-height:0; }
+  #filterRow { display:flex; gap:4px; align-items:center; padding:6px; border-bottom:1px solid var(--border); background:var(--panel); }
   #filter { flex:1; }
   #filter.bad { border-color:var(--bad); }
+  #filterRow button { padding:2px 10px; font-size:11px; }
+  .chips { display:flex; flex-wrap:wrap; gap:3px; padding:3px 6px; border-bottom:1px solid var(--border); }
+  .chip { background:#223140; border:1px solid var(--border); border-radius:3px; padding:0 5px; font-size:10px; }
+  #frames { flex:1; overflow-y:auto; min-height:0; }
+  table { width:100%; border-collapse:collapse; font-size:11px; }
+  th { text-align:left; color:var(--dim); padding:2px 5px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--panel); z-index:1; }
+  td { padding:1px 5px; border-bottom:1px solid #1b232d; vertical-align:top; word-break:break-all; white-space:nowrap; }
+  td:last-child { white-space:normal; }
+  tr.framrow.rx { box-shadow:inset 2px 0 0 #2ea043; }
+  tr.framrow.tx { box-shadow:inset 2px 0 0 #a371f7; }
+  tr.framrow.txfail td { color:var(--bad); }
   .framrow td[data-v] { cursor:pointer; }
   .framrow td[data-v]:hover { background:#1d2833; color:var(--acc); }
-  tr.framrow.rx { border-left:3px solid #2ea043; }
-  tr.framrow.tx { border-left:3px solid #a371f7; }
-  tr.framrow.txfail td { color:var(--bad); }
+
+  /* ctx menus */
   #ctxmenu { position:fixed; z-index:99; background:#161d26; border:1px solid var(--border); border-radius:6px; padding:4px; display:none; box-shadow:0 8px 24px rgba(0,0,0,.5); }
-  #ctxmenu div { padding:4px 12px; font-size:12px; cursor:pointer; border-radius:4px; }
-  #ctxmenu div:hover { background:#223140; color:var(--acc); }
-  .chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
-  .chip { background:#223140; border:1px solid var(--border); border-radius:4px; padding:1px 6px; font-size:11px; }
+  #ctxmenu .ctx-item { padding:3px 10px; font-size:11px; cursor:pointer; border-radius:4px; }
+  #ctxmenu .ctx-item:hover { background:#223140; color:var(--acc); }
+  #ctxmenu .ctx-title { padding:3px 10px 2px; font-size:9px; text-transform:uppercase; color:var(--dim); letter-spacing:.08em; border-bottom:1px solid var(--border); margin-bottom:2px; }
+  #ctxmenu .ctx-ascii { padding:2px 10px 3px; font-size:11px; color:var(--ok); max-width:320px; word-break:break-all; }
+  .ctx-btn { margin:0; padding:2px 7px; font-size:10px; }
+
+  /* live/metrics bars */
+  .barrow { display:flex; align-items:center; gap:6px; margin:1px 0; font-size:10px; flex-wrap:nowrap; white-space:nowrap; overflow:hidden; }
+  .barrow .lbl { flex:0 0 92px; color:var(--dim); text-align:right; overflow:hidden; }
+  .bar { height:9px; background:var(--acc); min-width:1px; transition:width .3s; }
+  .bar.noise { background:#4a7c59; }
+  .barrow .val { color:var(--fg); font-weight:bold; }
   .dir-rx { color:#3fb950; }
   .dir-tx { color:#a371f7; }
+  td .ascii { color:var(--ok); font-style:italic; margin-right:5px; }
+  .v-ok { color:var(--ok); }
+  .v-bad { color:var(--bad); }
+  .v-warn { color:var(--warn); }
+  .v-info { color:var(--acc); }
+  tr.framrow td.dimv { color:var(--dim); }
+  .card h2 { color:var(--warn); }
+  #topbar h1, .topkv b { color:var(--acc); }
+  .framrow:hover td { background:#14202c; }
+
+  #loglines { max-height:200px; overflow-y:auto; background:#0d1117; border:1px solid var(--border); border-radius:4px; padding:4px 6px; margin:4px 0 0; font-size:10px; white-space:pre-wrap; word-break:break-all; }
 </style>
 </head>
 <body>
-<header><h1>lora8</h1><span id="hdr" style="color:var(--dim)">MikroTik R11e-LR8 · SX1301</span><span id="eui" style="color:var(--ok)"></span></header>
-<div id="msg"></div>
-<div class="grid">
-
-  <div class="card">
-    <h2>Device</h2>
-    <div class="status" id="status"></div>
-    <label>Serial device</label>
-    <input id="devpath" value="/dev/ttyACM0">
-    <div class="row">
-      <button onclick="post('/api/connect',{path:devpath.value})">connect</button>
-      <button class="danger" onclick="post('/api/disconnect',{})">disconnect</button>
+<div id="app">
+  <header id="topbar">
+    <h1>lora8</h1>
+    <span class="topkv">R11e-LR8 · SX1301</span>
+    <span class="topkv" id="eui" style="color:var(--ok)"></span>
+    <span class="topkv"><span class="dot" id="dot-dev"></span><span id="dot-dev-t">dev</span></span>
+    <span class="topkv"><span class="dot" id="dot-run"></span><span id="dot-run-t">rx</span></span>
+    <span class="topkv"><span class="dot" id="dot-fwd"></span><span id="dot-fwd-t">ttn</span></span>
+    <span class="topkv" id="top-uptime"></span>
+    <span class="spacer"></span>
+    <span id="msg"></span>
+  </header>
+  <div id="cols">
+    <!-- LEFT -->
+    <div class="col">
+      <div class="card">
+        <h2>device</h2>
+        <div class="status" id="status"></div>
+        <label>serial</label>
+        <input id="devpath" value="/dev/ttyACM0">
+        <div class="btnrow">
+          <button onclick="post('/api/connect',{path:devpath.value})">connect</button>
+          <button class="danger" onclick="post('/api/disconnect',{})">disconnect</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>concentrator</h2>
+        <div class="row">
+          <div><label>rf0 mhz</label><input id="rf0" value="867.5"></div>
+          <div><label>rf1 mhz</label><input id="rf1" value="868.5"></div>
+        </div>
+        <div class="row">
+          <div><label><input type="checkbox" id="txena" checked style="width:auto">TX rf0</label></div>
+          <div><label><input type="checkbox" id="pub" checked style="width:auto">public</label></div>
+          <div><label><input type="checkbox" id="if8" style="width:auto">if8 std</label></div>
+          <div><label><input type="checkbox" id="mesh" style="width:auto">mesh</label></div>
+        </div>
+        <div class="btnrow">
+          <button onclick="start()">apply+start</button>
+          <button class="danger" onclick="post('/api/stop',{})">stop</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>transmit</h2>
+        <div class="row">
+          <div><label>freq</label><input id="txfreq" value="869.525"></div>
+          <div><label>dBm</label><input id="txpow" value="14"></div>
+          <div><label>rf</label><select id="txrf"><option>0</option><option>1</option></select></div>
+        </div>
+        <div class="row">
+          <div><label>sf</label><select id="txsf"><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option></select></div>
+          <div><label>bw</label><select id="txbw"><option>125</option><option>250</option><option>500</option></select></div>
+          <div><label>cr</label><select id="txcr"><option value="1">4/5</option><option value="2">4/6</option><option value="3">4/7</option><option value="4" selected>4/8</option></select></div>
+        </div>
+        <label>payload (hex)</label>
+        <input id="txpl" placeholder="48656c6c6f">
+        <div class="btnrow">
+          <button onclick="tx()">send now</button>
+          <button class="danger" onclick="post('/api/aborttx',{})">abort</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>forwarder (udp → ttn)</h2>
+        <label>lns host:port</label>
+        <input id="fwdsrv" placeholder="eu1.cloud.thethings.network:1700">
+        <div class="status" id="fwdstat"></div>
+        <div class="btnrow">
+          <button onclick="fwd(1)">start</button>
+          <button class="danger" onclick="fwd(0)">stop</button>
+        </div>
+      </div>
+    </div>
+    <!-- MAIN -->
+    <div class="col" id="frameswrap">
+      <div id="filterRow">
+        <input id="filter" placeholder="filter: dir=tx and sf>9, crc=bad, ascii>=hello, hex>=4865, freq_mhz>=868, status=failed …  (click any cell)">
+        <button onclick="applyFilterExpr()">apply</button>
+        <button onclick="resetFilter()">clear</button>
+      </div>
+      <div class="chips" id="filterChips"></div>
+      <div id="frames"><table><thead><tr>
+        <th>time</th><th>dir</th><th>freq</th><th>rf</th><th>mod</th><th>sf</th><th>bw</th><th>cr</th>
+        <th>rssi</th><th>snr</th><th>crc</th><th>power</th><th>toa</th><th>status</th><th>len</th><th>payload</th>
+      </tr></thead><tbody id="fbody"></tbody></table></div>
+    </div>
+    <!-- RIGHT -->
+    <div class="col">
+      <div class="card">
+        <h2>live counters</h2>
+        <div class="status" id="liveinfo"></div>
+        <div id="noisebars" style="margin-top:4px"></div>
+      </div>
+      <div class="card">
+        <h2>channel / sf</h2>
+        <div id="chanhist"></div>
+        <div id="sfhist"></div>
+      </div>
+      <div class="card">
+        <h2>state</h2>
+        <div class="status" id="devstate"></div>
+      </div>
+      <div class="card">
+        <h2>log <span class="tools"><button onclick="logpaused=!logpaused;logel.scrollTop=logel.scrollHeight">pause</button><button onclick="logel.textContent=''">clear</button></h2>
+        <pre id="loglines"></pre>
+      </div>
     </div>
   </div>
-
-  <div class="card">
-    <h2>Concentrator</h2>
-    <div class="row">
-      <div><label>RF0 freq (MHz)</label><input id="rf0" value="867.5"></div>
-      <div><label>RF1 freq (MHz)</label><input id="rf1" value="868.5"></div>
-    </div>
-    <div class="row">
-      <div><label><input type="checkbox" id="txena" checked style="width:auto"> TX enabled (RF0)</label></div>
-      <div><label><input type="checkbox" id="pub" checked style="width:auto"> LoRaWAN public sync</label></div>
-      <div><label><input type="checkbox" id="if8" style="width:auto"> std channel IF8</label></div>
-    </div>
-    <div class="row">
-      <button onclick="start()">apply config + start</button>
-      <button class="danger" onclick="post('/api/stop',{})">stop</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Uplink forwarder (Semtech UDP)</h2>
-    <label>LNS server (host:port)</label>
-    <input id="fwdsrv" placeholder="eu1.cloud.thethings.network:1700">
-    <div class="status" id="fwdstat"></div>
-    <div class="row">
-      <button onclick="fwd(1)">start forwarder</button>
-      <button class="danger" onclick="fwd(0)">stop forwarder</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Transmit</h2>
-    <div class="row">
-      <div><label>freq (MHz)</label><input id="txfreq" value="869.525"></div>
-      <div><label>power (dBm)</label><input id="txpow" value="14"></div>
-      <div><label>rf chain</label><select id="txrf"><option>0</option><option>1</option></select></div>
-    </div>
-    <div class="row">
-      <div><label>SF</label><select id="txsf"><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option></select></div>
-      <div><label>BW (kHz)</label><select id="txbw"><option>125</option><option>250</option><option>500</option></select></div>
-      <div><label>CR</label><select id="txcr"><option value="1">4/5</option><option value="2">4/6</option><option value="3">4/7</option><option value="4" selected>4/8</option></select></div>
-    </div>
-    <label>payload (hex)</label>
-    <input id="txpl" placeholder="48656c6c6f">
-    <div class="row">
-      <button onclick="tx()">send now</button>
-      <button class="danger" onclick="post('/api/aborttx',{})">abort tx</button>
-    </div>
-  </div>
-
-  <div class="card wide">
-    <h2>Live</h2>
-    <div class="status" id="liveinfo"></div>
-    <div id="noisebars" style="margin-top:10px"></div>
-    <div class="row" style="margin-top:10px">
-      <div><h2 style="margin:0 0 4px">packets / channel</h2><div id="chanhist"></div></div>
-      <div><h2 style="margin:0 0 4px">packets / SF</h2><div id="sfhist"></div></div>
-    </div>
-  </div>
-
-  <div class="card wide">
-    <h2>Frames
-      <span style="color:var(--dim);font-weight:normal;text-transform:none;font-size:11px">
-        — click a field to apply-as-filter</span>
-    </h2>
-    <div id="filterRow">
-      <input id="filter" placeholder="filter: dir=tx and sf>9, crc=bad, freq_mhz>=868, hex>=4865, status=failed …">
-      <button style="margin:0" onclick="applyFilterExpr()">apply</button>
-      <button style="margin:0" onclick="resetFilter()">clear</button>
-    </div>
-    <div class="chips" id="filterChips"></div>
-    <div id="frames"><table><thead><tr>
-      <th>time</th><th>dir</th><th>freq</th><th>rf</th><th>mod</th><th>sf</th><th>bw</th><th>cr</th>
-      <th>rssi</th><th>snr</th><th>crc</th><th>power</th><th>toa</th><th>status</th><th>len</th><th>payload (hex)</th>
-    </tr></thead><tbody id="fbody"></tbody></table></div>
-  </div>
-
-  <div id="ctxmenu"></div>
 </div>
+<div id="ctxmenu"></div>
 <script>
+let logpaused = false;
 const $ = id => document.getElementById(id);
+const logel = document.getElementById('loglines');
 const msg = t => { $('msg').textContent = t; setTimeout(()=>{ if($('msg').textContent===t) $('msg').textContent=''; }, 8000); };
 async function post(url, body) {
   try {
@@ -162,10 +218,16 @@ async function post(url, body) {
 async function get(url){ try { const r = await fetch(url); return await r.json(); } catch(e){ msg(String(e)); return null; } }
 
 function buildCfg() {
-  const rf0 = Math.round(parseFloat($('rf0').value)*1e6), rf1 = Math.round(parseFloat($('rf1').value)*1e6);
+  const mesh = $('mesh').checked;
+  // mesh mode: rf1 moves to 869.2 MHz so the meshtastic LongFast channel
+  // (869.525 MHz, SF11/BW250) lands at IF +325kHz on the std chain; the
+  // SX1301 "public" sync toggle is dropped to private (0x2B matches neither
+  // anyway). Mirrors gw.MeshWatch().
+  const rf0 = Math.round(parseFloat($('rf0').value)*1e6);
+  const rf1 = mesh ? 869200000 : Math.round(parseFloat($('rf1').value)*1e6);
   const multi = (rf,f)=>({Enable:true,RFChain:rf,FreqHz:f,Bandwidth:3,Datarate:126,SyncWordSize:0,SyncWord:0});
   return {
-    Board:{LorawanPublic:$('pub').checked, ClkSrc:1},
+    Board:{LorawanPublic: mesh ? false : $('pub').checked, ClkSrc:1},
     RxRF:[
       {Enable:true,FreqHz:rf0,RssiOffset:-215.4,Type:2,TxEnable:$('txena').checked},
       {Enable:true,FreqHz:rf1,RssiOffset:-215.4,Type:2,TxEnable:false},
@@ -173,7 +235,9 @@ function buildCfg() {
     RxIF:[
       multi(0,-400000),multi(0,-200000),multi(0,0),multi(0,200000),
       multi(1,-400000),multi(1,-200000),multi(1,0),multi(1,200000),
-      {Enable:$('if8').checked,RFChain:1,FreqHz:-100000,Bandwidth:2,Datarate:2,SyncWordSize:0,SyncWord:0},
+      mesh
+        ? {Enable:true,RFChain:1,FreqHz:325000,Bandwidth:2,Datarate:32,SyncWordSize:0,SyncWord:0}
+        : {Enable:$('if8').checked,RFChain:1,FreqHz:-100000,Bandwidth:2,Datarate:2,SyncWordSize:0,SyncWord:0},
       {Enable:false,RFChain:1,FreqHz:300000,Bandwidth:2,Datarate:64000,SyncWordSize:0,SyncWord:0},
     ],
     Gain:{Size:2,LUT:[]}
@@ -192,11 +256,31 @@ async function tx() {
     payload_hex: $('txpl').value, mode: 'immediate',
   });
 }
-async function fwd(on) { await post('/api/fwd', {server: $('fwdsrv').value, enable: !!on}); }
+async function fwd(on) {
+  const r = await post('/api/fwd', {server: $('fwdsrv').value, enable: !!on});
+  if (r && !r.error) { msg('forwarder ' + (on ? 'started' : 'stopped')); poll(); }
+}
 
 // ================= frame log + filter engine =================
 const NUMERIC = new Set(['freq_mhz','rf','if','sf','bw','cr','rssi','snr','power','toa_ms','size']);
-const STRINGY = new Set(['dir','mod','crc','status','hex','err']);
+const STRINGY = new Set(['dir','mod','crc','status','hex','err','ascii']);
+function hexToAscii(hex) {
+  if (!hex || hex.length % 2) return '';
+  let out = '';
+  for (let i = 0; i < hex.length; i += 2) {
+    const c = parseInt(hex.substr(i, 2), 16);
+    if (c >= 32 && c < 127) out += String.fromCharCode(c);
+    else out += '';
+  }
+  return out;
+}
+function printableAscii(hex) {
+  if (!hex || hex.length < 2) return null;
+  const out = hexToAscii(hex);
+  const printable = (out.match(/[ -~]/g) || []).length;
+  const ratio = printable / (hex.length / 2);
+  return ratio > 0.9 ? out : null;
+}
 const frameStore = []; // all fetched frames, in seq order
 let lastSeq = 0;
 let filterAst = null; // null = no filter
@@ -295,16 +379,18 @@ $('filter').addEventListener('keydown', e => { if (e.key === 'Enter') applyFilte
 const ctx = $('ctxmenu');
 function hideMenu(){ ctx.style.display='none'; }
 document.addEventListener('click', e => { if (!ctx.contains(e.target)) hideMenu(); });
-function showCtx(x, y, field, value) {
+function showCtx(x, y, field, value, ascii) {
+  const hdr = `<div class="ctx-title">apply as filter</div>` +
+    (ascii ? `<div class="ctx-ascii">ascii: "${ascii.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}"</div>` : '');
   const opts = [
-    ['AND ' + field + ' == ' + value, () => addFilter('and', field, '==', value)],
-    ['OR '  + field + ' == ' + value, () => addFilter('or',  field, '==', value)],
-    ['AND NOT ' + field + ' == ' + value, () => addFilter('and', field, '!=', value)],
-    ['OR NOT '  + field + ' == ' + value, () => addFilter('or',  field, '!=', value)],
+    ['AND ' + field + ' &equals; ' + value, () => addFilter('and', field, '==', value)],
+    ['AND ' + field + ' &ne; ' + value, () => addFilter('and', field, '!=', value)],
+    ['Or, '  + field + ' &equals; ' + value, () => addFilter('or',  field, '==', value)],
+    ['Or, '  + field + ' &ne; ' + value, () => addFilter('or',  field, '!=', value)],
   ];
-  ctx.innerHTML = opts.map((o,i)=>`<div data-i="${i}">${o[0]}</div>`).join('');
-  ctx.querySelectorAll('div').forEach(d => d.addEventListener('click', () => { opts[d.dataset.i][1](); hideMenu(); }));
-  ctx.style.left = Math.min(x, innerWidth-260) + 'px';
+  ctx.innerHTML = hdr + opts.map((o,i)=>`<div data-i="${i}" class="ctx-item">${o[0]}</div>`).join('');
+  ctx.querySelectorAll('.ctx-item').forEach(d => d.addEventListener('click', ev => { ev.stopPropagation(); opts[d.dataset.i][1](); hideMenu(); }));
+  ctx.style.left = Math.min(x, innerWidth-280) + 'px';
   ctx.style.top = y + 'px';
   ctx.style.display = 'block';
 }
@@ -324,22 +410,24 @@ function frameCells(fr) {
   const d = f => f !== undefined && f !== null ? f : '·';
   const cell = (f, v, cls='') => `<td data-f="${f}" data-v="${v === undefined || v === null ? '' : v}" class="${cls}">${d(v)}</td>`;
   const status = fr.dir === 'tx' ? (fr.status === 'ok' ? 'ok' + (fr.toa_ms ? ` (${fr.toa_ms}ms)` : '') : 'failed') : (fr.crc || '·');
+  const rssiCls = fr.rssi === undefined ? '' : (fr.rssi >= -100 ? 'v-ok' : fr.rssi >= -120 ? 'v-warn' : 'v-bad');
+  const snrCls  = fr.snr  === undefined ? '' : (fr.snr  >= 0   ? 'v-ok' : fr.snr  >= -7  ? 'v-warn' : 'v-bad');
   return {
     html: [
-      `<td>${fr.time}</td>`,
+      `<td class="dimv">${fr.time}</td>`,
       cell('dir', fr.dir, 'dir-' + fr.dir),
       cell('freq_mhz', fr.freq_mhz),
       cell('rf', fr.rf),
-      cell('mod', fr.mod),
+      cell('mod', fr.mod, fr.mod==='FSK'?'v-warn':''),
       cell('sf', fr.sf),
       cell('bw', fr.bw),
-      cell('cr', fr.cr),
-      cell('rssi', fr.rssi),
-      cell('snr', fr.snr),
-      cell('crc', fr.dir === 'rx' ? fr.crc : undefined),
+      cell('cr', fr.cr, 'dimv'),
+      cell('rssi', fr.rssi, rssiCls),
+      cell('snr', fr.snr, snrCls),
+      cell('crc', fr.dir === 'rx' ? fr.crc : undefined, fr.crc === 'ok' ? 'v-ok' : fr.crc === 'bad' ? 'v-bad' : ''),
       cell('power', fr.power),
       cell('toa_ms', fr.toa_ms),
-      `<td${fr.status ? '' : ' title="'+(fr.err||"").replace(/"/g,'&quot;')+'"'}>${status}</td>`,
+      `<td class="${fr.dir === 'tx' && fr.status === 'ok' ? 'v-ok' : fr.dir === 'tx' && fr.status === 'failed' ? 'v-bad' : ''}"${fr.status ? '' : ' title="'+(fr.err||"").replace(/"/g,'&quot;')+'"'}>${status}</td>`,
       cell('size', fr.size),
       `<td${fr.hex ? ` data-f="hex" data-v="${fr.hex}"` : ''}>${fr.hex ? fr.hex.slice(0,64) + (fr.hex.length>64?'…':'') : '·'}</td>`,
     ].join(''),
@@ -363,10 +451,234 @@ function renderFrames() {
 $('frames').addEventListener('click', e => {
   const td = e.target.closest('td[data-v]');
   if (!td || td.dataset.v === '') return;
-  showCtx(e.clientX, e.clientY, td.dataset.f, td.dataset.v);
+  e.stopPropagation(); // don't let the dismissal handler run on this click
+  if (td.dataset.f === 'hex') {
+    showPayloadInspector(e.clientX, e.clientY, td.dataset.v, td.dataset.ascii || '');
+  } else {
+    showCtx(e.clientX, e.clientY, td.dataset.f, td.dataset.v, td.dataset.ascii);
+  }
 });
 
-// ================= polling =================
+// ============== payload inspector + LoRaWAN parse/decrypt ==============
+const MTYPES = {0:'Join Request',1:'Join Accept',2:'Unconfirmed Data Up',3:'Unconfirmed Data Down',4:'Confirmed Data Up',5:'Confirmed Data Down',6:'RFU',7:'Proprietary'};
+function le16(b, i) { return b[i] | (b[i+1] << 8); }
+function hexBytes(b) { return Array.from(b).map(x=>x.toString(16).padStart(2,'0')).join(''); }
+function hexToU8(h) { const o = new Uint8Array(h.length/2); for (let i = 0; i < o.length; i++) o[i] = parseInt(h.substr(2*i,2),16); return o; }
+function u8ToHex(a) { return Array.from(a).map(x=>x.toString(16).padStart(2,'0')).join(''); }
+function lorawanParse(hex) {
+  if (hex.length < 24) return null;
+  const b = hexToU8(hex);
+  const mt = b[0] >> 5;
+  const mic = hex.slice(-8);
+  const body = {mtype: mt, mtypeName: MTYPES[mt] || ('mtype ' + mt), mic};
+  if (mt === 0 && b.length === 23) {
+    body.joinEUI = u8ToHex(b.slice(1,9).reverse());
+    body.devEUI  = u8ToHex(b.slice(9,17).reverse());
+    body.devNonce = le16(b, 17);
+  } else if ((mt >= 2 && mt <= 5)) {
+    body.devAddr = u8ToHex(b.slice(1,5).reverse());
+    const fc = b[5];
+    body.adr = !!(fc & 0x80);
+    body.adrAckReq = !!(fc & 0x40);
+    body.ack = !!(fc & 0x20);
+    body.fPending = !!(fc & 0x10);
+    body.fOptsLen = fc & 0x0f;
+    body.fCnt = le16(b, 6);
+    const fportIdx = 8 + body.fOptsLen;
+    body.fOpts = u8ToHex(b.slice(8, fportIdx));
+    const b2 = 1 + 7 + body.fOptsLen;
+    body.frmLen = b.length - 4 - b2 - (b.length > 4 + b2 ? 1 : 0);
+    if (body.frmLen > 0) { body.fPort = b[b2]; body.frm = u8ToHex(b.slice(b2+1, b.length-4)); }
+    else { body.fPort = null; body.frm = ''; }
+  }
+  return body;
+}
+
+// ---- meshtastic guess ----
+// LoRa wire layout (meshtastic/firmware src/mesh/RadioInterface.h PacketHeader):
+// to(4 LE) from(4 LE) id(4 LE) flags(1) channel hash(1) next_hop(1) relay_node(1) | payload
+// payload = AES-CTR encrypted meshtastic Data protobuf (default channel PSK),
+// so we only do protobuf-lite guessing on it.
+function le32(b, i) { return (b[i] | (b[i+1]<<8) | (b[i+2]<<16) | (b[i+3]<<24)) >>> 0; }
+const PORTNUMS = {0:'unknown',1:'text',2:'remote_hw',3:'position',4:'nodeinfo',5:'routing',6:'admin',8:'waypoint',32:'reply',33:'ip_tunnel',34:'paxcounter',64:'serial',65:'store_forward',66:'range_test',67:'telemetry',68:'zeko',70:'map_report',71:'private',72:'ataks',256:'max'};
+function meshParse(hex) {
+  if (!hex || hex.length < 34) return null; // 16B header + ≥1B payload
+  const b = hexToU8(hex);
+  const to = le32(b, 0), from = le32(b, 4), id = le32(b, 8);
+  // heuristics: broadcast dest, or node ids that look like !abcdxxxx (high byte 0)
+  const broadcast = to === 0xffffffff;
+  const nodeish = v => v !== 0 && v >= 0x100 && v < 0xffffff00;
+  if (!broadcast && !(nodeish(to) && nodeish(from))) return null;
+  const flags = b[12];
+  const p = {
+    to, from, id, broadcast,
+    hopLimit: flags & 0x07,
+    wantAck: !!(flags & 0x08),
+    viaMqtt: !!(flags & 0x10),
+    hopStart: (flags & 0xe0) >> 5,
+    chanHash: b[13], nextHop: b[14], relayNode: b[15],
+    payload: b.slice(16),
+  };
+  // protobuf-lite scan of the payload: field1 varint = portnum, field2 len-delimited = bytes
+  // (meshtastic Data message — only readable when not encrypted, which is rare on-air)
+  try {
+    const d = p.payload;
+    let i = 0;
+    const varint = () => { let v = 0, s = 0; while (i < d.length) { const c = d[i++]; v |= (c & 0x7f) << s; s += 7; if (!(c & 0x80)) break; } return v >>> 0; };
+    if (d.length >= 2 && d[0] === 0x08) { // field 1, wiretype 0 (varint)
+      i = 1;
+      p.portnum = varint();
+      if (i < d.length && d[i] === 0x12) { // field 2, wiretype 2 (len-delim)
+        i++;
+        const n = varint();
+        const bytes = d.slice(i, i + n);
+        if (bytes.length === n) {
+          p.pld = u8ToHex(bytes);
+          p.pldAscii = printableAscii(p.pld);
+          p.portnumName = PORTNUMS[p.portnum] || ('port ' + p.portnum);
+        }
+      }
+    }
+  } catch (e) { /* leave undefined */ }
+  p.tailAscii = printableAscii(u8ToHex(p.payload));
+  return p;
+}
+
+// LoRaWAN kolmar cipher path: AES-128 ECB of one 16-byte block. crypto.subtle
+// is only available in secure contexts (https/localhost) — the UI is plain
+// http, so fall back to a small self-contained AES.
+const AES_SBOX = new Uint8Array([0x63,0x7c,0x77,0x7b,0xf2,0x6b,0x6f,0xc5,0x30,0x01,0x67,0x2b,0xfe,0xd7,0xab,0x76,0xca,0x82,0xc9,0x7d,0xfa,0x59,0x47,0xf0,0xad,0xd4,0xa2,0xaf,0x9c,0xa4,0x72,0xc0,0xb7,0xfd,0x93,0x26,0x36,0x3f,0xf7,0xcc,0x34,0xa5,0xe5,0xf1,0x71,0xd8,0x31,0x15,0x04,0xc7,0x23,0xc3,0x18,0x96,0x05,0x9a,0x07,0x12,0x80,0xe2,0xeb,0x27,0xb2,0x75,0x09,0x83,0x2c,0x1a,0x1b,0x6e,0x5a,0xa0,0x52,0x3b,0xd6,0xb3,0x29,0xe3,0x2f,0x84,0x53,0xd1,0x00,0xed,0x20,0xfc,0xb1,0x5b,0x6a,0xcb,0xbe,0x39,0x4a,0x4c,0x58,0xcf,0xd0,0xef,0xaa,0xfb,0x43,0x4d,0x33,0x85,0x45,0xf9,0x02,0x7f,0x50,0x3c,0x9f,0xa8,0x51,0xa3,0x40,0x8f,0x92,0x9d,0x38,0xf5,0xbc,0xb6,0xda,0x21,0x10,0xff,0xf3,0xd2,0xcd,0x0c,0x13,0xec,0x5f,0x97,0x44,0x17,0xc4,0xa7,0x7e,0x3d,0x64,0x5d,0x19,0x73,0x60,0x81,0x4f,0xdc,0x22,0x2a,0x90,0x88,0x46,0xee,0xb8,0x14,0xde,0x5e,0x0b,0xdb,0xe0,0x32,0x3a,0x0a,0x49,0x06,0x24,0x5c,0xc2,0xd3,0xac,0x62,0x91,0x95,0xe4,0x79,0xe7,0xc8,0x37,0x6d,0x8d,0xd5,0x4e,0xa9,0x6c,0x56,0xf4,0xea,0x65,0x7a,0xae,0x08,0xba,0x78,0x25,0x2e,0x1c,0xa6,0xb4,0xc6,0xe8,0xdd,0x74,0x1f,0x4b,0xbd,0x8b,0x8a,0x70,0x3e,0xb5,0x66,0x48,0x03,0xf6,0x0e,0x61,0x35,0x57,0xb9,0x86,0xc1,0x1d,0x9e,0xe1,0xf8,0x98,0x11,0x69,0xd9,0x8e,0x94,0x9b,0x1e,0x87,0xe9,0xce,0x55,0x28,0xdf,0x8c,0xa1,0x89,0x0d,0xbf,0xe6,0x42,0x68,0x41,0x99,0x2d,0x0f,0xb0,0x54,0xbb,0x16]);
+const AES_RCON = [1,2,4,8,16,32,64,128,27,54];
+function xtime(v){ return ((v<<1)^(v&0x80?0x1b:0)) & 0xff; }
+function subWord(w){ return (AES_SBOX[(w>>>24)&0xff]<<24)|(AES_SBOX[(w>>>16)&0xff]<<16)|(AES_SBOX[(w>>>8)&0xff]<<8)|AES_SBOX[w&0xff]; }
+function rotWord(w){ return ((w<<8)|(w>>>24))>>>0; }
+function aes128Block(keyBytes, block) {
+  const w = []; // 44 round keys words BE
+  const kb = Array.from(keyBytes);
+  for (let i = 0; i < 4; i++) w[i] = ((kb[4*i]<<24)|(kb[4*i+1]<<16)|(kb[4*i+2]<<8)|kb[4*i+3])>>>0;
+  for (let i = 4; i < 44; i++) {
+    let t = w[i-1];
+    if (i % 4 === 0) t = (subWord(rotWord(t)) ^ (AES_RCON[i/4-1]<<24)) >>> 0;
+    w[i] = (w[i-4]^t)>>>0;
+  }
+  const rkFlat = (n) => { const o=[]; for (let i=0;i<4;i++) o.push((w[4*n+i]>>24)&0xff,(w[4*n+i]>>16)&0xff,(w[4*n+i]>>8)&0xff,w[4*n+i]&0xff); return o; };
+  const state = Array.from(block);
+  for (let i = 0; i < 16; i++) state[i] ^= rkFlat(0)[i];
+  for (let round = 1; round <= 10; round++) {
+    const rk = rkFlat(round);
+    const t = state.map(b=>AES_SBOX[b]);
+    // SubBytes+ShiftRows: state[row][col]: new row r = [t[r], t[4+((r+1)%4)], ...]
+    for (let r = 0; r < 4; r++)
+      for (let c = 0; c < 4; c++)
+        state[4*c+r] = t[4*((c+r)%4)+r];
+    if (round < 10) {
+      for (let c = 0; c < 4; c++) {
+        const a0=state[4*c], a1=state[4*c+1], a2=state[4*c+2], a3=state[4*c+3];
+        state[4*c+0] = xtime(a0)^(xtime(a1)^a1)^a2^a3;
+        state[4*c+1] = a0^xtime(a1)^(xtime(a2)^a2)^a3;
+        state[4*c+2] = a0^a1^xtime(a2)^(xtime(a3)^a3);
+        state[4*c+3] = (xtime(a0)^a0)^a1^a2^xtime(a3);
+      }
+    }
+    for (let i = 0; i < 16; i++) state[i] ^= rk[i];
+  }
+  return new Uint8Array(state);
+}
+async function aesRoundBlock(keyBytes, block) {
+  if (crypto.subtle) {
+    const key = await crypto.subtle.importKey('raw', keyBytes, 'AES-CBC', false, ['encrypt']);
+    const out = await crypto.subtle.encrypt({name:'AES-CBC', iv:new Uint8Array(16)}, key, block);
+    return new Uint8Array(out).slice(0, 16);
+  }
+  return aes128Block(keyBytes, block);
+}
+async function decryptFRMPayload(appSKeyHex, devAddrHex, dir, fCnt, frmHex) {
+  const key = hexToU8(appSKeyHex);
+  if (key.length !== 16) throw new Error('AppSKey must be 16 bytes (32 hex chars)');
+  const addr = hexToU8(devAddrHex).reverse();
+  const frm = hexToU8(frmHex);
+  const nBlocks = Math.ceil(frm.length / 16);
+  const plain = new Uint8Array(nBlocks * 16);
+  for (let i = 1; i <= nBlocks; i++) {
+    // K layout per spec: 0x01 | 0x00000000 | dir | DevAddr(LSB first) | FCnt 4B | 0x00 | blockNr
+    const KB = new Uint8Array(16);
+    KB[0]=0x01; KB[1]=KB[2]=KB[3]=KB[4]=0; KB[5+0]=dir;
+    KB.set(addr,6); KB[10]=fCnt&0xff; KB[11]=(fCnt>>8)&0xff; KB[12]=0; KB[13]=0; KB[14]=0; KB[15]=i;
+    const s = await aesRoundBlock(key, KB);
+    for (let j = 0; j < 16; j++) plain[(i-1)*16+j] = frm[(i-1)*16+j] ^ s[j];
+  }
+  return plain.slice(0, frm.length);
+}
+
+let inspectorKey = localStorage.getItem('lora8.appskey') || '';
+function showPayloadInspector(x, y, hex, ascii) {
+  const lw = lorawanParse(hex);
+  const mp = meshParse(hex);
+  let info = `<div class="ctx-title">payload</div>`;
+  if (ascii) info += `<div class="ctx-ascii">ascii: "${ascii.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}"</div>`;
+  if (lw) {
+    info += `<div class="ctx-ascii"><b style="color:var(--acc)">${lw.mtypeName}</b>, mic ${lw.mic}`;
+    if (lw.mtype === 0) info += `<br>joineui ${lw.joinEUI}
+deveui ${lw.devEUI}
+devnonce ${lw.devNonce}`;
+    else { info += `<br>devaddr ${lw.devAddr} fcnt ${lw.fCnt}
+      ${lw.adr?' adr':''}${lw.adrAckReq?' adrackreq':''}${lw.ack?' ACK':''}${lw.fPending?' fpending':''}${lw.fOptsLen?` fopts(╔${lw.fOptsLen}B) ${lw.fOpts}`:''}`;
+      if (lw.fPort !== null && lw.fPort !== undefined) info += `<br>fport ${lw.fPort}, ${lw.frmLen}B frm ${lw.frm}`; }
+    info += `</div>`;
+  }
+  if (mp) {
+    const e = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const f32 = v => v.toString(16).padStart(8, '0');
+    let m = `<div class="ctx-ascii" style="color:var(--warn)">meshtastic? ${mp.broadcast ? 'broadcast' : 'direct'} hdr<br>`;
+    m += `to 0x${f32(mp.to)} ← from 0x${f32(mp.from)}<br>`;
+    m += `id 0x${f32(mp.id)} chan 0x${mp.chanHash.toString(16).padStart(2,'0')}`;
+    m += ` next_hop 0x${mp.nextHop.toString(16).padStart(2,'0')} relay 0x${mp.relayNode.toString(16).padStart(2,'0')}<br>`;
+    m += `hop ${mp.hopLimit}/${mp.hopStart}${mp.wantAck ? ' WANTACK' : ''}${mp.viaMqtt ? ' MQTT' : ''}`;
+    if (mp.portnum !== undefined) {
+      m += `<br>portnum ${mp.portnumName} (${mp.portnum})`;
+      if (mp.pld) m += `<br>pld ${mp.pld}`;
+      if (mp.pldAscii) m += `<br>text "${e(mp.pldAscii)}"`;
+    } else {
+      m += `<br><span style="color:var(--dim)">payload encrypted (AES-CTR, channel PSK)${mp.tailAscii ? ' · ascii-ish: "' + e(mp.tailAscii) + '"' : ''}</span>`;
+    }
+    m += `</div>`;
+    info += m;
+  }
+  info += `<div class="ctx-ascii" style="max-width:300px;word-break:break-all;color:var(--dim)">${hex}</div>`;
+  const isDataUp = lw && (lw.mtype === 2 || lw.mtype === 4) && lw.frm && lw.frm.length > 0;
+  if (isDataUp) {
+    info += `<div class="ctx-ascii">decrypt with AppSKey:<br>
+      <input class="ctx-input" id="deckey" placeholder="32 hex chars" value="${inspectorKey}" style="width:260px;background:#0d1117;color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:3px 6px;font:inherit;font-size:11px">
+      <button class="ctx-btn" data-act="decrypt">decrypt</button>
+      <span id="decout"></span></div>`;
+  }
+  const acts = [['copy hex', 'copyhex'], [ascii?'copy ascii':'', 'copyascii'], ['filter AND hex ≥ …', 'fand'], ['filter OR hex ≥ …', 'for']].filter(a=>a[0]);
+  info += `<div style="display:flex;gap:4px;padding:4px 8px 6px">` +
+    acts.map(a=>`<button class="ctx-btn" data-act="${a[1]}">${a[0]}</button>`).join('') + `</div>`;
+  ctx.innerHTML = info;
+  ctx.style.left = Math.min(x, innerWidth-340)+'px'; ctx.style.top = y+'px'; ctx.style.display='block';
+  ctx.querySelectorAll('[data-act]').forEach(el => el.addEventListener('click', ev => {
+    ev.stopPropagation();
+    const act = el.dataset.act;
+    if (act === 'copyhex') navigator.clipboard.writeText(hex).then(()=>{el.textContent='copied ✓';});
+    if (act === 'copyascii') navigator.clipboard.writeText(ascii).then(()=>{el.textContent='copied ✓';});
+    if (act === 'fand') { addFilter('and','hex','>=',hex); hideMenu(); }
+    if (act === 'for') { addFilter('or','hex','>=',hex); hideMenu(); }
+    if (act === 'decrypt') {
+      const k = document.getElementById('deckey').value.trim();
+      inspectorKey = k; localStorage.setItem('lora8.appskey', k);
+      decryptFRMPayload(k, lw.devAddr, 0, lw.fCnt, lw.frm)
+        .then(p => {
+          const h = u8ToHex(p);
+          const a = printableAscii(h);
+          document.getElementById('decout').innerHTML = `<div>hex ${h}${a?`<br>ascii "${a.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}"`:''}</div>`;
+        })
+        .catch(e => { document.getElementById('decout').textContent = 'error: ' + e.message; });
+    }
+  }));
+}
+
+// ============== polling =================
 const chanHist = {}, sfHist = {};
 let lastCounters = null;
 function bar(el, label, v, max, cls='bar') {
@@ -384,10 +696,29 @@ async function poll() {
       `<div class="kv"><b>µs counter</b>${st.trigcnt||0}</div>`,
       `<div class="kv"><b>tx</b>${['?','off','free','scheduled','emitting'][st.txstatus]||st.txstatus}</div>`,
     ].join('');
-    if (st.eui) $('eui').textContent = 'gateway EUI: ' + st.eui;
+    if (st.eui) $('eui').textContent = st.eui;
+    $('dot-dev').className = 'dot' + (st.connected ? ' on' : '');
+    $('dot-run').className = 'dot' + (st.started ? ' on' : '');
+    if (st.uptime_s) {
+      const u = Math.floor(st.uptime_s);
+      $('top-uptime').textContent = 'up ' + Math.floor(u/86400) + 'd ' + String(Math.floor(u/3600)%24).padStart(2,'0') + ':' + String(Math.floor(u/60)%60).padStart(2,'0') + ':' + String(u%60).padStart(2,'0');
+    }
+    const fmtUptime = u => { const d=Math.floor(u/86400), h=Math.floor(u%86400/3600), m=Math.floor(u%3600/60), sec=Math.floor(u%60); return (d?d+'d ':'')+(h?h+'h ':'')+(m?m+'m ':'')+sec+'s'; };
+    $('devstate').innerHTML = [
+      `<div class="kv"><b>daemon uptime</b>${st.uptime_s ? fmtUptime(st.uptime_s) : '—'}</div>`,
+    ].join('');
+  }
+  const lg = await get('/api/logs');
+  if (lg && lg.lines && !logpaused) {
+    const el = $('loglines');
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+    el.textContent = lg.lines.join('\n');
+    if (atBottom) el.scrollTop = el.scrollHeight;
   }
   const fs = await get('/api/fwd');
   if (fs) {
+    if ($('fwdsrv').value === '' && fs.server) $('fwdsrv').value = fs.server;
+    $('dot-fwd').className = 'dot' + (fs.connected ? ' on' : (fs.running ? ' warn' : ''));
     $('fwdstat').innerHTML = [
       `<div class="kv"><b>forwarder</b><span class="dot ${fs.running?'on':''}"></span>${fs.running?fs.server:'stopped'}</div>`,
       `<div class="kv"><b>lns link</b><span class="dot ${fs.connected?'on':''}"></span></div>`,
@@ -413,6 +744,7 @@ async function poll() {
   const pk = await get('/api/packets?since='+lastSeq);
   if (pk && pk.length) {
     for (const fr of pk) {
+      fr.ascii = printableAscii(fr.hex);
       frameStore.push(fr);
       lastSeq = Math.max(lastSeq, fr.seq);
       if (fr.dir === 'rx') {
@@ -423,12 +755,13 @@ async function poll() {
     }
     if (frameStore.length > 1000) frameStore.splice(0, frameStore.length-1000);
     renderFrames();
-    $('chanhist').innerHTML = Object.keys(chanHist).sort().map(k=>bar(0,k+' MHz',chanHist[k],Math.max(1,...Object.values(chanHist)))).join('');
+    $('chanhist').innerHTML = Object.keys(chanHist).sort().map(k=>bar(0,k,chanHist[k],Math.max(1,...Object.values(chanHist)))).join('');
     $('sfhist').innerHTML = Object.keys(sfHist).sort().map(k=>bar(0,k,sfHist[k],Math.max(1,...Object.values(sfHist)))).join('');
   }
 }
 setInterval(poll, 1000);
 poll();
+
 </script>
 </body>
 </html>

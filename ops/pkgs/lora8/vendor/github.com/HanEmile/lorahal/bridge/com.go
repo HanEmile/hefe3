@@ -7,7 +7,7 @@
 //
 //	host -> MCU:  [ cmdID(1) | len_msb(1) | len_lsb(1) | address(1) | data... ]
 //	MCU  -> host: [ cmdID(1) | len_msb(1) | len_lsb(1) | status(1)   | data... ]
-package com
+package bridge
 
 import (
 	"errors"

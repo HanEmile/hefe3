@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"emile.space/lora8/internal/hal"
+	"github.com/HanEmile/lorahal/hal"
 )
 
 // LogEntry is one frame in the in-memory log (RX or TX).
@@ -57,6 +57,34 @@ func DefaultEU868() Config {
 	return c
 }
 
+// MeshWatch returns a configuration tuned to listen for Meshtastic's EU868
+// "Long Fast" default channel: SF11 / BW 250 kHz / CR 4/5, sync word 0x2B,
+// centered on 869.525 MHz
+// (meshtastic/firmware: src/mesh/MeshRadio.h modemPresetToParams() default arm
+// LONG_FAST → sf=11, bw=250kHz, cr=5; src/mesh/RadioLibInterface.h syncWord
+// 0x2B; src/mesh/RadioInterface.cpp regions[] EU_868 {869.4..869.65 MHz} →
+// freq = 869.4 + BW/2 = 869.525 MHz).
+//
+// Differences from DefaultEU868:
+//   - lorawan_public=false. The SX1301 only knows two preamble-sync modes
+//     (LoRaWAN public ≈ 0x34 / private ≈ 0x12 FRAME_SYNCH peak pairs); 0x2B
+//     matches neither. Private mode is the best-effort fallback — decode
+//     degrades to "heuristic preamble lock" and weak packets may be missed.
+//   - Radio 1 moves 868.5 → 869.2 MHz so the 869.525 MHz mesh channel lands
+//     at IF +325 kHz on the std (IF8) chain: |IF| + BW/2 = 450 kHz fits the
+//     500 kHz BW250 RF window (rf1=868.5 would need IF +1025 kHz — out of
+//     band). The multi-SF channels on rf1 are therefore no longer TTN-valid;
+//     mesh mode is opt-in, radio 0 keeps the TTN 867.x plan intact.
+//   - IF8 (std LoRa modem) is locked to SF11/BW250 at that IF. The 8 multi-SF
+//     chains stay enabled (harmless); IF9 (FSK) stays disabled.
+func MeshWatch() Config {
+	c := DefaultEU868()
+	c.Board.LorawanPublic = false
+	c.RxRF[1].FreqHz = 869200000
+	c.RxIF[8] = hal.RxIFConf{Enable: true, RFChain: 1, FreqHz: 325000, Bandwidth: hal.BW250kHz, Datarate: hal.DRLoraSF11}
+	return c
+}
+
 // Gateway owns the HAL and fan-out of RX packets.
 type Gateway struct {
 	mu        sync.Mutex // guards everything below + all HAL calls
@@ -81,11 +109,54 @@ type Gateway struct {
 	rxBad     uint64
 	txRetries uint64
 	txFail    uint64
+
+	history *HistoryWriter
 }
 
 // New creates a Gateway (not yet connected). maxLog is the RX log capacity.
-func New(maxLog int) *Gateway {
-	return &Gateway{maxLog: maxLog}
+// If logDir is non-empty, frames are appended to daily JSONL files there and
+// the last maxLog entries from today/yesterday are preloaded.
+func New(maxLog int, logDir string) *Gateway {
+	g := &Gateway{maxLog: maxLog}
+	if logDir != "" {
+		w, err := NewHistoryWriter(logDir)
+		if err != nil {
+			log.Printf("gw: history disabled: %v", err)
+		} else {
+			g.history = w
+			old, lastSeq, err := LoadRecent(logDir, maxLog)
+			if err == nil && len(old) > 0 {
+				g.lastLog = old
+				g.seq = lastSeq
+				log.Printf("gw: preloaded %d history frames (up to seq %d)", len(old), lastSeq)
+			}
+		}
+	}
+	return g
+}
+
+// appendEntry registers a frame in the ring and the persistent history.
+// Called with the mutex already held except from Connect paths - this helper
+// takes the lock itself.
+
+func (g *Gateway) appendEntry(e LogEntry) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.appendEntryLocked(e)
+}
+
+func (g *Gateway) appendEntryLocked(e LogEntry) {
+	e.Seq = g.seq
+	g.seq++
+	g.lastLog = append(g.lastLog, e)
+	if len(g.lastLog) > g.maxLog {
+		g.lastLog = g.lastLog[len(g.lastLog)-g.maxLog:]
+	}
+	if g.history != nil {
+		if err := g.history.Append(recordFromEntry(e)); err != nil {
+			log.Printf("gw: history append failed: %v", err)
+		}
+	}
 }
 
 // Subscribe registers a fan-out callback for RX batches. Called with at most
@@ -266,14 +337,8 @@ func (g *Gateway) rxLoop(stop chan struct{}) {
 			} else {
 				g.rxBad++
 			}
-			e := LogEntry{Seq: g.seq, Time: time.Now(), Dir: "rx"}
-			g.seq++
 			ep := p
-			e.Rx = &ep
-			g.lastLog = append(g.lastLog, e)
-		}
-		if len(g.lastLog) > g.maxLog {
-			g.lastLog = g.lastLog[len(g.lastLog)-g.maxLog:]
+			g.appendEntryLocked(LogEntry{Time: time.Now(), Dir: "rx", Rx: &ep})
 		}
 		subs := append([]func([]hal.RxPacket){}, g.subs...)
 		g.mu.Unlock()
@@ -396,19 +461,12 @@ func (g *Gateway) Send(pkt hal.TxPacket) error {
 	// log the TX frame (fskSyncWordSize matters only for FSK; LoRa default)
 	pkt.Size = uint16(len(pkt.Payload))
 	toa := hal.TimeOnAir(pkt, 3)
-	g.mu.Lock()
-	e := LogEntry{Seq: g.seq, Time: time.Now(), Dir: "tx", TxToa: toa}
-	g.seq++
 	ep := pkt
-	e.Tx = &ep
+	e := LogEntry{Time: time.Now(), Dir: "tx", TxToa: toa, Tx: &ep}
 	if err != nil {
 		e.TxErr = err.Error()
 	}
-	g.lastLog = append(g.lastLog, e)
-	if len(g.lastLog) > g.maxLog {
-		g.lastLog = g.lastLog[len(g.lastLog)-g.maxLog:]
-	}
-	g.mu.Unlock()
+	g.appendEntry(e)
 	return err
 }
 

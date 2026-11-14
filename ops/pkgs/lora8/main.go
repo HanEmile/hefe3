@@ -25,15 +25,18 @@ import (
 
 	"emile.space/lora8/internal/fwd"
 	"emile.space/lora8/internal/gw"
-	"emile.space/lora8/internal/hal"
+	"github.com/HanEmile/lorahal/hal"
 	"emile.space/lora8/internal/web"
 )
 
 var devFlag = flag.String("dev", "/dev/ttyACM0", "serial device of the concentrator")
 
+var startedAt = time.Now()
+
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
 	log.SetPrefix("[lora8] ")
+	log.SetOutput(web.LogWriter(os.Stderr)) // tee into the /api/logs ring without changing callers
 	flag.Parse()
 	cmd := "web"
 	if flag.NArg() > 0 {
@@ -96,7 +99,7 @@ func configureAndStart(g *gw.Gateway, cfg gw.Config) {
 // (RX FIFO fill, header/packet counters, RSSI registers, timestamp) so we can
 // tell "RF-side silence" apart from "driver-side silence".
 func cmdProbe() {
-	g := gw.New(10)
+	g := gw.New(10, "")
 	if err := g.Connect(devPath()); err != nil {
 		log.Fatalf("connect: %v", err)
 	}
@@ -115,7 +118,7 @@ func cmdProbe() {
 }
 
 func cmdListen() {
-	g := gw.New(500)
+	g := gw.New(500, "")
 	if err := g.Connect(devPath()); err != nil {
 		log.Fatalf("connect: %v", err)
 	}
@@ -147,7 +150,7 @@ func cmdSend(fs *flag.FlagSet, args []string) {
 	if err != nil || len(payload) == 0 {
 		log.Fatalf("payload must be non-empty hex")
 	}
-	g := gw.New(100)
+	g := gw.New(100, "")
 	if err := g.Connect(devPath()); err != nil {
 		log.Fatalf("connect: %v", err)
 	}
@@ -187,7 +190,7 @@ func waitTx(g *gw.Gateway, maxMs uint32) {
 func cmdFwd(fs *flag.FlagSet, args []string) {
 	server := fs.String("server", "", "LNS address host:port (e.g. eu1.cloud.thethings.network:1700)")
 	fs.Parse(args)
-	g := gw.New(500)
+	g := gw.New(500, "")
 	if err := g.Connect(devPath()); err != nil {
 		log.Fatalf("connect: %v", err)
 	}
@@ -215,9 +218,10 @@ func cmdWeb(fs *flag.FlagSet, args []string) {
 	auto := fs.Bool("auto", false, "connect + configure(EU868) + start immediately")
 	dev := fs.String("autodev", "", "override -dev for -auto")
 	fwdSrv := fs.String("fwd", "", "enable Semtech UDP forwarder to this LNS host:port on startup")
+	logDir := fs.String("logdir", "", "directory for persistent frame history (daily JSONL files)")
 	fs.Parse(args)
 
-	g := gw.New(1000)
+	g := gw.New(1000, *logDir)
 	f := &fwd.Forwarder{Send: g.Send}
 	if *auto {
 		p := devPath()
@@ -251,6 +255,7 @@ func cmdWeb(fs *flag.FlagSet, args []string) {
 	}
 	g.Subscribe(f.OnPackets)
 	s := web.New(g, f, gw.DefaultEU868())
+	s.StartedAt = startedAt
 	srv := &http.Server{Addr: *addr, Handler: s.Handler()}
 	fmt.Printf("web UI listening on http://%s\n", displayAddr(*addr))
 	log.Fatal(srv.ListenAndServe())

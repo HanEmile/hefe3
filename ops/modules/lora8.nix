@@ -94,7 +94,10 @@ in
           "-dev ${cfg.device}"
           "web -auto"
           "-addr ${cfg.address}:${toString cfg.port}"
+          "-logdir /var/lib/lora8"
         ] ++ lib.optional (cfg.lns != null) "-fwd ${cfg.lns}");
+
+        StateDirectory = "lora8"; # persistent frame history (daily JSONL)
 
         # The MCU bridge drops off USB for ~20 s whenever it is reset (and on
         # replug), so recover instead of giving up.

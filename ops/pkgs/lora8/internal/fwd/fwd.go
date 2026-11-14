@@ -18,7 +18,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"emile.space/lora8/internal/hal"
+	"github.com/HanEmile/lorahal/hal"
 )
 
 const (

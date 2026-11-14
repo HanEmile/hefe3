@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"strconv"
@@ -15,7 +16,7 @@ import (
 
 	"emile.space/lora8/internal/fwd"
 	"emile.space/lora8/internal/gw"
-	"emile.space/lora8/internal/hal"
+	"github.com/HanEmile/lorahal/hal"
 )
 
 //go:embed index.html
@@ -26,8 +27,47 @@ type Server struct {
 	G   *gw.Gateway
 	Fwd *fwd.Forwarder
 
+	StartedAt time.Time
+
 	mu  sync.Mutex
 	Cfg gw.Config
+}
+
+// logRing keeps the most recent log lines for the UI's Logs card.
+type logRing struct {
+	mu    sync.Mutex
+	lines []string
+	max   int
+}
+
+// LogWriter tees primary log output into the shared ring while still writing
+// to stderr/journald.
+func LogWriter(w io.Writer) io.Writer { return io.MultiWriter(w, ringWriter) }
+
+var ringWriter = &logRing{max: 200}
+
+func (l *logRing) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	line := strings.TrimRight(string(p), "\n")
+	if line != "" {
+		l.lines = append(l.lines, line)
+		if len(l.lines) > l.max {
+			l.lines = l.lines[len(l.lines)-l.max:]
+		}
+	}
+	return len(p), nil
+}
+
+func (l *logRing) Tail(n int) []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if n > len(l.lines) {
+		n = len(l.lines)
+	}
+	out := make([]string, n)
+	copy(out, l.lines[len(l.lines)-n:])
+	return out
 }
 
 // New creates the UI server bound to g/f. cfg is the working configuration
@@ -67,6 +107,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/diag", s.diag)
 	mux.HandleFunc("GET /metrics", s.metrics)
 	mux.HandleFunc("GET /healthz", s.healthz)
+	mux.HandleFunc("GET /api/logs", s.logs)
 	mux.HandleFunc("POST /api/fwd", s.fwdCtl)
 	mux.HandleFunc("GET /api/fwd", s.fwdInfo)
 	return mux
@@ -76,9 +117,14 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 	uid, mcuFW, chip, ok := s.G.Info()
 	trig, _ := s.G.TrigCount()
 	txs, _ := s.G.TxStatus()
+	uptime := 0.0
+	if !s.StartedAt.IsZero() {
+		uptime = time.Since(s.StartedAt).Seconds()
+	}
 	writeJSON(w, 200, map[string]any{
 		"connected": ok,
-		"path":      s.G.Path(),
+		"uptime_s":  uptime,
+		"path":     s.G.Path(),
 		"mcu_uid":   hex.EncodeToString(uid[:]),
 		"eui":       strings.ToUpper(hex.EncodeToString(uid[:])),
 		"mcu_fw":    fmt.Sprintf("0x%08X", mcuFW),
@@ -384,6 +430,11 @@ func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 		code = 503
 	}
 	writeJSON(w, code, map[string]bool{"ok": ok})
+}
+
+// logs returns the tail of the in-memory daemon log ring.
+func (s *Server) logs(w http.ResponseWriter, r *http.Request) {
+ writeJSON(w, 200, map[string]any{"lines": ringWriter.Tail(100)})
 }
 
 // metrics exposes the concentrator + forwarder state in Prometheus text
