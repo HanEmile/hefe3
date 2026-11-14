@@ -73,7 +73,7 @@ From caladan, with an SD card inserted:
 diskutil list
 
 # Flash (streams image from medano, writes to SD card)
-./flash-bmc.sh /dev/disk5 lampadas-bmc
+ops/machines/aarch64/flash-bmc.sh /dev/disk5 lampadas-bmc
 ```
 
 The script builds the image on medano (instant if cached), streams it

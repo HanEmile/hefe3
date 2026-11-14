@@ -7,8 +7,8 @@ pkgs.mkShell {
   ];
 
   shellHook = ''
-    echo "uxn toolchain available:"
-    echo "  uxnasm hello.tal hello.rom   # assemble"
-    echo "  uxn2 hello.rom               # run (also: uxnemu, uxncli)"
+    echo "uxn toolchain available (sources live in ./uxn/):"
+    echo "  uxnasm uxn/hello.tal uxn/hello.rom   # assemble"
+    echo "  uxn2 uxn/hello.rom                   # run (also: uxnemu, uxncli)"
   '';
 }

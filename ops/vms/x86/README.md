@@ -139,8 +139,8 @@ restarting the VM.
 If you need a manual install (uncommon - only for non-standard partition
 layouts, encryption, or pre-existing data disks), uncomment
 `install_vol` in `libvirt.nix`, deploy medano, attach to the VM with
-`virsh console newvm console1`, and follow `install.sh` in the repo
-root. Then comment out `install_vol`, redeploy, and copy the generated
+`virsh console newvm console1`, and follow `docs/install.sh` in the
+repo. Then comment out `install_vol`, redeploy, and copy the generated
 `/etc/nixos/hardware-configuration.nix` back into the repo as
 `ops/vms/x86/newvm/hardware-configuration.nix` (instead of importing
 `../hardware-image.nix`).

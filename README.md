@@ -1,11 +1,13 @@
 # hefe3
 
 NixOS monorepo for the emile.space fleet. One Hetzner host (`medano`)
-hypervises ~27 libvirt VMs; two more bare-metal machines (`lampadas`,
-the `mail` host) and the Hetzner Storagebox sit outside. `caladan`
-(this Mac) is the dev/deploy box: every `nix-build` and `deploy`
-in here originates from caladan and uses medano as the remote x86_64
-builder.
+hypervises 22 libvirt VMs; five more machines are bare-metal
+(`lampadas`, `mail`, `lernaeus`, `lankiveil`, `parella` — four of
+them watched over by Raspberry-Pi BMC helpers, see
+`ops/machines/aarch64/BMC.md`). A Hetzner Storagebox sits outside.
+`caladan` (macOS) is the dev/deploy box: every `nix-build` and
+`deploy` in here originates from caladan and uses medano as the
+remote x86_64 builder.
 
 ## Hosts
 
@@ -15,8 +17,16 @@ builder.
 | medano      | Hetzner hypervisor                  | 95.217.35.60    | (tailnet)         | `ops/machines/x86/medano/`                      |
 | lampadas    | secondary bare-metal (off-site)     | - | 100.87.209.97     | `ops/machines/x86/lampadas/`                    |
 | mail        | mail host                           | - | (tailnet)         | `ops/machines/x86/mail/`                        |
-| naraj       | TLS-terminating reverse proxy VM    | (DNAT via med.) | (tailnet)         | `ops/vms/x86/naraj/`                            |
-| auth        | Authelia SSO VM                     | - | (tailnet)         | `ops/vms/x86/auth/`                             |
+| lernaeus    | GPU workstation + Sunshine host     | - | 100.122.98.27     | `ops/machines/x86/lernaeus/`                    |
+| lankiveil   | router PC                           | - | (tailnet)         | `ops/machines/x86/lankiveil/`                   |
+| parella     | Xeon Phi host                       | - | (tailnet)         | `ops/machines/x86/parella/`                     |
+
+## VMs
+
+| VM          | Role                                | Public v4       | Tailscale v4      | Config                                          |
+|-------------|-------------------------------------|-----------------|-------------------|-------------------------------------------------|
+| naraj       | TLS-terminating reverse proxy       | (DNAT via med.) | (tailnet)         | `ops/vms/x86/naraj/`                            |
+| auth        | Authelia SSO                        | - | (tailnet)         | `ops/vms/x86/auth/`                             |
 | md          | HedgeDoc                            | - | (tailnet)         | `ops/vms/x86/md/`                               |
 | git         | Forgejo / git hosting               | - | (tailnet)         | `ops/vms/x86/git/`                              |
 | data        | SFTPGo                              | - | 100.104.120.80    | `ops/vms/x86/data/`                             |
@@ -33,6 +43,10 @@ builder.
 | factorio    | Factorio (UDP 34197 forwarded)      | (DNAT via med.) | (tailnet)         | `ops/vms/x86/factorio/`                         |
 | r2wars      | r2wars site                         | - | (tailnet)         | `ops/vms/x86/r2wars/`                           |
 | rou         | VPN exit (private bridge)           | 192.168.33.2    | (tailnet)         | `ops/vms/x86/rou/`                              |
+| arr         | *arr-stack on `rou` private bridge  | 192.168.33.3    | (tailnet)         | `ops/vms/x86/arr/`                              |
+| irc         | Ergo + soju (IRC)                   | - | (tailnet)         | `ops/vms/x86/irc/`                              |
+| pretix      | pretix ticket shop                  | - | (tailnet)         | `ops/vms/x86/pretix/`                           |
+| jules       | minimal linux VM (jules)            | - | (tailnet)         | `ops/vms/x86/jules/`                            |
 
 ## Removed VMs
 
@@ -43,10 +57,8 @@ builder.
   key entries). The storagebox restic repo
   `/mnt/storagebox-bx11/backup/late` remains intact for history;
   delete it manually when retention says so.
-| arr         | *arr-stack on `rou` private bridge  | 192.168.33.3    | (tailnet)         | `ops/vms/x86/arr/`                              |
-| irc         | Ergo + soju (IRC)                   | - | (tailnet)         | `ops/vms/x86/irc/`                              |
-| pretix      | pretix ticket shop                  | - | (tailnet)         | `ops/vms/x86/pretix/`                           |
-| jules       | minimal linux VM (jules)            | - | (tailnet)         | `ops/vms/x86/jules/`                            |
+- **`sb1`–`sb5` (2026-11)** — standby Linux scratch VMs (2 GiB, no
+  services); decommissioned, `tmp` covers the use case.
 
 Tailnet domain is `pinto-pike.ts.net`. Full IPAM in
 `ops/ipam/default.nix` (default bridge, `private`, `rou`, `code`, and
@@ -59,7 +71,9 @@ the isolated sandbox net: NAT outbound, east-west blocked on medano.
 hefe3/
   default.nix                  readTree entry; allowlists users/ paths per host
   deploy_all.sh                whole-fleet VM deploy (result-<vm> outlinks, -P 4)
-  install.sh                   minimal bare-metal NixOS install runbook
+  docs/                        install.sh (minimal VM install runbook),
+                               dated VEX scan snapshots (untracked)
+  uxn/                         uxn/varvara playground (.tal sources + roms)
   third_party/                 npins pins (npins/sources.json) + readTree wrapper
   ops/
     ipam/                      SINGLE SOURCE OF TRUTH for VM IPs+MACs+ports
@@ -73,9 +87,15 @@ hefe3/
     shells/                    nix-shell envs
     modules/                   shared NixOS modules
     machines/aarch64/caladan/  caladan host config
+    machines/aarch64/*-bmc/    the four RPi1 BMC boards (+ BMC.md,
+                               flash-bmc.sh, minisign.pub)
     machines/x86/medano/       hypervisor (networking.nix has natFlows)
     machines/x86/lampadas/     off-site bare-metal
+    machines/x86/lernaeus/     GPU workstation (sway, Steam, Sunshine;
+                               encrypted ZFS, see its README.md)
     machines/x86/mail/         mail host
+    machines/x86/lankiveil/    router PC
+    machines/x86/parella/      Xeon Phi host
     vms/x86/<vm>/              per-VM configs (default.nix + libvirt.nix)
     vms/x86/vm-base.nix        shared VM NixOS config (network from IPAM, ssh, tailscale, node-exporter)
     vms/x86/libvirt-base.nix   shared libvirt domain template; restart = null
@@ -226,10 +246,13 @@ Hetzner). Internally:
    git, data, miki,
    photo, social, rss,
    tmp, amalthea,
-   demo01, sb{1,2,3},
+   demo01, nomos, jules,
+   pretix, irc,
    minecraft, factorio,
    r2wars
 ```
+
+(`code` lives on its own isolated virbr3 sandbox, see above)
 
 - All public 80/443 → `naraj` (192.168.75.2) via PREROUTING DNAT
   declared in `ops/machines/x86/medano/networking.nix` (`natFlows`
