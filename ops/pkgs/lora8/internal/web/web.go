@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -222,49 +223,80 @@ func (s *Server) abortTx(w http.ResponseWriter, r *http.Request) {
 func (s *Server) packets(w http.ResponseWriter, r *http.Request) {
 	since, _ := strconv.ParseUint(r.URL.Query().Get("since"), 10, 64)
 	entries := s.G.PacketsSince(since)
-	type out struct {
-		Seq        uint64 `json:"seq"`
-		Time       string `json:"time"`
-		FreqMHz    string `json:"freq_mhz"`
-		IF         int    `json:"if"`
-		RF         int    `json:"rf"`
-		Mod        string `json:"mod"`
-		DR         string `json:"dr"`
-		CR         int    `json:"cr"`
-		RSSI       string `json:"rssi"`
-		SNR        string `json:"snr"`
-		CRC        string `json:"crc"`
-		Size       int    `json:"size"`
-		PayloadHEX string `json:"payload_hex"`
-	}
-	res := make([]out, 0, len(entries))
+	res := make([]map[string]any, 0, len(entries))
 	for _, e := range entries {
-		p := e.Pkt
-		dr := ""
-		mod := "LORA"
-		if p.Modulation == hal.ModLora {
-			dr = fmt.Sprintf("SF%d", dr2sf(p.Datarate))
-		} else {
-			mod = "FSK"
-			dr = fmt.Sprintf("%d", p.Datarate)
+		f := map[string]any{
+			"seq":  e.Seq,
+			"time": e.Time.Format("15:04:05.000"),
+			"dir":  e.Dir,
 		}
-		res = append(res, out{
-			Seq:        e.Seq,
-			Time:       e.Time.Format("15:04:05.000"),
-			FreqMHz:    fmt.Sprintf("%.3f", float64(p.FreqHz)/1e6),
-			IF:         int(p.IFChain),
-			RF:         int(p.RFChain),
-			Mod:        mod,
-			DR:         dr,
-			CR:         int(p.Coderate),
-			RSSI:       fmt.Sprintf("%.1f", p.Rssi),
-			SNR:        fmt.Sprintf("%.1f", p.Snr),
-			CRC:        fmt.Sprintf("0x%02x", p.Status),
-			Size:       int(p.Size),
-			PayloadHEX: hex.EncodeToString(p.Payload),
-		})
+		if e.Dir == "rx" && e.Rx != nil {
+			p := e.Rx
+			f["freq_mhz"] = math.Round(float64(p.FreqHz)/1e4) / 1e2
+			f["if"] = int(p.IFChain)
+			f["rf"] = int(p.RFChain)
+			f["mod"] = "LORA"
+			if p.Modulation == hal.ModLora {
+				f["sf"] = dr2sf(p.Datarate)
+				f["bw"] = bw2khz(p.Bandwidth)
+			} else {
+				f["mod"] = "FSK"
+				f["br"] = int(p.Datarate)
+			}
+			f["cr"] = int(p.Coderate)
+			f["rssi"] = math.Round(float64(p.Rssi)*10) / 10
+			f["snr"] = math.Round(float64(p.Snr)*10) / 10
+			f["crc"] = map[uint8]string{hal.StatCRCOK: "ok", hal.StatCRCBad: "bad", hal.StatNoCRC: "nocrc"}[p.Status]
+			f["size"] = int(p.Size)
+			f["hex"] = hex.EncodeToString(p.Payload)
+		}
+		if e.Dir == "tx" && e.Tx != nil {
+			p := e.Tx
+			f["freq_mhz"] = math.Round(float64(p.FreqHz)/1e4) / 1e2
+			f["rf"] = int(p.RFChain)
+			f["mod"] = "LORA"
+			if p.Modulation == hal.ModLora {
+				f["sf"] = dr2sf(p.Datarate)
+				f["bw"] = bw2khz(p.Bandwidth)
+			} else {
+				f["mod"] = "FSK"
+				f["br"] = int(p.Datarate)
+			}
+			f["cr"] = int(p.Coderate)
+			f["power"] = int(p.RFPower)
+			f["toa_ms"] = e.TxToa
+			f["size"] = int(p.Size)
+			f["hex"] = hex.EncodeToString(p.Payload)
+			if e.TxErr != "" {
+				f["status"] = "failed"
+				f["err"] = e.TxErr
+			} else {
+				f["status"] = "ok"
+			}
+		}
+		res = append(res, f)
 	}
 	writeJSON(w, 200, res)
+}
+
+func bw2khz(bw uint8) int {
+	switch bw {
+	case hal.BW500kHz:
+		return 500
+	case hal.BW250kHz:
+		return 250
+	case hal.BW125kHz:
+		return 125
+	case hal.BW62k5Hz:
+		return 62
+	case hal.BW31k2Hz:
+		return 31
+	case hal.BW15k6Hz:
+		return 15
+	case hal.BW7k8Hz:
+		return 7
+	}
+	return 0
 }
 
 func dr2sf(dr uint32) int {

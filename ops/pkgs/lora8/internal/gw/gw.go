@@ -13,11 +13,16 @@ import (
 	"emile.space/lora8/internal/hal"
 )
 
-// LogEntry is one packet in the in-memory RX log.
+// LogEntry is one frame in the in-memory log (RX or TX).
 type LogEntry struct {
 	Seq  uint64
 	Time time.Time
-	Pkt  hal.RxPacket
+	Dir  string // "rx" | "tx"
+
+	Rx    *hal.RxPacket
+	Tx    *hal.TxPacket
+	TxErr string // set if the TX (after retry) failed
+	TxToa uint32 // ms
 }
 
 // Config is the full concentrator configuration.
@@ -261,8 +266,11 @@ func (g *Gateway) rxLoop(stop chan struct{}) {
 			} else {
 				g.rxBad++
 			}
+			e := LogEntry{Seq: g.seq, Time: time.Now(), Dir: "rx"}
 			g.seq++
-			g.lastLog = append(g.lastLog, LogEntry{Seq: g.seq, Time: time.Now(), Pkt: p})
+			ep := p
+			e.Rx = &ep
+			g.lastLog = append(g.lastLog, e)
 		}
 		if len(g.lastLog) > g.maxLog {
 			g.lastLog = g.lastLog[len(g.lastLog)-g.maxLog:]
@@ -360,6 +368,7 @@ func (g *Gateway) PacketsSince(since uint64) []LogEntry {
 
 // Send transmits a packet. A failing MCU ACK after the concentrator has been
 // up for a while is handled by one full self-heal cycle + single retry.
+// Every attempt (success or failure) is recorded in the frame log.
 func (g *Gateway) Send(pkt hal.TxPacket) error {
 	g.mu.Lock()
 	if !g.connected {
@@ -368,23 +377,39 @@ func (g *Gateway) Send(pkt hal.TxPacket) error {
 	}
 	err := g.H.Send(pkt)
 	g.mu.Unlock()
-	if err == nil {
-		return nil
+	if err != nil {
+		log.Printf("gw: tx failed (%v), running self-heal and retrying once", err)
+		g.txRetries++
+		g.recover()
+		g.mu.Lock()
+		if !g.connected {
+			g.txFail++
+			err = fmt.Errorf("tx retry after self-heal: not connected")
+		} else {
+			err = g.H.Send(pkt)
+			if err != nil {
+				g.txFail++
+			}
+		}
+		g.mu.Unlock()
 	}
-	log.Printf("gw: tx failed (%v), running self-heal and retrying once", err)
-	g.txRetries++
-	g.recover()
+	// log the TX frame (fskSyncWordSize matters only for FSK; LoRa default)
+	pkt.Size = uint16(len(pkt.Payload))
+	toa := hal.TimeOnAir(pkt, 3)
 	g.mu.Lock()
-	defer g.mu.Unlock()
-	if !g.connected {
-		g.txFail++
-		return fmt.Errorf("tx retry after self-heal: not connected")
+	e := LogEntry{Seq: g.seq, Time: time.Now(), Dir: "tx", TxToa: toa}
+	g.seq++
+	ep := pkt
+	e.Tx = &ep
+	if err != nil {
+		e.TxErr = err.Error()
 	}
-	if err := g.H.Send(pkt); err != nil {
-		g.txFail++
-		return err
+	g.lastLog = append(g.lastLog, e)
+	if len(g.lastLog) > g.maxLog {
+		g.lastLog = g.lastLog[len(g.lastLog)-g.maxLog:]
 	}
-	return nil
+	g.mu.Unlock()
+	return err
 }
 
 // AbortTx aborts TX.

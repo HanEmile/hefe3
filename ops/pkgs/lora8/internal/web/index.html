@@ -6,7 +6,7 @@
 <title>lora8 // R11e-LR8</title>
 <style>
   :root { --bg:#0f1419; --panel:#1a2129; --border:#2d3943; --fg:#c8d3dc; --dim:#6b7a88; --acc:#58a6ff; --ok:#3fb950; --bad:#f85149; }
-  * { box-sizing: border-box; }
+  * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.45 ui-monospace,Menlo,monospace; }
   header { padding:10px 18px; border-bottom:1px solid var(--border); display:flex; gap:16px; align-items:baseline; }
   header h1 { font-size:16px; margin:0; color:var(--acc); }
@@ -29,7 +29,7 @@
   .kv b { display:block; font-weight:normal; color:var(--dim); font-size:11px; }
   .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; background:var(--bad); }
   .dot.on { background:var(--ok); }
-  #rxlog { max-height:400px; overflow-y:auto; }
+  #frames { max-height:460px; overflow-y:auto; }
   #msg { color:var(--bad); padding:0 12px; white-space:pre-wrap; }
   .wide { grid-column:1/-1; }
   .barrow { display:flex; align-items:center; gap:8px; margin:2px 0; font-size:11px; }
@@ -37,6 +37,22 @@
   .bar { height:10px; background:var(--acc); border-radius:2px; min-width:1px; transition:width .3s; }
   .bar.noise { background:#4a7c59; }
   .barrow .val { color:var(--dim); }
+  /* frames table + filter */
+  #filterRow { display:flex; gap:8px; align-items:center; }
+  #filter { flex:1; }
+  #filter.bad { border-color:var(--bad); }
+  .framrow td[data-v] { cursor:pointer; }
+  .framrow td[data-v]:hover { background:#1d2833; color:var(--acc); }
+  tr.framrow.rx { border-left:3px solid #2ea043; }
+  tr.framrow.tx { border-left:3px solid #a371f7; }
+  tr.framrow.txfail td { color:var(--bad); }
+  #ctxmenu { position:fixed; z-index:99; background:#161d26; border:1px solid var(--border); border-radius:6px; padding:4px; display:none; box-shadow:0 8px 24px rgba(0,0,0,.5); }
+  #ctxmenu div { padding:4px 12px; font-size:12px; cursor:pointer; border-radius:4px; }
+  #ctxmenu div:hover { background:#223140; color:var(--acc); }
+  .chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+  .chip { background:#223140; border:1px solid var(--border); border-radius:4px; padding:1px 6px; font-size:11px; }
+  .dir-rx { color:#3fb950; }
+  .dir-tx { color:#a371f7; }
 </style>
 </head>
 <body>
@@ -86,7 +102,7 @@
   <div class="card">
     <h2>Transmit</h2>
     <div class="row">
-      <div><label>freq (MHz)</label><input id="txfreq" value="868.1"></div>
+      <div><label>freq (MHz)</label><input id="txfreq" value="869.525"></div>
       <div><label>power (dBm)</label><input id="txpow" value="14"></div>
       <div><label>rf chain</label><select id="txrf"><option>0</option><option>1</option></select></div>
     </div>
@@ -96,7 +112,7 @@
       <div><label>CR</label><select id="txcr"><option value="1">4/5</option><option value="2">4/6</option><option value="3">4/7</option><option value="4" selected>4/8</option></select></div>
     </div>
     <label>payload (hex)</label>
-    <input id="txpl" placeholder="48656c6c6f" >
+    <input id="txpl" placeholder="48656c6c6f">
     <div class="row">
       <button onclick="tx()">send now</button>
       <button class="danger" onclick="post('/api/aborttx',{})">abort tx</button>
@@ -114,11 +130,23 @@
   </div>
 
   <div class="card wide">
-    <h2>Received packets <button style="margin:0 0 0 10px;padding:1px 8px" onclick="lastSeq=0;rxlog.innerHTML=''">clear</button></h2>
-    <div id="rxlog"><table><thead><tr>
-      <th>time</th><th>freq</th><th>if</th><th>mod</th><th>dr</th><th>rssi</th><th>snr</th><th>crc</th><th>len</th><th>payload (hex)</th>
-    </tr></thead><tbody id="rxbody"></tbody></table></div>
+    <h2>Frames
+      <span style="color:var(--dim);font-weight:normal;text-transform:none;font-size:11px">
+        — click a field to apply-as-filter</span>
+    </h2>
+    <div id="filterRow">
+      <input id="filter" placeholder="filter: dir=tx and sf>9, crc=bad, freq_mhz>=868, hex>=4865, status=failed …">
+      <button style="margin:0" onclick="applyFilterExpr()">apply</button>
+      <button style="margin:0" onclick="resetFilter()">clear</button>
+    </div>
+    <div class="chips" id="filterChips"></div>
+    <div id="frames"><table><thead><tr>
+      <th>time</th><th>dir</th><th>freq</th><th>rf</th><th>mod</th><th>sf</th><th>bw</th><th>cr</th>
+      <th>rssi</th><th>snr</th><th>crc</th><th>power</th><th>toa</th><th>status</th><th>len</th><th>payload (hex)</th>
+    </tr></thead><tbody id="fbody"></tbody></table></div>
   </div>
+
+  <div id="ctxmenu"></div>
 </div>
 <script>
 const $ = id => document.getElementById(id);
@@ -152,8 +180,7 @@ function buildCfg() {
   };
 }
 async function start() {
-  const c = buildCfg();
-  const r = await post('/api/config', c);
+  const r = await post('/api/config', buildCfg());
   if (!r || r.error) return;
   await post('/api/start', {});
 }
@@ -165,11 +192,181 @@ async function tx() {
     payload_hex: $('txpl').value, mode: 'immediate',
   });
 }
-async function fwd(on) {
-  await post('/api/fwd', {server: $('fwdsrv').value, enable: !!on});
+async function fwd(on) { await post('/api/fwd', {server: $('fwdsrv').value, enable: !!on}); }
+
+// ================= frame log + filter engine =================
+const NUMERIC = new Set(['freq_mhz','rf','if','sf','bw','cr','rssi','snr','power','toa_ms','size']);
+const STRINGY = new Set(['dir','mod','crc','status','hex','err']);
+const frameStore = []; // all fetched frames, in seq order
+let lastSeq = 0;
+let filterAst = null; // null = no filter
+
+class FilterError extends Error {}
+
+function tokenize(s) {
+  const toks = [];
+  const re = /\s*(>=|<=|!=|==|>|<|=|\(|\)|\bAND\b|\bOR\b|\bNOT\b|\band\b|\bor\b|\bnot\b|[A-Za-z_][A-Za-z0-9_]*|[^\s()>=<!]+)/g;
+  let m;
+  while ((m = re.exec(s)) !== null) toks.push(m[1]);
+  return toks;
 }
 
-let lastSeq = 0;
+// grammar: or: and (OR and)*  and: not (AND not)*  not: NOT not | cmp | ( or )
+class Parser {
+  constructor(toks) { this.t = toks; this.i = 0; }
+  peek() { return this.t[this.i]; }
+  eat() { return this.t[this.i++]; }
+  expectBool(op) {
+    const t = this.eat();
+    if (!t || t.toUpperCase() !== op) throw new FilterError(`expected ${op}, got "${t}"`);
+  }
+  parse() { const a = this.or(); if (this.i < this.t.length) throw new FilterError(`trailing "${this.peek()}"`); return a; }
+  or()  { let l = this.and(); while (this.peek() && this.peek().toUpperCase() === 'OR')  { this.eat(); l = {op:'or', l, r:this.and()}; } return l; }
+  and() { let l = this.not(); while (this.peek() && (this.peek().toUpperCase() === 'AND' || (!['()',')','OR','or'].includes(this.peek())))) { if (this.peek().toUpperCase()==='AND') this.eat(); l = {op:'and', l, r:this.not()}; } return l; }
+  not() {
+    const p = this.peek();
+    if (!p) throw new FilterError('unexpected end');
+    if (p.toUpperCase() === 'NOT') { this.eat(); return {op:'not', sub:this.not()}; }
+    if (p === '(') { this.eat(); const a = this.or(); const c = this.eat(); if (c !== ')') throw new FilterError('missing )'); return a; }
+    return this.cmp();
+  }
+  cmp() {
+    const f = this.eat();
+    if (!f || f === ')' || /^(and|or|not|\(|\))$/i.test(f)) throw new FilterError(`bad field "${f}"`);
+    if (!NUMERIC.has(f) && !STRINGY.has(f)) throw new FilterError(`unknown field "${f}"`);
+    const op = this.eat();
+    if (!op || !/^(=|==|!=|>|<|>=|<=)$/.test(op)) throw new FilterError(`bad operator "${op}"`);
+    const v = this.eat();
+    if (v === undefined || v === '(' || v === ')') throw new FilterError(`missing value after ${op}`);
+    return {op:'cmp', f, o: op === '=' ? '==' : op, v};
+  }
+}
+
+function match(ast, fr) {
+  switch (ast.op) {
+    case 'and': return match(ast.l, fr) && match(ast.r, fr);
+    case 'or':  return match(ast.l, fr) || match(ast.r, fr);
+    case 'not': return !match(ast.sub, fr);
+    case 'cmp': {
+      if (fr[ast.f] === undefined || fr[ast.f] === null) return false;
+      if (NUMERIC.has(ast.f)) {
+        const a = Number(fr[ast.f]), b = Number(ast.v);
+        if (isNaN(b)) return false;
+        switch (ast.o) {
+          case '==': return a === b;
+          case '!=': return a !== b;
+          case '>':  return a >  b;
+          case '<':  return a <  b;
+          case '>=': return a >= b;
+          case '<=': return a <= b;
+        }
+      } else {
+        const a = String(fr[ast.f]).toLowerCase(), b = ast.v.toLowerCase();
+        switch (ast.o) {
+          case '==': return a === b;
+          case '!=': return a !== b;
+          case '>':  return a.includes(b) && a !== b;
+          case '<':  return a.includes(b) && a !== b;
+          case '>=': return a.includes(b);
+          case '<=': return a.includes(b);
+        }
+      }
+      return false;
+    }
+  }
+}
+
+function applyFilterExpr() {
+  const val = $('filter').value.trim();
+  try {
+    filterAst = val ? new Parser(tokenize(val)).parse() : null;
+    $('filter').classList.remove('bad');
+    renderFrames();
+    renderChips();
+  } catch (e) {
+    $('filter').classList.add('bad');
+    msg(e.message);
+  }
+}
+function resetFilter() { $('filter').value=''; filterAst=null; $('filter').classList.remove('bad'); renderFrames(); renderChips(); }
+$('filter').addEventListener('keydown', e => { if (e.key === 'Enter') applyFilterExpr(); });
+
+// click-a-field → apply-as-filter mini menu (wireshark style)
+const ctx = $('ctxmenu');
+function hideMenu(){ ctx.style.display='none'; }
+document.addEventListener('click', e => { if (!ctx.contains(e.target)) hideMenu(); });
+function showCtx(x, y, field, value) {
+  const opts = [
+    ['AND ' + field + ' == ' + value, () => addFilter('and', field, '==', value)],
+    ['OR '  + field + ' == ' + value, () => addFilter('or',  field, '==', value)],
+    ['AND NOT ' + field + ' == ' + value, () => addFilter('and', field, '!=', value)],
+    ['OR NOT '  + field + ' == ' + value, () => addFilter('or',  field, '!=', value)],
+  ];
+  ctx.innerHTML = opts.map((o,i)=>`<div data-i="${i}">${o[0]}</div>`).join('');
+  ctx.querySelectorAll('div').forEach(d => d.addEventListener('click', () => { opts[d.dataset.i][1](); hideMenu(); }));
+  ctx.style.left = Math.min(x, innerWidth-260) + 'px';
+  ctx.style.top = y + 'px';
+  ctx.style.display = 'block';
+}
+function addFilter(boolop, field, rel, value) {
+  const cur = $('filter').value.trim();
+  const term = `${field}${rel}${value}`;
+  $('filter').value = cur ? `${cur} ${boolop} ${term}` : term;
+  applyFilterExpr();
+}
+
+function renderChips() {
+  const v = $('filter').value.trim();
+  $('filterChips').innerHTML = v ? v.split(/\s+(?:and|or)\s+/i).map(c=>`<span class="chip">${c}</span>`).join('') : '';
+}
+
+function frameCells(fr) {
+  const d = f => f !== undefined && f !== null ? f : '·';
+  const cell = (f, v, cls='') => `<td data-f="${f}" data-v="${v === undefined || v === null ? '' : v}" class="${cls}">${d(v)}</td>`;
+  const status = fr.dir === 'tx' ? (fr.status === 'ok' ? 'ok' + (fr.toa_ms ? ` (${fr.toa_ms}ms)` : '') : 'failed') : (fr.crc || '·');
+  return {
+    html: [
+      `<td>${fr.time}</td>`,
+      cell('dir', fr.dir, 'dir-' + fr.dir),
+      cell('freq_mhz', fr.freq_mhz),
+      cell('rf', fr.rf),
+      cell('mod', fr.mod),
+      cell('sf', fr.sf),
+      cell('bw', fr.bw),
+      cell('cr', fr.cr),
+      cell('rssi', fr.rssi),
+      cell('snr', fr.snr),
+      cell('crc', fr.dir === 'rx' ? fr.crc : undefined),
+      cell('power', fr.power),
+      cell('toa_ms', fr.toa_ms),
+      `<td${fr.status ? '' : ' title="'+(fr.err||"").replace(/"/g,'&quot;')+'"'}>${status}</td>`,
+      cell('size', fr.size),
+      `<td${fr.hex ? ` data-f="hex" data-v="${fr.hex}"` : ''}>${fr.hex ? fr.hex.slice(0,64) + (fr.hex.length>64?'…':'') : '·'}</td>`,
+    ].join(''),
+    klass: `framrow ${fr.dir.toLowerCase()} ${fr.status === 'failed' ? 'txfail' : ''}`,
+  };
+}
+
+function renderFrames() {
+  const tb = $('fbody');
+  tb.innerHTML = '';
+  const list = filterAst ? frameStore.filter(f => match(filterAst, f)) : frameStore;
+  for (const fr of list.slice().reverse()) {
+    const c = frameCells(fr);
+    const tr = document.createElement('tr');
+    tr.className = c.klass;
+    tr.innerHTML = c.html;
+    tb.appendChild(tr);
+  }
+}
+
+$('frames').addEventListener('click', e => {
+  const td = e.target.closest('td[data-v]');
+  if (!td || td.dataset.v === '') return;
+  showCtx(e.clientX, e.clientY, td.dataset.f, td.dataset.v);
+});
+
+// ================= polling =================
 const chanHist = {}, sfHist = {};
 let lastCounters = null;
 function bar(el, label, v, max, cls='bar') {
@@ -189,6 +386,15 @@ async function poll() {
     ].join('');
     if (st.eui) $('eui').textContent = 'gateway EUI: ' + st.eui;
   }
+  const fs = await get('/api/fwd');
+  if (fs) {
+    $('fwdstat').innerHTML = [
+      `<div class="kv"><b>forwarder</b><span class="dot ${fs.running?'on':''}"></span>${fs.running?fs.server:'stopped'}</div>`,
+      `<div class="kv"><b>lns link</b><span class="dot ${fs.connected?'on':''}"></span></div>`,
+      `<div class="kv"><b>rx/fw</b>${fs.rxnb}/${fs.rxfw}</div>`,
+      `<div class="kv"><b>tx</b>${fs.txnb}</div>`,
+    ].join('');
+  }
   const dg = await get('/api/diag');
   if (dg && !dg.error) {
     const dHdr = dg.hdr0 + dg.hdrMB + dg.hdrFSK;
@@ -204,30 +410,21 @@ async function poll() {
       bar(0,'decRSSI',dg.decRSSI,255,'bar noise');
     lastCounters = dg;
   }
-  const fs = await get('/api/fwd');
-  if (fs) {
-    $('fwdstat').innerHTML = [
-      `<div class="kv"><b>forwarder</b><span class="dot ${fs.running?'on':''}"></span>${fs.running?fs.server:'stopped'}</div>`,
-      `<div class="kv"><b>lns link</b><span class="dot ${fs.connected?'on':''}"></span></div>`,
-      `<div class="kv"><b>rx/fw</b>${fs.rxnb}/${fs.rxfw}</div>`,
-      `<div class="kv"><b>tx</b>${fs.txnb}</div>`,
-    ].join('');
-  }
   const pk = await get('/api/packets?since='+lastSeq);
   if (pk && pk.length) {
-    const tb = $('rxbody');
-    for (const p of pk) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${p.time}</td><td>${p.freq_mhz}</td><td>${p.if}</td><td>${p.mod}</td><td>${p.dr}</td><td>${p.rssi}</td><td>${p.snr}</td><td>${p.crc}</td><td>${p.size}</td><td style="max-width:340px">${p.payload_hex}</td>`;
-      tb.prepend(tr);
-      lastSeq = Math.max(lastSeq, p.seq);
-      const ch = p.freq_mhz;
-      chanHist[ch] = (chanHist[ch]||0)+1;
-      if (p.mod==='LORA') sfHist[p.dr] = (sfHist[p.dr]||0)+1;
+    for (const fr of pk) {
+      frameStore.push(fr);
+      lastSeq = Math.max(lastSeq, fr.seq);
+      if (fr.dir === 'rx') {
+        const ch = fr.freq_mhz.toFixed(3);
+        chanHist[ch] = (chanHist[ch]||0)+1;
+        if (fr.mod === 'LORA' && fr.sf) sfHist['SF'+fr.sf] = (sfHist['SF'+fr.sf]||0)+1;
+      }
     }
+    if (frameStore.length > 1000) frameStore.splice(0, frameStore.length-1000);
+    renderFrames();
     $('chanhist').innerHTML = Object.keys(chanHist).sort().map(k=>bar(0,k+' MHz',chanHist[k],Math.max(1,...Object.values(chanHist)))).join('');
     $('sfhist').innerHTML = Object.keys(sfHist).sort().map(k=>bar(0,k,sfHist[k],Math.max(1,...Object.values(sfHist)))).join('');
-    while (tb.rows.length > 300) tb.deleteRow(-1);
   }
 }
 setInterval(poll, 1000);
