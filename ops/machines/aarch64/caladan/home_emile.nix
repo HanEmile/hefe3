@@ -17,6 +17,15 @@ in
     homeDirectory = "/Users/emile";
   };
 
+  # Spotlight (and thus Raycast/Launchpad) does not index symlinked .app
+  # bundles, which is what linkApps (the HM default for stateVersion < 25.11)
+  # puts in ~/Applications/Home Manager Apps. copyApps instead places real
+  # APFS copies there, which get indexed -> `moonlight-qt` becomes findable.
+  targets.darwin = {
+    linkApps.enable = false;
+    copyApps.enable = true;
+  };
+
   programs = {
     # let home-manager install and manage itself
     home-manager.enable = true;
@@ -181,6 +190,9 @@ in
     ffmpeg
     exiftool
     unstable.mpv
+    # Moonlight game-streaming client (pairs with Sunshine on lernaeus).
+    # Declarative replacement for the former `brew install --cask moonlight`.
+    unstable.moonlight-qt
 
     # photo (darktable fork)
     (pkgs.callPackage hefe.ops.pkgs.ansel { })

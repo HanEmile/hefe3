@@ -26,7 +26,10 @@
     (import ./gpu.nix (args1 // args2))
     (import ./sway.nix (args1 // args2))
     (import ./gaming.nix (args1 // args2))
+    (import ./sunshine.nix (args1 // args2))
+    ../../../vms/x86/modules/tailscale-cert-renew.nix
     (import ./fans.nix (args1 // args2))
+    (import ./nic.nix (args1 // args2))
     (import ./bluetooth.nix (args1 // args2))
     ./hardware-configuration.nix
   ];
@@ -121,13 +124,20 @@
       "@wheel"
     ];
 
-    # Pull cached store paths from medano (over ssh-ng) in addition to the
-    # public cache. medano has most of the fleet's closures already built,
-    # so building lernaeus locally substitutes from medano first, then
-    # cache.nixos.org, and only compiles what neither has (e.g. the nvidia
-    # kernel module). lernaeus's nix-build@lernaeus key is authorized on
-    # medano via ops/acl (medano.lernaeus). require-sigs is relaxed for the
-    # ssh substituter since medano's store paths aren't signed.
+    # Pull cached store paths from medano (over legacy ssh://) in addition
+    # to the public cache. medano has most of the fleet's closures already
+    # built, so building lernaeus locally substitutes from medano first,
+    # then cache.nixos.org, and only compiles what neither has (e.g. the
+    # nvidia kernel module). lernaeus's nix-build@lernaeus key is
+    # authorized on medano via ops/acl (medano.lernaeus). require-sigs is
+    # relaxed for the ssh substituter since medano's store paths aren't
+    # signed.
+    # NOTE: ssh:// here is the LEGACY store protocol, on purpose. With
+    # ssh-ng:// we repeatedly hit the "deadlock mid-copy on big closures"
+    # bug (sunshine deploy, ~12k paths): connection ESTABLISHED, both ends
+    # idle in poll() with unacked bytes, transfer wedged forever. ssh://
+    # (nix-store --serve) does not show this. Re-test ssh-ng:// when nix
+    # is upgraded substantially.
     substituters = [
       "ssh://lernaeus@medano.emile.space"
       "https://cache.nixos.org/"

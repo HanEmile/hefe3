@@ -116,7 +116,10 @@ in
     package = null;
 
     config = rec {
-      modifier = "Mod4"; # Super
+      # Alt (Option on Mac keyboards). NOT Mod4/Super: when streaming via
+      # Sunshine/Moonlight from a Mac, macOS eats most Cmd combos before
+      # they reach the client, making the Mod4 modifier unusable remotely.
+      modifier = "Mod1";
       terminal = "${pkgs.kitty}/bin/kitty";
       menu = "${pkgs.rofi}/bin/rofi -show drun";
 
