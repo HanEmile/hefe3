@@ -129,11 +129,11 @@
     # medano via ops/acl (medano.lernaeus). require-sigs is relaxed for the
     # ssh substituter since medano's store paths aren't signed.
     substituters = [
-      "ssh-ng://lernaeus@medano.emile.space"
+      "ssh://lernaeus@medano.emile.space"
       "https://cache.nixos.org/"
     ];
     trusted-substituters = [
-      "ssh-ng://lernaeus@medano.emile.space"
+      "ssh://lernaeus@medano.emile.space"
     ];
     require-sigs = false;
   };
