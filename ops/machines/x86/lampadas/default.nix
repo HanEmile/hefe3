@@ -223,7 +223,12 @@ in
     users = {
       root = {
         hashedPassword = "";
-        openssh.authorizedKeys.keys = emile_keys;
+        openssh.authorizedKeys.keys = emile_keys ++ [
+          # root@lampadas' own key: fleet-self-upgrade's deploy target is the
+          # "lampadas" loopback alias (ops/modules/fleet-upgrade.nix), so root
+          # needs to authorised-key itself (2026-11-14).
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIARD1yc+6LpvGg5JcFc2jDFBv3kKRLXeNYqqFnCmAHkZ root@lampadas"
+        ];
       };
       emile = {
         isNormalUser = true;

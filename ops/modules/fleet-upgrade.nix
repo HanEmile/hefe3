@@ -164,12 +164,17 @@ in
           UserKnownHostsFile /var/lib/fleet/medano-initrd_known_hosts
 
       # fleet-self-upgrade deploys "lampadas" to itself; give root a loopback
-      # alias instead of relying on decades-old stale user config
+      # alias instead of relying on decades-old stale user config.
+      # accept-new is load-bearing: without it the unattended nightly deploy
+      # dies on the host-key prompt (first contact, no known_hosts entry) and
+      # lampadas never picks up fleet-upgrade.sh fixes (failed every night
+      # 2026-11-04..14 -> stale initrd ZFS unlock -> medano outage 11-14).
       Host lampadas
           HostName 127.0.0.1
           User root
           Port 22
           IdentityFile /root/.ssh/id_ed25519
+          StrictHostKeyChecking accept-new
     '' + vmSshConfig;
 
     age.secrets = {
