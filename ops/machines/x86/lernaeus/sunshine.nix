@@ -64,6 +64,9 @@
   # origin was allowed once in the STATEFUL config
   # (~emile/.config/sunshine/sunshine.conf):
   #   csrf_allowed_origins = https://lernaeus.pinto-pike.ts.net
+  # Same file also carries the latency tweak for static content:
+  #   minimum_fps_target = 60   (default = half the stream fps; felt as
+  #   "mouse going laggy" on the desktop where scenes are mostly static)
   # Deliberately not in services.sunshine.settings: settings render into a
   # Nix config file and freeze ALL web-UI configuration (incl. pairing).
   tailscaleCertRenew.hostnames = [ "lernaeus.pinto-pike.ts.net" ];
