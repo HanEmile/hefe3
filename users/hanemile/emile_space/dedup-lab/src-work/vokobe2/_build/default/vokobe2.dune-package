@@ -1,0 +1,4 @@
+(lang dune 3.23)
+(name vokobe2)
+(sections (lib .) (bin ../../bin))
+(files (lib (META dune-package opam)) (bin (vokobe2)))

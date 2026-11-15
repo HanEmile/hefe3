@@ -1,0 +1,18 @@
+== bin/main.ml: no folds
+== lib/generator.ml: no folds
+== lib/heading.ml: no folds
+== lib/json.ml: no folds
+== lib/main.ml: no folds
+== lib/page.ml: no folds
+== lib/render.ml: 1 fold(s), build OK
+FOLD dedup_shared_1 nodes=20 occurrences=4 contexts=[eval_call; get_page_attr; render_query_] params=[v ctx] lines-saved=9
+RESULT folds=1 bytes-before=40112 bytes-after=39461 lines-before=1083 lines-after=1074
+== lib/roughmap.ml: no folds
+== lib/sexp.ml: no folds
+== lib/util.ml: no folds
+== test/test_vokobe2.ml: no folds
+
+SUMMARY copy=/Users/emile/emile.space/v2/dedup-lab/src-head/vokobe2 threshold=10
+SUMMARY folds-applied=1 incl-reverted=0
+SUMMARY lines-before=4109 lines-after=4100
+logs: /Users/emile/emile.space/v2/dedup-lab/verify/src-head/logs

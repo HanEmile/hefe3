@@ -1,0 +1,4 @@
+FILE /Users/emile/emile.space/v2/dedup-lab/src-work/vokobe2/lib/render.ml bytes=40317 lines=1060 threshold=10
+SKIP nodes=10 occurrences=2 reason=would grow the file (negative line savings)
+DONE no-clone-class-above-threshold folds=0
+RESULT folds=0 bytes-before=40317 bytes-after=40317 lines-before=1060 lines-after=1060

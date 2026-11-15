@@ -1,0 +1,6 @@
+FILE /Users/emile/emile.space/v2/dedup-lab/src-head/vokobe2/lib/render.ml bytes=40112 lines=1083 threshold=10
+FOLD dedup_shared_1 nodes=20 occurrences=4 contexts=[eval_call; get_page_attr; render_query_] params=[v ctx] lines-saved=9
+SKIP nodes=10 occurrences=2 reason=would grow the file (negative line savings)
+DONE no-clone-class-above-threshold folds=1
+RESULT folds=1 bytes-before=40112 bytes-after=39461 lines-before=1083 lines-after=1074
+WROTE /Users/emile/emile.space/v2/dedup-lab/src-head/vokobe2/lib/render.ml

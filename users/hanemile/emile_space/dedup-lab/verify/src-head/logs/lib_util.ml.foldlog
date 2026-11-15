@@ -1,0 +1,3 @@
+FILE /Users/emile/emile.space/v2/dedup-lab/src-head/vokobe2/lib/util.ml bytes=1764 lines=57 threshold=10
+DONE no-clone-class-above-threshold folds=0
+RESULT folds=0 bytes-before=1764 bytes-after=1764 lines-before=57 lines-after=57

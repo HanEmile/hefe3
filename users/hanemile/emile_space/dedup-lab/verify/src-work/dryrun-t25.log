@@ -1,0 +1,30 @@
+FILE /Users/emile/emile.space/v2/dedup-lab/src-work/vokobe2/lib/generator.ml bytes=22392 lines=613 threshold=25
+DONE no-clone-class-above-threshold folds=0
+RESULT folds=0 bytes-before=22392 bytes-after=22392 lines-before=613 lines-after=613
+FILE /Users/emile/emile.space/v2/dedup-lab/src-work/vokobe2/lib/heading.ml bytes=3543 lines=104 threshold=25
+DONE no-clone-class-above-threshold folds=0
+RESULT folds=0 bytes-before=3543 bytes-after=3543 lines-before=104 lines-after=104
+FILE /Users/emile/emile.space/v2/dedup-lab/src-work/vokobe2/lib/json.ml bytes=5950 lines=184 threshold=25
+DONE no-clone-class-above-threshold folds=0
+RESULT folds=0 bytes-before=5950 bytes-after=5950 lines-before=184 lines-after=184
+FILE /Users/emile/emile.space/v2/dedup-lab/src-work/vokobe2/lib/main.ml bytes=114 lines=2 threshold=25
+DONE no-clone-class-above-threshold folds=0
+RESULT folds=0 bytes-before=114 bytes-after=114 lines-before=2 lines-after=2
+FILE /Users/emile/emile.space/v2/dedup-lab/src-work/vokobe2/lib/page.ml bytes=6081 lines=159 threshold=25
+DONE no-clone-class-above-threshold folds=0
+RESULT folds=0 bytes-before=6081 bytes-after=6081 lines-before=159 lines-after=159
+FILE /Users/emile/emile.space/v2/dedup-lab/src-work/vokobe2/lib/render.ml bytes=40317 lines=1060 threshold=25
+DONE no-clone-class-above-threshold folds=0
+RESULT folds=0 bytes-before=40317 bytes-after=40317 lines-before=1060 lines-after=1060
+FILE /Users/emile/emile.space/v2/dedup-lab/src-work/vokobe2/lib/roughmap.ml bytes=60658 lines=1549 threshold=25
+DONE no-clone-class-above-threshold folds=0
+RESULT folds=0 bytes-before=60658 bytes-after=60658 lines-before=1549 lines-after=1549
+FILE /Users/emile/emile.space/v2/dedup-lab/src-work/vokobe2/lib/sexp.ml bytes=2546 lines=85 threshold=25
+DONE no-clone-class-above-threshold folds=0
+RESULT folds=0 bytes-before=2546 bytes-after=2546 lines-before=85 lines-after=85
+FILE /Users/emile/emile.space/v2/dedup-lab/src-work/vokobe2/lib/util.ml bytes=2171 lines=70 threshold=25
+DONE no-clone-class-above-threshold folds=0
+RESULT folds=0 bytes-before=2171 bytes-after=2171 lines-before=70 lines-after=70
+FILE /Users/emile/emile.space/v2/dedup-lab/src-work/vokobe2/bin/main.ml bytes=7374 lines=190 threshold=25
+DONE no-clone-class-above-threshold folds=0
+RESULT folds=0 bytes-before=7374 bytes-after=7374 lines-before=190 lines-after=190

@@ -1,0 +1,10 @@
+FILE /Users/emile/emile.space/v2/dedup-lab/gate-test/gatetest.ml bytes=744 lines=22 threshold=10
+FOLD dedup_shared_1 nodes=84 occurrences=2 contexts=[a; b] params=[n] lines-saved=1
+DONE no-clone-class-above-threshold folds=1
+RESULT folds=1 bytes-before=744 bytes-after=638 lines-before=22 lines-after=21
+WROTE /Users/emile/emile.space/v2/dedup-lab/gate-test/gatetest.ml
+REVERTED n-folds=1 reason=dune-build-failed
+  build: File "gatetest.ml", line 8, characters 7-9:
+  build: 8 |     (n ++ 3) + (n ++ 3) * 2 + (n ++ 3) + (n ++ 3)
+  build:            ^^
+  build: Error: Unbound value (++)

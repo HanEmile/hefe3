@@ -1,0 +1,8 @@
+lib: [
+  "_build/install/default/lib/vokobe2/META"
+  "_build/install/default/lib/vokobe2/dune-package"
+  "_build/install/default/lib/vokobe2/opam"
+]
+bin: [
+  "_build/install/default/bin/vokobe2"
+]

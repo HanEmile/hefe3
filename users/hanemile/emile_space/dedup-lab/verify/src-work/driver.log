@@ -1,0 +1,16 @@
+== bin/main.ml: no folds
+== lib/generator.ml: no folds
+== lib/heading.ml: no folds
+== lib/json.ml: no folds
+== lib/main.ml: no folds
+== lib/page.ml: no folds
+== lib/render.ml: no folds
+== lib/roughmap.ml: no folds
+== lib/sexp.ml: no folds
+== lib/util.ml: no folds
+== test/test_vokobe2.ml: no folds
+
+SUMMARY copy=/Users/emile/emile.space/v2/dedup-lab/src-work/vokobe2 threshold=10
+SUMMARY folds-applied=0 incl-reverted=0
+SUMMARY lines-before=4146 lines-after=4146
+logs: /Users/emile/emile.space/v2/dedup-lab/verify/src-work/logs
