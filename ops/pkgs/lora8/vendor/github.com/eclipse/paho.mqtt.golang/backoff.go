@@ -47,7 +47,7 @@ func newBackoffController() *backoffController {
 func (b *backoffController) getBackoffSleepTime(
 	situation string, initSleepPeriod time.Duration, maxSleepPeriod time.Duration, processTime time.Duration, skipFirst bool,
 ) (time.Duration, bool) {
-	// Decide first sleep time if the situation is not continual.
+	// Decide first sleep time if the situation is not continual. 
 	var firstProcess = func(status *backoffStatus, init time.Duration, skip bool) (time.Duration, bool) {
 		if skip {
 			status.lastSleepPeriod = 0
@@ -74,7 +74,7 @@ func (b *backoffController) getBackoffSleepTime(
 	status.lastErrorTime = time.Now()
 
 	// When there is a lot of time between last and this error, sleep period is initialized.
-	if status.lastErrorTime.Sub(oldTime) > (processTime*2 + status.lastSleepPeriod) {
+	if status.lastErrorTime.Sub(oldTime) > (processTime * 2 + status.lastSleepPeriod) {
 		return firstProcess(status, initSleepPeriod, skipFirst)
 	}
 
