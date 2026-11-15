@@ -19,7 +19,14 @@ in
 {
   imports = [
     ../../modules/generation-canary.nix
+    # fleet self-recovery baseline (2026-11-15 review): failed-unit/stale-
+    # backup alerts to #emile + magic-rollback self-heal of degraded states
+    (import ../../modules/syswatch.nix { inherit hefe pkgs; })
+    (import ../../modules/magic-rollback.nix { inherit hefe pkgs; })
   ];
+
+  syswatchBot.enable = true;
+  magicRollback.enable = true;
 
   boot.loader.grub.enable = true;
   boot.loader.grub.device = "/dev/sda";

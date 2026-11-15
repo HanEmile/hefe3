@@ -89,6 +89,14 @@ in
       };
     };
 
+    # The storagebox CIFS automount is set up in the host namespace and
+    # does not propagate into restic's private mount namespace (PrivateTmp
+    # etc.) -> ENODEV and the backup fails permanently for the night.
+    # RequiresMountsFor pulls it in; this was hand-patched onto lampadas,
+    # medano and mail per-host since 2026-06 while the shared VM module
+    # kept generating broken units (2026-11-15 review).
+    systemd.services."restic-backups-${hostname}".unitConfig.RequiresMountsFor = "/mnt/storagebox-bx11";
+
     services.restic.backups."${hostname}" = {
       timerConfig = {
         OnCalendar = cfg.onCalendar;

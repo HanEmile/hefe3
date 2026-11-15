@@ -12,7 +12,15 @@
     ./hardware-configuration.nix
     ./mail.nix
     (import ../../../modules/storagebox.nix { inherit hefe; })
+    ../../../modules/generation-canary.nix
+    # fleet self-recovery baseline (2026-11-15 review)
+    (import ../../../modules/syswatch.nix { inherit hefe pkgs; })
+    (import ../../../modules/magic-rollback.nix { inherit hefe pkgs; })
   ];
+
+  syswatchBot.enable = true;
+  magicRollback.enable = true;
+  generationCanary.enable = true;
 
   age = {
     secrets = {
@@ -25,7 +33,9 @@
 
   boot.loader.grub.enable = true;
   boot.loader.grub.devices = [ "/dev/sda" ];
-  boot.kernelPackages = pkgs.linuxPackages_latest;
+  # Pin the same LTS as medano; linuxPackages_latest on an unattended
+  # remote box is a gratuitous reboot-roulette (2026-11-15 review).
+  boot.kernelPackages = pkgs.linuxPackages_6_12;
 
   networking = {
     hostName = "mail";

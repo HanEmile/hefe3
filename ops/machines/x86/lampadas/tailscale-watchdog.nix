@@ -181,6 +181,11 @@ let
     if reachable; then
       log "RECOVER ok after tailscaled restart"
       date +%s > "$HEARTBEAT"
+      # A tailscaled restart invalidates every `tailscale serve` rule that
+      # the fire-and-forget oneshots asserted once at boot
+      # (ha-tailscale-service, immich-tailscale-service) - re-assert them
+      # now or the tailnet endpoints stay dark (2026-11-15 review).
+      systemctl try-restart ha-tailscale-service.service immich-tailscale-service.service >>"$DBG" 2>&1 || true
     else
       log "RECOVER FAILED - still down after restart (likely upstream link down). Will retry in ${checkInterval}."
     fi

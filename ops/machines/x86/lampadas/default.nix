@@ -69,6 +69,12 @@ in
     # drops and logs diagnostics. See file header.
     (import ./tailscale-watchdog.nix (args1 // args2))
 
+    # Self-recovery baseline (2026-11-15 review): syswatch everywhere,
+    # magic-rollback self-heal, medano standby-unlock + email sentry.
+    (import ../../../modules/syswatch.nix { inherit hefe pkgs; })
+    (import ../../../modules/magic-rollback.nix { inherit hefe pkgs; })
+    (import ./fleet-watch.nix (args1 // args2))
+
     # MikroTik R11e-LR8 LoRa concentrator card (mPCIe->USB, /dev/lora8):
     # toolkit + web UI + Semtech UDP forwarder towards TTN.
     (import ../../../modules/lora8.nix { inherit hefe; })
@@ -848,29 +854,19 @@ in
   # unprotected and nobody noticed - this bot is the noticing mechanism.
   #
   # Unlike the irc-VM bots (which connect to Ergo's localhost plaintext
-  # port) this one comes in via the public ingress
+  # port) every syswatch comes in via the public ingress
   # (ircs://irc.emile.space:6697, same path soju's emilespace upstream
   # takes): lampadas's tailnet ACLs don't reach the irc VM (verified
   # 2026-10-28: tailscale reports "no matching peer" for it). All probes are
   # local and need no credentials: unit state via `systemctl` over the
   # system bus works fine from a DynamicUser, disk/mem/load come from /proc.
-  systemd.services.syswatch = {
-    description = "Post lampadas system anomaly alerts to #emile";
-    after = [ "network-online.target" ];
-    wants = [ "network-online.target" ];
-    wantedBy = [ "multi-user.target" ];
-    # systemctl on PATH for the failed-unit / backup-unit queries.
-    path = [ config.systemd.package ];
-    serviceConfig = {
-      DynamicUser = true;
-      StateDirectory = "syswatch";
-      ExecStart = "${pkgs.callPackage hefe.ops.pkgs.syswatch { }}/bin/syswatch --tls --server irc.emile.space:6697 --channel '#emile'";
-      # AF_UNIX for the D-Bus systemctls, AF_INET/AF_INET6 for IRC + DNS.
-      RestrictAddressFamilies = [ "AF_UNIX" "AF_INET" "AF_INET6" ];
-      Restart = "always";
-      RestartSec = "10s";
-    };
-  };
+  # The unit itself lives in ops/modules/syswatch.nix (shared fleet-wide
+  # since the 2026-11-15 self-recovery review).
+  syswatchBot.enable = true;
+
+  # Magic-rollback self-heal (re-activate degraded, roll back once after):
+  # ops/modules/magic-rollback.nix, fleet-wide since 2026-11-15.
+  magicRollback.enable = true;
 
   # Nightly fleet auto-upgrade (02:00 VMs+medano, 03:30 lampadas itself,
   # 08:00 IRC report). Requires root@lampadas to be able to ssh root@medano

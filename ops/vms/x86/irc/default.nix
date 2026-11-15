@@ -360,15 +360,19 @@ in
         mkdir -p $DIR
         TMP=$(mktemp $DIR/.irc_health.XXXXXX)
         chmod 0644 $TMP
+        # metric shape must match uptimebot's scraper
+        # (^health_probe_up{name=...,url=...} in ops/pkgs/uptimebot), not
+        # ad-hoc names - ergo_up/soju_up were written but consumed by
+        # nobody (2026-11-15 review: the alerting host can die unnoticed).
         if ${pkgs.iproute2}/bin/ss -tlnH 'sport = :${toString ergoPlainPort}' | grep -q LISTEN; then
-          echo 'ergo_up 1' > $TMP
+          echo 'health_probe_up{name="ergo",url="irc://127.0.0.1:${toString ergoPlainPort}"} 1' > $TMP
         else
-          echo 'ergo_up 0' > $TMP
+          echo 'health_probe_up{name="ergo",url="irc://127.0.0.1:${toString ergoPlainPort}"} 0' > $TMP
         fi
         if ${pkgs.iproute2}/bin/ss -tlnH 'sport = :${toString sojuTlsPort}' | grep -q LISTEN; then
-          echo 'soju_up 1' >> $TMP
+          echo 'health_probe_up{name="soju",url="ircs://127.0.0.1:${toString sojuTlsPort}"} 1' >> $TMP
         else
-          echo 'soju_up 0' >> $TMP
+          echo 'health_probe_up{name="soju",url="ircs://127.0.0.1:${toString sojuTlsPort}"} 0' >> $TMP
         fi
         mv $TMP $DIR/irc_health.prom
       '';

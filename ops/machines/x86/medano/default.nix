@@ -18,6 +18,11 @@ let
   vm = name: hefe.path.origSrc + ("/ops/vms/x86/" + name + "/libvirt.nix");
 in
 {
+  # fleet self-recovery baseline (2026-11-15 review): failed-unit/stale-
+  # backup alerts to #emile + magic-rollback self-heal of degraded states
+  syswatchBot.enable = true;
+  magicRollback.enable = true;
+
   # QEMU user-mode emulation for armv6l — lets medano build armv6l-linux
   # derivations (RPi 1 BMC images) via transparent emulation.
   boot.binfmt.emulatedSystems = [ "armv6l-linux" ];
@@ -66,30 +71,9 @@ in
     owner = "fleet-unlock-pull";
     group = "fleet-unlock-pull";
   };
-  users.groups.fleet-unlock-pull = { };
-  users.users.fleet-unlock-pull = {
-    isSystemUser = true;
-    group = "fleet-unlock-pull";
-    description = "serves lampadas' LUKS passphrase to its initrd (forced command)";
-    shell = pkgs.writeShellScript "fleet-luks-cat" ''
-      exec ${pkgs.coreutils}/bin/cat /run/agenix/lampadas_luks_passphrase
-    '';
-    openssh.authorizedKeys.keys = [
-      # private half lives on lampadas at /root/lampadas_initrd_pull_ed25519,
-      # baked into its initrd via boot.initrd.secrets
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM/nmvMERO4KvBAVuc7L2SaoDFXvMmpYrDk0I0mjSKmE lampadas-initrd-pull"
-    ];
-  };
-  # belt & suspenders: the key must not be able to do anything except the
-  # forced-command shell
-  services.openssh.extraConfig = ''
-    Match User fleet-unlock-pull
-        AllowTcpForwarding no
-        AllowAgentForwarding no
-        PermitTunnel no
-        X11Forwarding no
-        PermitTTY no
-  '';
+  # users.groups/users.users live in the acl-driven block further down
+  # (no path-sugar here: this file already defines users = ...; and
+  # services = ...;  in full form - Nix refuses the duplicate top-level).
   # Second copy of lampadas' backup repos on grave (2026-11-01: the status
   # page only ever showed the small metadata repo; the ~430 GiB immich
   # library had exactly ONE copy, on the bx11). bx11 and medano are both
@@ -195,6 +179,8 @@ in
 
   imports = [
     (import ./boot.nix (args1 // args2))
+    (import ../../../modules/syswatch.nix { inherit hefe pkgs; })
+    (import ../../../modules/magic-rollback.nix { inherit hefe pkgs; })
     ./networking.nix
     ./hardware-configuration.nix
     ./libvirt
@@ -275,8 +261,25 @@ in
           # login); this one is root@lampadas' interactive key.
           "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIARD1yc+6LpvGg5JcFc2jDFBv3kKRLXeNYqqFnCmAHkZ root@lampadas"
         ];
+        # serves lampadas' LUKS passphrase to its initrd (forced-command
+        # shell is the restriction; Match-block in services.openssh below)
+        fleet-unlock-pull = {
+          isSystemUser = true;
+          group = "fleet-unlock-pull";
+          description = "serves lampadas' LUKS passphrase to its initrd (forced command)";
+          shell = (pkgs.writeShellScriptBin "fleet-luks-cat" ''
+            exec ${pkgs.coreutils}/bin/cat /run/agenix/lampadas_luks_passphrase
+          '') // { shellPath = "/bin/fleet-luks-cat"; };
+          openssh.authorizedKeys.keys = [
+            # private half lives on lampadas at
+            # /root/lampadas_initrd_pull_ed25519, baked into its initrd
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM/nmvMERO4KvBAVuc7L2SaoDFXvMmpYrDk0I0mjSKmE lampadas-initrd-pull"
+          ];
+        };
       };
-      groups = aclconf.groups;
+      groups = aclconf.groups // {
+        fleet-unlock-pull = { };
+      };
     };
 
   environment.systemPackages = with pkgs; [
@@ -311,6 +314,15 @@ in
       # disable PAM challenge-response path entirely (2026-10-12 VEX scan:
       # kept CVE-2007-2768 visible because sshd-no-opie was dropped)
       settings.KbdInteractiveAuthentication = false;
+      # the LUKS-pull key must do nothing but run its forced-command shell
+      extraConfig = ''
+        Match User fleet-unlock-pull
+            AllowTcpForwarding no
+            AllowAgentForwarding no
+            PermitTunnel no
+            X11Forwarding no
+            PermitTTY no
+      '';
     };
 
     tailscale = {
