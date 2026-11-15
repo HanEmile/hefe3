@@ -190,7 +190,7 @@ func toRxpk(pkts []hal.RxPacket, st *Stats) []map[string]any {
 			"rfch": p.RFChain,
 			"freq": float64(p.FreqHz) / 1e6,
 			"stat": 1,
-			"rssi": round1(p.Rssi),
+			"rssi": int(math.Round(float64(p.Rssi))),
 			"size": p.Size,
 			"data": base64.StdEncoding.EncodeToString(p.Payload),
 		}

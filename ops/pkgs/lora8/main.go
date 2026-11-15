@@ -25,8 +25,9 @@ import (
 
 	"emile.space/lora8/internal/fwd"
 	"emile.space/lora8/internal/gw"
-	"github.com/HanEmile/lorahal/hal"
+	"emile.space/lora8/internal/mqttbridge"
 	"emile.space/lora8/internal/web"
+	"github.com/HanEmile/lorahal/hal"
 )
 
 var devFlag = flag.String("dev", "/dev/ttyACM0", "serial device of the concentrator")
@@ -219,6 +220,8 @@ func cmdWeb(fs *flag.FlagSet, args []string) {
 	dev := fs.String("autodev", "", "override -dev for -auto")
 	fwdSrv := fs.String("fwd", "", "enable Semtech UDP forwarder to this LNS host:port on startup")
 	logDir := fs.String("logdir", "", "directory for persistent frame history (daily JSONL files)")
+	mqttAddr := fs.String("mqtt", "", "subscribe Meshtastic MQTT relay at tcp://host:port (empty=off), topic msh/#")
+	mqttTopic := fs.String("mqtt-topic", "msh/#", "mqtt topic to subscribe when -mqtt is on")
 	fs.Parse(args)
 
 	g := gw.New(1000, *logDir)
@@ -252,6 +255,17 @@ func cmdWeb(fs *flag.FlagSet, args []string) {
 				}
 			}
 		}()
+	}
+	if *mqttAddr != "" {
+		addr := *mqttAddr
+		if !strings.HasPrefix(addr, "tcp://") {
+			addr = "tcp://" + addr
+		}
+		if _, err := mqttbridge.New(addr, *mqttTopic, g.InjectRaw); err != nil {
+			log.Printf("mqtt bridge failed: %v", err)
+		} else {
+			log.Printf("mqtt bridge: %s %s", addr, *mqttTopic)
+		}
 	}
 	g.Subscribe(f.OnPackets)
 	s := web.New(g, f, gw.DefaultEU868())

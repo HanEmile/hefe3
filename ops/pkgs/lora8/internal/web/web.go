@@ -2,11 +2,12 @@
 package web
 
 import (
+	"bytes"
+	"io"
 	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
 	"net/http"
 	"strconv"
@@ -21,6 +22,9 @@ import (
 
 //go:embed index.html
 var indexHTML []byte
+
+//go:embed lite.html
+var liteHTML []byte
 
 // Server holds the dependencies for the UI.
 type Server struct {
@@ -91,8 +95,16 @@ func writeErr(w http.ResponseWriter, err error) {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		// friendly overview for humans; the dense power view lives at /pro
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(liteHTML)
+	})
+	mux.HandleFunc("GET /pro", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(indexHTML)
+	})
+	mux.HandleFunc("GET /index.html", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/pro", http.StatusTemporaryRedirect)
 	})
 	mux.HandleFunc("GET /api/status", s.status)
 	mux.HandleFunc("POST /api/connect", s.connect)
@@ -105,6 +117,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/aborttx", s.abortTx)
 	mux.HandleFunc("GET /api/packets", s.packets)
 	mux.HandleFunc("GET /api/diag", s.diag)
+	mux.HandleFunc("GET /api/spectrum", s.spectrum)
+	mux.HandleFunc("POST /api/spectrum", s.spectrum)
+
+	// meshtastic meshd (local python daemon on :8099)
+	mux.HandleFunc("GET /api/mesh/peers", s.meshPeers)
+	mux.HandleFunc("GET /api/mesh/messages", s.meshMessages)
+	mux.HandleFunc("GET /api/mesh/status", s.meshStatus)
+	mux.HandleFunc("POST /api/mesh/send", s.meshSend)
 	mux.HandleFunc("GET /metrics", s.metrics)
 	mux.HandleFunc("GET /healthz", s.healthz)
 	mux.HandleFunc("GET /api/logs", s.logs)
@@ -124,7 +144,7 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{
 		"connected": ok,
 		"uptime_s":  uptime,
-		"path":     s.G.Path(),
+		"path":      s.G.Path(),
 		"mcu_uid":   hex.EncodeToString(uid[:]),
 		"eui":       strings.ToUpper(hex.EncodeToString(uid[:])),
 		"mcu_fw":    fmt.Sprintf("0x%08X", mcuFW),
@@ -143,6 +163,47 @@ func (s *Server) diag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, d)
+}
+
+// spectrum: GET returns the latest spectral sweep, POST {enabled:bool}
+// toggles spectrum mode (serial sweeps against the RX loop, see
+// gw/spectrum.go for the coexistence semantics).
+func (s *Server) spectrum(w http.ResponseWriter, r *http.Request) {
+	spec := s.G.Spectrum
+	if spec == nil {
+		writeJSON(w, 200, map[string]any{"enabled": false, "err": "spectrum not available"})
+		return
+	}
+	if r.Method == http.MethodPost {
+		var req struct {
+			Enabled bool `json:"enabled"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, err)
+			return
+		}
+		spec.SetEnabled(req.Enabled)
+	}
+	res := map[string]any{
+		"enabled": spec.Enabled(),
+		"sweeps":  spec.Sweeps(),
+	}
+	if l := spec.Latest(); l != nil {
+		res["ts"] = l.Time.Format(time.RFC3339)
+		res["rf"] = l.RFChain
+		if l.Err != "" {
+			res["err"] = l.Err
+		}
+		pts := make([]map[string]any, len(l.Points))
+		for i, p := range l.Points {
+			pts[i] = map[string]any{
+				"freq_mhz": math.Round(float64(p.FreqHz)/1e3) / 1e3,
+				"rssi":     math.Round(float64(p.RssiDb)*10) / 10,
+			}
+		}
+		res["points"] = pts
+	}
+	writeJSON(w, 200, res)
 }
 
 type connectReq struct {
@@ -275,6 +336,13 @@ func (s *Server) packets(w http.ResponseWriter, r *http.Request) {
 			"seq":  e.Seq,
 			"time": e.Time.Format("15:04:05.000"),
 			"dir":  e.Dir,
+		}
+		if e.Rx != nil {
+			if e.Source != "" {
+				f["class"] = e.Source
+			} else {
+				f["class"] = gw.Classify(e.Rx.Payload)
+			}
 		}
 		if e.Dir == "rx" && e.Rx != nil {
 			p := e.Rx
@@ -434,8 +502,49 @@ func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 
 // logs returns the tail of the in-memory daemon log ring.
 func (s *Server) logs(w http.ResponseWriter, r *http.Request) {
- writeJSON(w, 200, map[string]any{"lines": ringWriter.Tail(100)})
+	writeJSON(w, 200, map[string]any{"lines": ringWriter.Tail(100)})
 }
+
+// meshd proxy: GET/POST loops over the local meshd daemon, forwarding JSON
+// translation and marking unavailability as a clean error for the UI.
+
+var meshHTTP = &http.Client{Timeout: 3 * time.Second}
+
+const meshdBase = "http://127.0.0.1:8099"
+
+func meshGet(w http.ResponseWriter, path string) {
+	resp, err := meshHTTP.Get(meshdBase + path)
+	if err != nil {
+		writeJSON(w, 502, map[string]string{"error": "meshd unreachable: " + err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
+}
+
+func meshPost(w http.ResponseWriter, r *http.Request, path string) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	resp, err := meshHTTP.Post(meshdBase+path, "application/json", bytes.NewReader(body))
+	if err != nil {
+		writeJSON(w, 502, map[string]string{"error": "meshd unreachable: " + err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
+}
+
+func (s *Server) meshPeers(w http.ResponseWriter, r *http.Request)    { meshGet(w, "/api/peers") }
+func (s *Server) meshMessages(w http.ResponseWriter, r *http.Request) { meshGet(w, "/api/messages") }
+func (s *Server) meshStatus(w http.ResponseWriter, r *http.Request)   { meshGet(w, "/api/status") }
+func (s *Server) meshSend(w http.ResponseWriter, r *http.Request)     { meshPost(w, r, "/api/send") }
 
 // metrics exposes the concentrator + forwarder state in Prometheus text
 // format so lampadas' prometheus (and thus the fleet dashboards) can scrape
@@ -482,6 +591,17 @@ func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 		gauge("lora8_noise_rssi_raw", "Instantaneous noise/RSSI registers (raw units).", `{reg="chann"}`, float64(d.ChannRSSI))
 		gauge("lora8_noise_rssi_raw", "Instantaneous noise/RSSI registers (raw units).", `{reg="bb"}`, float64(d.BBRSSI))
 		gauge("lora8_noise_rssi_raw", "Instantaneous noise/RSSI registers (raw units).", `{reg="dec"}`, float64(d.DecRSSI))
+	}
+	if spec := s.G.Spectrum; spec != nil {
+		ctr("lora8_spectrum_sweeps_total", "Spectral sweep attempts (spectrum mode).", "", float64(spec.Sweeps()))
+		gauge("lora8_spectrum_enabled", "1 if periodic spectral sweeps are enabled.", "", b2f(spec.Enabled()))
+		if l := spec.Latest(); l != nil && l.Err == "" {
+			gauge("lora8_spectrum_last_sweep_age_seconds", "Age of the last successful spectral sweep.", "", time.Since(l.Time).Seconds())
+			fmt.Fprintf(&b, "# HELP lora8_spectrum_rssi_dbm Max RSSI per frequency bin from the latest spectral sweep.\n# TYPE lora8_spectrum_rssi_dbm gauge\n")
+			for _, p := range l.Points {
+				fmt.Fprintf(&b, "lora8_spectrum_rssi_dbm{freq=\"%.3f\",rfchain=\"%d\"} %v\n", float64(p.FreqHz)/1e6, l.RFChain, p.RssiDb)
+			}
+		}
 	}
 
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4")

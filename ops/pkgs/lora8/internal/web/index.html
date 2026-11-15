@@ -88,8 +88,28 @@
   .card h2 { color:var(--warn); }
   #topbar h1, .topkv b { color:var(--acc); }
   .framrow:hover td { background:#14202c; }
+  .msgrow { padding:4px 0; border-bottom:1px solid #20272f; }
+  .msgrow.mine { opacity:.85; }
+  .card.wide .medswipe { }
 
   #loglines { max-height:200px; overflow-y:auto; background:#0d1117; border:1px solid var(--border); border-radius:4px; padding:4px 6px; margin:4px 0 0; font-size:10px; white-space:pre-wrap; word-break:break-all; }
+
+  /* phone: stack everything, frames first */
+  @media (max-width: 900px) {
+    body { overflow:auto; }
+    #app { grid-template-rows:auto 1fr; height:auto; min-height:100vh; }
+    #topbar { flex-wrap:wrap; gap:8px; padding:4px 8px; height:auto; }
+    #topbar .topkv { font-size:10px; }
+    #cols { display:flex; flex-direction:column; }
+    #cols .col { border-right:none; border-bottom:1px solid var(--border); overflow:visible; padding:6px; }
+    #frameswrap { order:-1; height:62vh; }
+    #frames { overflow:auto; }
+    .card { margin-bottom:6px; }
+    #frames table { font-size:10px; }
+    th, td { padding:2px 3px; }
+    #filterRow { flex-wrap:wrap; }
+    #filter { flex:1 1 100%; }
+  }
 </style>
 </head>
 <body>
@@ -101,7 +121,7 @@
     <span class="topkv"><span class="dot" id="dot-dev"></span><span id="dot-dev-t">dev</span></span>
     <span class="topkv"><span class="dot" id="dot-run"></span><span id="dot-run-t">rx</span></span>
     <span class="topkv"><span class="dot" id="dot-fwd"></span><span id="dot-fwd-t">ttn</span></span>
-    <span class="topkv" id="top-uptime"></span>
+    <span class="topkv" id="top-uptime"></span><span class="topkv"><a href="/" style="color:var(--dim);text-decoration:none;border:1px solid var(--border);padding:1px 7px">lite view</a></span>
     <span class="spacer"></span>
     <span id="msg"></span>
   </header>
@@ -128,7 +148,7 @@
           <div><label><input type="checkbox" id="txena" checked style="width:auto">TX rf0</label></div>
           <div><label><input type="checkbox" id="pub" checked style="width:auto">public</label></div>
           <div><label><input type="checkbox" id="if8" style="width:auto">if8 std</label></div>
-          <div><label><input type="checkbox" id="mesh" style="width:auto">mesh</label></div>
+          <div title="private sync (0x12) — meshcore listening; Pauses LoRaWAN/TTN"><label><input type="checkbox" id="mesh" style="width:auto">meshcore</label></div>
         </div>
         <div class="btnrow">
           <button onclick="start()">apply+start</button>
@@ -191,12 +211,42 @@
         <div id="sfhist"></div>
       </div>
       <div class="card">
+        <h2>spectrum (rssi sweep) <span class="tools"><button id="specbtn" onclick="specToggle()">off</button></span></h2>
+        <div id="specmeta"></div>
+        <div id="specplot" style="display:flex;align-items:flex-end;height:70px;gap:1px"></div>
+      </div>
+      <div class="card">
         <h2>state</h2>
         <div class="status" id="devstate"></div>
       </div>
       <div class="card">
         <h2>log <span class="tools"><button onclick="logpaused=!logpaused;logel.scrollTop=logel.scrollHeight">pause</button><button onclick="logel.textContent=''">clear</button></h2>
         <pre id="loglines"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+        <div class="card wide" id="meshcard">
+          <h2>mesh <span class="tools"><span id="meshstate" style="color:var(--dim)"></span></span></h2>
+          <div id="meshcols" style="display:grid;grid-template-columns:1fr 1fr 280px;gap:10px">
+            <div>
+              <div id="ppeers"><table><thead><tr><th>name</th><th>id</th><th>hw</th><th>snr</th><th>last</th><th>batt</th></tr></thead><tbody id="peertbody"></tbody></table></div>
+            </div>
+            <div>
+              <div id="pmessages" style="max-height:240px;overflow-y:auto;font-size:11px"></div>
+            </div>
+            <div>
+              <label>to</label>
+              <select id="meshTo" style="width:100%"><option value="broadcast">broadcast</option></select>
+              <label>text</label>
+              <input id="meshText" placeholder="message">
+              <div class="btnrow">
+                <button onclick="meshSend()">send text</button>
+              </div>
+              <div id="meshsendstate" style="color:var(--dim);font-size:10px;margin-top:4px"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -219,12 +269,12 @@ async function get(url){ try { const r = await fetch(url); return await r.json()
 
 function buildCfg() {
   const mesh = $('mesh').checked;
-  // mesh mode: rf1 moves to 869.2 MHz so the meshtastic LongFast channel
-  // (869.525 MHz, SF11/BW250) lands at IF +325kHz on the std chain; the
-  // SX1301 "public" sync toggle is dropped to private (0x2B matches neither
-  // anyway). Mirrors gw.MeshWatch().
+  // meshcore mode (private sync 0x12): rf1 moves to 869.2 MHz so 869.525 MHz
+  // (SF11/BW250) lands at IF +325kHz on the std chain. LoRaWAN/TTN DEAF
+  // meanwhile — sync families are mutually exclusive on this card.
   const rf0 = Math.round(parseFloat($('rf0').value)*1e6);
   const rf1 = mesh ? 869200000 : Math.round(parseFloat($('rf1').value)*1e6);
+  if (mesh) msg('meshcore mode: LoRaWAN/TTN goes deaf while enabled');
   const multi = (rf,f)=>({Enable:true,RFChain:rf,FreqHz:f,Bandwidth:3,Datarate:126,SyncWordSize:0,SyncWord:0});
   return {
     Board:{LorawanPublic: mesh ? false : $('pub').checked, ClkSrc:1},
@@ -256,6 +306,11 @@ async function tx() {
     payload_hex: $('txpl').value, mode: 'immediate',
   });
 }
+let specEnabled = false;
+async function specToggle() {
+  const r = await post('/api/spectrum', {enabled: !specEnabled});
+  if (r && !r.error) poll();
+}
 async function fwd(on) {
   const r = await post('/api/fwd', {server: $('fwdsrv').value, enable: !!on});
   if (r && !r.error) { msg('forwarder ' + (on ? 'started' : 'stopped')); poll(); }
@@ -263,7 +318,7 @@ async function fwd(on) {
 
 // ================= frame log + filter engine =================
 const NUMERIC = new Set(['freq_mhz','rf','if','sf','bw','cr','rssi','snr','power','toa_ms','size']);
-const STRINGY = new Set(['dir','mod','crc','status','hex','err','ascii']);
+const STRINGY = new Set(['dir','mod','crc','status','hex','err','ascii','class']);
 function hexToAscii(hex) {
   if (!hex || hex.length % 2) return '';
   let out = '';
@@ -425,6 +480,7 @@ function frameCells(fr) {
       cell('rssi', fr.rssi, rssiCls),
       cell('snr', fr.snr, snrCls),
       cell('crc', fr.dir === 'rx' ? fr.crc : undefined, fr.crc === 'ok' ? 'v-ok' : fr.crc === 'bad' ? 'v-bad' : ''),
+      cell('class', fr.class, {'lorawan':'v-ok','meshtastic':'dir-tx','meshcore':'v-warn','reticulum':'v-info'}[fr.class] || ''),
       cell('power', fr.power),
       cell('toa_ms', fr.toa_ms),
       `<td class="${fr.dir === 'tx' && fr.status === 'ok' ? 'v-ok' : fr.dir === 'tx' && fr.status === 'failed' ? 'v-bad' : ''}"${fr.status ? '' : ' title="'+(fr.err||"").replace(/"/g,'&quot;')+'"'}>${status}</td>`,
@@ -611,9 +667,82 @@ async function decryptFRMPayload(appSKeyHex, devAddrHex, dir, fCnt, frmHex) {
 }
 
 let inspectorKey = localStorage.getItem('lora8.appskey') || '';
+// mqt inspector: decode the json wrapper meshtastic/serial bridges emit, show
+// structured details, offer related frames by from/to/class.
+function hexToText(hex) { let s = ''; for (let i = 0; i + 1 < hex.length; i += 2) { const c = parseInt(hex.substr(i, 2), 16); s += String.fromCharCode(c); } return s; }
+function showMqttInspector(x, y, hex, ascii, fc) {
+  const text = hexToText(hex);
+  let obj = null, parseNote = '';
+  try { obj = JSON.parse(text); } catch (e) { parseNote = 'not JSON-mqtt envelope'; }
+  const from = obj && obj.from !== undefined ? obj.from : null;
+  const to = obj && obj.to !== undefined ? obj.to : null;
+  const decoded = obj && obj.decoded ? obj.decoded : (obj && obj.packet && obj.packet.decoded) ? obj.packet.decoded : null;
+  let rows = '';
+  if (obj) {
+    const skip = new Set(['payload', 'raw', 'when']);
+    const KV = Object.entries(obj).filter(([k]) => !skip.has(k));
+    rows = KV.map(([k, v]) => `<tr><th style="color:var(--dim);text-align:left">${k}</th><td>${typeof v === 'object' ? JSON.stringify(v).slice(0, 200) : String(v)}</td></tr>`).join('');
+  }
+  const rel = fc && frameStore.length ? frameStore.filter(f =>
+    (from !== null && f.class === fc.class && f.hex && f.hex.includes(hexToUtf16le(from))) ||
+    (to !== null && to !== 4294967295 && f.hex && f.hex.includes(hexToUtf16le(to)))
+  ).slice(-8) : [];
+  ctx.innerHTML = `<div class="ctx-title">mqtt frame ${obj ? '' : '· unparseable'}</div>` +
+    (ascii ? `<div class="ctx-ascii">ascii: "${ascii.replace(/"/g, '&quot;')}"</div>` : '') +
+    (obj ? `<div class="ctx-ascii"><b style="color:var(--acc)">${obj.decoded?.portnum || obj.portnum || obj.port || 'packet'}</b> · from ${from ? '0x' + Number(from).toString(16).padStart(8, '0') : '—'} → ${to !== null && to !== 4294967295 ? '0x' + Number(to).toString(16).padStart(8, '0') : 'broadcast'}</div>` +
+    `<table style="font-size:11px;border-collapse:collapse;margin:4px 8px">${rows}</table>` +
+    (decoded && (decoded.payload || decoded.raw) ? `<div class="ctx-ascii" style="color:var(--dim)">decoded:</div><div class="ctx-ascii" style="white-space:pre-wrap;max-width:420px;word-break:break-all">${String(decoded.raw || decoded.payload).slice(0, 600).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>` : '') :
+    `<div class="ctx-ascii" style="max-width:420px;word-break:break-all">${text.slice(0, 900)}</div>`) +
+    (rel.length ? `<div class="ctx-ascii" style="margin-top:4px">related (${rel.length})</div>` +
+      rel.map(a => `<div data-x data-y class="ctx-item" data-hex="${a.hex}" style="cursor:pointer;color:var(--dim)">@${a.time} · ${a.class} · ${a.hex.substr(0, 48)}${a.hex.length > 48 ? '…' : ''}</div>`).join('') : '') +
+    `<div style="display:flex;gap:4px;padding:4px 8px 6px">
+      <button class="ctx-btn" data-act="copyhex">copy hex</button>
+      <button class="ctx-btn" data-act="fand">filter AND hex ≥ …</button>
+      <button class="ctx-btn" data-act="relonly">only related</button>
+      <button class="ctx-btn" data-act="allmesh">all mqtt</button>
+    </div>`;
+  ctx.style.left = Math.min(x, innerWidth - 480) + 'px'; ctx.style.top = y + 'px'; ctx.style.display = 'block';
+  ctx.querySelectorAll('[data-act]').forEach(el => el.addEventListener('click', ev => {
+    ev.stopPropagation();
+    if (el.dataset.act === 'copyhex') navigator.clipboard.writeText(hex).then(() => el.textContent = 'copied ✓');
+    if (el.dataset.act === 'fand') { addFilter('and', 'hex', '>=', hex); hideMenu(); }
+    if (el.dataset.act === 'allmesh') { addFilter('or', 'class', '==', 'mqtt'); hideMenu(); }
+    if (el.dataset.act === 'relonly') {
+      const ids = rel.map(a => a.hex);
+      if (ids.length) {
+        $('filter').value = '(' + ids.map(h => 'hex>=' + h).join(' or ') + ')';
+        applyFilterExpr();
+      }
+      hideMenu();
+    }
+  }));
+  ctx.querySelectorAll('[data-hex]').forEach(el => el.addEventListener('click', ev => {
+    ev.stopPropagation();
+    const h = el.dataset.hex, tdFra = frameStore.find(f=>f.hex===h);
+    showPayloadInspector(x, y, h, tdFra ? tdFra.ascii : '');
+  }));
+}
+function hexToUtf16le(n) {
+  const h = Number(n).toString(16).padStart(8, '0');
+  // meshtastic serial bridge encodes node IDs like "!fd285555" then hex; for filter search both raw 8-hex forms
+  return h;
+}
+
 function showPayloadInspector(x, y, hex, ascii) {
-  const lw = lorawanParse(hex);
-  const mp = meshParse(hex);
+  const fc = frameStore.find(f => f.hex === hex);
+  if (fc && fc.class === 'unknown' && hex.length > 40) { showPayloadLab(x, y, hex); return; }
+  // class-directed parse: don't let MQTT JSON get mangled as LoRaWAN
+  let lw = null, ret = null, mc = null, mt = null;
+  const cls = fc ? fc.class : null;
+  if (cls === 'mqtt') { showMqttInspector(x, y, hex, ascii, fc); return; }
+  if (cls === 'lorawan') lw = lorawanParse(hex);
+  else if (cls === 'reticulum') ret = reticulumParse(hex);
+  else if (cls === 'meshcore') mc = meshCoreParse(hex);
+  else if (cls === 'meshtastic') mt = meshParse(hex);
+  else {
+    lw = lorawanParse(hex);
+    ret = reticulumParse(hex); mc = meshCoreParse(hex); mt = meshParse(hex);
+  }
   let info = `<div class="ctx-title">payload</div>`;
   if (ascii) info += `<div class="ctx-ascii">ascii: "${ascii.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}"</div>`;
   if (lw) {
@@ -626,9 +755,21 @@ devnonce ${lw.devNonce}`;
       if (lw.fPort !== null && lw.fPort !== undefined) info += `<br>fport ${lw.fPort}, ${lw.frmLen}B frm ${lw.frm}`; }
     info += `</div>`;
   }
-  if (mp) {
-    const e = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    const f32 = v => v.toString(16).padStart(8, '0');
+  const e = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const f32 = v => v.toString(16).padStart(8, '0');
+  if (ret) {
+    let m = `<div class="ctx-ascii" style="color:var(--info)">reticulum · ${ret.ptName}`;
+    m += ` · ${ret.dstName} · ${ret.propName} · hops ${ret.hops}`;
+    if (ret.ht) m += ` · transport`;
+    m += `<br>dest ${ret.dest}<br>ctx 0x${ret.context.toString(16).padStart(2,'0')} · ${ret.dataLen}B data</div>`;
+    info += m;
+  } else if (mc) {
+    let m = `<div class="ctx-ascii" style="color:var(--warn)">meshcore · ${mc.ptName} · ${mc.rtName}`;
+    if (mc.tc) m += ` · tc ${mc.tc}`;
+    m += `<br>hops ${mc.hops}×${mc.hs}B · path ${mc.path||'—'}<br>payload ${Math.floor(mc.pay.length/2)}B</div>`;
+    info += m;
+  } else if (mt) {
+    const mp = mt;
     let m = `<div class="ctx-ascii" style="color:var(--warn)">meshtastic? ${mp.broadcast ? 'broadcast' : 'direct'} hdr<br>`;
     m += `to 0x${f32(mp.to)} ← from 0x${f32(mp.from)}<br>`;
     m += `id 0x${f32(mp.id)} chan 0x${mp.chanHash.toString(16).padStart(2,'0')}`;
@@ -675,6 +816,76 @@ devnonce ${lw.devNonce}`;
         })
         .catch(e => { document.getElementById('decout').textContent = 'error: ' + e.message; });
     }
+  }));
+}
+
+// ============== protocol lab (meshcore / reticulum / unknown) ==============
+const MC_TYPES = {0:'REQ',1:'REPLY',2:'TXT_MSG',3:'ACK',4:'ADVERT',5:'GRP_TXT',6:'GRP_DATA',7:'ANON_REQ',8:'PATH',9:'TRACE',10:'MULTIPART',11:'CONTROL',15:'RAW'};
+const MC_ROUTES = {0:'transport-flood',1:'flood',2:'direct',3:'transport-direct'};
+function meshCoreParse(hex) {
+  const b = hexToU8(hex);
+  if (b.length < 2) return null;
+  const rt = b[0] & 3, pt = (b[0]>>2)&0x0F, ver = (b[0]>>6)&3;
+  let i = 1, tc = null;
+  if (rt === 0 || rt === 3) { if (b.length < 6) return null; tc = (b[i]|(b[i+1]<<8)) + ',' + (b[i+2]|(b[i+3]<<8)); i += 4; }
+  const pl = b[i++], hops = pl & 0x3F, hs = (pl>>6)+1;
+  const pathLen = hops * hs;
+  if (i + pathLen > b.length) return null;
+  const path = u8ToHex(b.slice(i, i+pathLen));
+  const payload = b.slice(i + pathLen);
+  return {rt, rtName: MC_ROUTES[rt]||rt, pt, ptName: MC_TYPES[pt]||pt, ver, tc, hops, hs, path, pay: u8ToHex(payload)};
+}
+const RN_PKT = ['data','announce','link-req','proof'];
+const RN_DST = ['single','group','plain','link'];
+const RN_PROP = ['broadcast','transport'];
+function reticulumParse(hex) {
+  const b = hexToU8(hex);
+  if (b.length < 19) return null;
+  const ifac = (b[0]>>7)&1, ht = (b[0]>>6)&1, ctxf=(b[0]>>5)&1, prop=(b[0]>>4)&1, dst=(b[0]>>2)&3, pt=b[0]&3;
+  const hops = b[1];
+  const addrLen = ht ? 32 : 16;
+  if (b.length < 2 + addrLen + 1) return null;
+  const dest = u8ToHex(b.slice(2, 2+addrLen));
+  const context = b[2+addrLen];
+  const data = b.slice(2+addrLen+1);
+  return {ifac, ht, ctxf, prop, dst, pt, hops, dest, context, dataLen: data.length,
+    ptName: RN_PKT[pt], dstName: RN_DST[dst], propName: RN_PROP[prop]};
+}
+function entropyOf(hex) {
+  if (!hex) return 0;
+  const counts = new Map();
+  for (let i=0;i<hex.length;i+=2){ const v=hex.substr(i,2); counts.set(v,(counts.get(v)||0)+1); }
+  const n = hex.length/2; let H=0;
+  counts.forEach(c=>{ const p=c/n; H -= p*Math.log2(p); });
+  return H.toFixed(2);
+}
+function byteHistogram(hex) {
+  const counts = new Array(256).fill(0);
+  for (let i=0;i<hex.length;i+=2) counts[parseInt(hex.substr(i,2),16)]++;
+  const mx = Math.max(1, ...counts);
+  let out = '';
+  for (let v=0; v<256; v++) {
+    const k = Math.round(counts[v]/mx*32);
+    out += `<span title="0x${v.toString(16).padStart(2,'0')}: ${counts[v]}" style="display:inline-block;width:5px;height:${Math.max(2,k)}px;background:${counts[v]?'#4cc2ff':'#1b232d'}"></span>`;
+  }
+  return `<div style="display:flex;align-items:flex-end;gap:0;height:36px;overflow:hidden">${out}</div>`;
+}
+function showPayloadLab(x, y, hex) {
+  const same = frameStore.filter(f => f.hex && f.hex !== hex && (f.hex.substr(0,4) === hex.substr(0,4))).slice(-8);
+  ctx.innerHTML = `<div class="ctx-title">payload lab · unknown framing</div>
+    <div class="ctx-ascii" style="max-width:420px;word-break:break-all">${hex}</div>
+    <div class="ctx-ascii">ascii: "${(printableAscii(hex)||'').replace(/"/g,'&quot;')}" · entropy ${entropyOf(hex)} bits/byte · similar-prefix frames: ${same.length}</div>
+    <div style="padding:4px 8px">${byteHistogram(hex)}</div>
+    ${same.map(s=>`<div class="ctx-ascii" style="color:var(--dim)">≈ ${s.time} ${s.hex.substr(0,48)}${s.hex.length>48?'…':''}</div>`).join('')}
+    <div style="display:flex;gap:4px;padding:4px 8px 6px">
+      <button class="ctx-btn" data-act="copyhex">copy hex</button>
+      <button class="ctx-btn" data-act="fand">filter AND hex ≥ …</button>
+    </div>`;
+  ctx.style.left = Math.min(x, innerWidth-460)+'px'; ctx.style.top = y+'px'; ctx.style.display='block';
+  ctx.querySelectorAll('[data-act]').forEach(el => el.addEventListener('click', ev => {
+    ev.stopPropagation();
+    if (el.dataset.act === 'copyhex') navigator.clipboard.writeText(hex).then(()=>{el.textContent='copied ✓';});
+    if (el.dataset.act === 'fand') { addFilter('and','hex','>=',hex); hideMenu(); }
   }));
 }
 
@@ -741,6 +952,27 @@ async function poll() {
       bar(0,'decRSSI',dg.decRSSI,255,'bar noise');
     lastCounters = dg;
   }
+  const sp = await get('/api/spectrum');
+  if (sp) {
+    specEnabled = !!sp.enabled;
+    $('specbtn').textContent = specEnabled ? 'on' : 'off';
+    let meta = '';
+    if (!specEnabled) meta = 'spectrum mode off — sweeps the rf0 PLL every 30s, RX stalls a few s per sweep';
+    else if (sp.err) meta = `<span class="v-bad">${sp.err}</span>`;
+    else if (sp.ts) meta = `${sp.ts.replace('T',' ').slice(11,19)} · rf${sp.rf} · sweep #${sp.sweeps}`;
+    $('specmeta').innerHTML = meta;
+    const pts = sp.points || [];
+    if (pts.length) {
+      const lo=-125, hi=-40;
+      $('specplot').innerHTML = pts.map(p => {
+        const t = Math.max(0, Math.min(1, (p.rssi - lo) / (hi - lo)));
+        const col = p.rssi > -85 ? 'var(--bad)' : p.rssi > -100 ? 'var(--warn)' : '#4a7c59';
+        return `<div title="${p.freq_mhz} MHz  ${p.rssi} dBm" style="flex:1;min-width:2px;height:${Math.round(3 + t*67)}px;background:${col}"></div>`;
+      }).join('');
+      meta += `<span style="color:var(--dim)"> &nbsp;${pts[0].freq_mhz}–${pts[pts.length-1].freq_mhz} MHz</span>`;
+      $('specmeta').innerHTML = meta;
+    }
+  }
   const pk = await get('/api/packets?since='+lastSeq);
   if (pk && pk.length) {
     for (const fr of pk) {
@@ -761,6 +993,84 @@ async function poll() {
 }
 setInterval(poll, 1000);
 poll();
+
+// -------- mesh UI --------
+let meshPeers = [];
+let meshLastMsgTs = 0;
+
+function fmtElapsed(ts) {
+  if (!ts) return '—';
+  const diff = Math.max(0, Date.now()/1000 - ts);
+  if (diff < 60) return Math.floor(diff)+'s';
+  if (diff < 3600) return Math.floor(diff/60)+'m';
+  if (diff < 86400) return Math.floor(diff/3600)+'h';
+  return Math.floor(diff/86400)+'d';
+}
+
+async function meshPoll() {
+  const st = await get('/api/status');
+  const pe = await get('/api/mesh/peers');
+  if (pe && !pe.error) {
+    meshPeers = (pe.peers || []).slice().sort((a,b)=>(b.lastHeard||0)-(a.lastHeard||0));
+    const tb = $('peertbody');
+    tb.innerHTML = meshPeers.map(p => `<tr class="${p.isFavorite?'v-warn':''}">
+      <td>${p.longName||'—'}${p.shortName&&p.shortName!==' '?' <span style="color:var(--dim)">'+p.shortName+'</span>':''}</td>
+      <td style="color:var(--dim)">${p.num !== null && p.num !== undefined ? '!'+p.num.toString(16).padStart(8,'0') : (p.id||'—')}</td>
+      <td>${p.hwModel||''}</td>
+      <td>${p.snr !== undefined && p.snr !== null ? p.snr.toFixed(1) : ''}</td>
+      <td>${fmtElapsed(p.lastHeard)}</td>
+      <td>${p.batteryLevel!==undefined && p.batteryLevel!==null ? p.batteryLevel+'%' : ''}</td>
+    </tr>`).join('');
+    const sel = $('meshTo');
+    const prev = sel.value;
+    const opts = ['<option value="broadcast">broadcast</option>'].concat(meshPeers.map(p =>
+      `<option value="${p.num||p.id}">${(p.longName||p.shortName||'!'+ (p.num||'').toString(16) || '?')}</option>`));
+    if (sel.innerHTML !== opts.join('').replace(/</g,'<')) sel.innerHTML = opts.join('');
+    sel.value = prev || 'broadcast';
+    $('meshstate').textContent = meshPeers.length + ' peers';
+  }
+  const ms = await get('/api/mesh/messages');
+  if (ms && !ms.error) {
+    const arr = ms.messages || [];
+    const fresh = arr.filter(m => m.when > meshLastMsgTs);
+    for (const m of fresh) meshLastMsgTs = Math.max(meshLastMsgTs, m.when);
+    if (fresh.length || !document.getElementById('pmessages').dataset.init) {
+      document.getElementById('pmessages').dataset.init = '1';
+      const el = document.getElementById('pmessages');
+      const rows = arr.slice(-40).reverse().map(m => {
+        const t = new Date((m.when||0)*1000).toLocaleTimeString('de-DE',{hour12:false});
+        const fromName = findPeerName(m.from);
+        return `<div class="msgrow${m.from==='self'?' mine':''}">
+          <span class="dimv">${t}</span> <b style="color:${m.from==='self'?'var(--acc)':'var(--ok)'}">${fromName}</b><span class="dimv">${m.portnum||''}</span>
+          <div style="white-space:pre-wrap;word-break:break-word">${esc(m.text||'[packet]')}</div>
+        </div>`;
+      }).join('');
+      el.innerHTML = rows;
+    }
+  }
+  const stt = await get('/api/mesh/status');
+  if (stt && stt.error) { /* ui shows in state */ }
+}
+
+function findPeerName(num) {
+  if (num === 'self' || num === undefined || num === null) return 'you';
+  const p = meshPeers.find(x => x.num === num);
+  return p ? (p.longName || p.shortName || '!' + (p.num||'').toString(16)) : '!' + (num !== undefined && num !== null ? num.toString(16) : '?');
+}
+
+async function meshSend() {
+  const text = $('meshText').value.trim();
+  if (!text) return;
+  const to = $('meshTo').value;
+  const r = await post('/api/mesh/send', {to, text});
+  $('meshsendstate').textContent = r && r.error ? 'error: ' + r.error : (r && r.ok ? 'sent' : (r && r.ok === false ? 'failed' : 'sent'));
+  $('meshText').value = '';
+  setTimeout(() => { $('meshsendstate').textContent=''; }, 4000);
+  meshPoll();
+}
+setInterval(meshPoll, 3000);
+meshPoll();
+
 
 </script>
 </body>

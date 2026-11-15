@@ -73,14 +73,24 @@ in
     # toolkit + web UI + Semtech UDP forwarder towards TTN.
     (import ../../../modules/lora8.nix { inherit hefe; })
 
+    # Self-hosted ChirpStack LoRaWAN network server next to TTN:
+    # lora8 -> chirpstack-packet-multiplexer (:1700) -> TTN + local
+    # gateway-bridge (:1701) -> MQTT -> podman'd chirpstack server (web
+    # UI :8090, tailnet only). See ops/modules/chirpstack.nix.
+    (import ../../../modules/chirpstack.nix { inherit hefe pkgs-unstable; })
+
   ];
+
+  services.chirpstack-lns.enable = true;
 
   services.lora8 = {
     enable = true;
-    # Semtech UDP on TTN V3 (EU). Gateway EUI = MCU bridge UID shown in the
-    # web UI; register it at https://eu1.cloud.thethings.network/console
-    # as "Legacy Semtech UDP packet forwarder".
-    lns = "eu1.cloud.thethings.network:1700";
+    # The multiplexer fans uplinks out to TTN (eu1) and the local
+    # ChirpStack gateway-bridge; downlinks from both work.
+    lns = "127.0.0.1:1700";
+    # Meshcore/meshtastic relays mesh (WiFi node -> mosquitto) into the
+    # frames table tagged "mqtt".
+    mqttAddr = "127.0.0.1:1883";
   };
 
   hardware.fancontrol = {

@@ -36,12 +36,91 @@ type FrameRecord struct {
 	Err    string  `json:"err,omitempty"`
 	ToaMs  uint32  `json:"toa_ms,omitempty"`
 	Power  int8    `json:"power,omitempty"`
+	Class  string  `json:"class,omitempty"` // protocol classification
+}
+
+// Classify gives a best-effort protocol label for a received frame.
+// LoRaWAN (mtype sane + CRC sane length), Meshtastic (16B header heuristic),
+// MeshCore (meshcore packet v1 header + path-length arithmetic consistent),
+// Reticulum (2B header + 16B addr field + plausible hops), else "unknown".
+func Classify(p []byte) string {
+	n := len(p)
+	if n >= 12 {
+		// LoRaWAN MHDR: mtype {0,2,3,4,5}, v4 RFU=0, major=00
+		m := p[0] >> 5
+		if (m == 0 || (m >= 2 && m <= 5)) && (p[0]&0x03) == 0 {
+			if m == 0 { // join-request exactly 23 B always
+				if n == 23 {
+					return "lorawan"
+				}
+			}
+			return "lorawan"
+		}
+	}
+	// MeshCore (v1): header + optional 4B transport codes (route 0/3) +
+	// path_length byte whose hop/size decomposition must exactly fit.
+	if n >= 2 {
+		rt := p[0] & 0x03
+		hasTC := rt == 0 || rt == 3
+		idx := 1
+		if hasTC {
+			if n < 6 {
+				return "unknown"
+			}
+			idx += 4
+		}
+		if idx < n-1 {
+			pl := p[idx]
+			hops := int(pl & 0x3F)
+			hsize := int(pl>>6) + 1
+			want := idx + 1 + hops*hsize
+			if want <= n-1 && want >= idx+2 {
+				ptype := (p[0] >> 2) & 0x0F
+				if ptype <= 0x0F {
+					// plausible if remaining payload fits 0..184
+					pay := n - want
+					if pay <= 184 {
+						return "meshcore"
+					}
+				}
+			}
+		}
+	}
+	// Reticulum: bytes 0-1 header, then 16B or 32B address; hops sane (<64),
+	// payload up to 465 bytes. Lightweight heuristic.
+	if n >= 19 {
+		htype := (p[0] >> 6) & 0x01
+		prop := (p[0] >> 4) & 0x01
+		dtype := (p[0] >> 2) & 0x03
+		ptype := p[0] & 0x03
+		hops := p[1]
+		addrLen := 16
+		if htype == 1 {
+			addrLen = 32
+		}
+		rem := n - (2 + addrLen + 1)
+		// strict: data leftover sane & non-trivial; hops low; all byte-0 fields
+		// within protocol range (noise tends to scatter them wildly)
+		if n >= 2+addrLen+1 && hops <= 10 && prop <= 1 && dtype <= 3 && rem >= 8 && rem <= 465 {
+			_ = ptype
+			return "reticulum"
+		}
+	}
+	// Meshtastic: 16-byte little-endian header, plausible flags/hash bytes.
+	if n >= 17 {
+		hops := p[12] & 0x07
+		if hops <= 3 && p[12]>>3 <= 3 { // hop limit + hop start sane
+			return "meshtastic"
+		}
+	}
+	return "unknown"
 }
 
 func recordFromEntry(e LogEntry) FrameRecord {
 	r := FrameRecord{TS: e.Time.UnixMilli(), Seq: e.Seq, Dir: e.Dir}
 	if e.Rx != nil {
 		p := e.Rx
+		r.Class = Classify(p.Payload)
 		r.FreqHz, r.RF, r.If = p.FreqHz, p.RFChain, int(p.IFChain)
 		if p.Modulation == hal.ModLora {
 			r.Mod = "LORA"

@@ -13,8 +13,28 @@
 */
 
 #include "config.h"
+#include "secrets.h"     // WIFI_SSID / WIFI_PASS / OTA_PASS (see secrets.example.h)
+
+#include <WiFi.h>
+#include <ArduinoOTA.h>
 
 uint8_t counter = 0;
+
+// WiFi OTA: once flashed over USB, future updates go over the air. Ping fast
+// fail-safe: OTA only activates after LoRaWAN joins (or on join fail retry),
+// otherwise the uplink loop is unaffected.
+static void otaInit() {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  ArduinoOTA.setHostname("lora8-node");
+  ArduinoOTA.setPassword(OTA_PASS);
+  ArduinoOTA
+    .onStart([]() { Serial.println("OTA start"); })
+    .onEnd([]() { Serial.println("OTA done"); })
+    .onProgress([](unsigned int p, unsigned int t) { Serial.printf("OTA %u%%\r", p * 100 / t); })
+    .onError([](ota_error_t e) { Serial.printf("OTA error %u\n", e); });
+  ArduinoOTA.begin();
+}
 
 void setup() {
   Serial.begin(115200);
@@ -33,11 +53,21 @@ void setup() {
   state = node.beginOTAA(joinEUI, devEUI, nwkKey, appKey);
   debug(state != RADIOLIB_ERR_NONE, F("Initialise node failed"), state, true);
 
-  Serial.println(F("Joining (this can take a few tries) ..."));
-  state = node.activateOTAA();
-  debug(state != RADIOLIB_LORAWAN_NEW_SESSION, F("Join failed"), state, true);
+  Serial.println(F("Joining (OTAA, retries forever) ..."));
+  while (true) {
+    state = node.activateOTAA();
+    if (state == RADIOLIB_LORAWAN_NEW_SESSION) break;
+    Serial.print(F("join attempt failed: "));
+    Serial.print(stateDecode(state));
+    Serial.print(" (");
+    Serial.print(state);
+    Serial.println(") - retrying in 10 s");
+    delay(10000);
+  }
 
   Serial.println(F("Joined!\n"));
+  otaInit();
+  Serial.println(F("OTA over WiFi listening (ide: Network -> lora8-node, pass in secrets.h)"));
 }
 
 void loop() {
@@ -58,5 +88,10 @@ void loop() {
   Serial.print(F("Next uplink in "));
   Serial.print(uplinkIntervalSeconds);
   Serial.println(F(" s\n"));
-  delay(uplinkIntervalSeconds * 1000UL);
+
+  // service WiFi OTA requests between uplinks (chunk the wait to stay responsive)
+  for (uint32_t i = 0; i < uplinkIntervalSeconds * 10; i++) {
+    ArduinoOTA.handle();
+    delay(100);
+  }
 }

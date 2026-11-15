@@ -41,11 +41,17 @@ in
     lns = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
+      description = "LoRaWAN network server via Semtech UDP (GWMP).";
       example = "eu1.cloud.thethings.network:1700";
+    };
+
+    mqttAddr = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "127.0.0.1:1883";
       description = ''
-        Optional LoRaWAN network server (Semtech UDP) to forward packets to.
-        The gateway EUI for the LNS registration is the card's MCU bridge UID
-        shown on the web UI status page.
+        Subscribe a local Meshtastic MQTT relay (the mesh node publishes to
+        mqtt/#). Frames appear in the UI tagged "mqtt". null = off.
       '';
     };
 
@@ -95,7 +101,8 @@ in
           "web -auto"
           "-addr ${cfg.address}:${toString cfg.port}"
           "-logdir /var/lib/lora8"
-        ] ++ lib.optional (cfg.lns != null) "-fwd ${cfg.lns}");
+        ] ++ lib.optional (cfg.lns != null) "-fwd ${cfg.lns}"
+          ++ lib.optional (cfg.mqttAddr != null) "-mqtt ${cfg.mqttAddr}");
 
         StateDirectory = "lora8"; # persistent frame history (daily JSONL)
 

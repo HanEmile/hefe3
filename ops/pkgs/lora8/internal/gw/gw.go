@@ -5,6 +5,7 @@
 package gw
 
 import (
+	"encoding/hex"
 	"fmt"
 	"log"
 	"sync"
@@ -18,6 +19,9 @@ type LogEntry struct {
 	Seq  uint64
 	Time time.Time
 	Dir  string // "rx" | "tx"
+
+	// Source marks non-card origins (mqtt relay, tap...).
+	Source string
 
 	Rx    *hal.RxPacket
 	Tx    *hal.TxPacket
@@ -57,26 +61,20 @@ func DefaultEU868() Config {
 	return c
 }
 
-// MeshWatch returns a configuration tuned to listen for Meshtastic's EU868
-// "Long Fast" default channel: SF11 / BW 250 kHz / CR 4/5, sync word 0x2B,
-// centered on 869.525 MHz
-// (meshtastic/firmware: src/mesh/MeshRadio.h modemPresetToParams() default arm
-// LONG_FAST → sf=11, bw=250kHz, cr=5; src/mesh/RadioLibInterface.h syncWord
-// 0x2B; src/mesh/RadioInterface.cpp regions[] EU_868 {869.4..869.65 MHz} →
-// freq = 869.4 + BW/2 = 869.525 MHz).
+// MeshWatch returns a configuration tuned for MeshCore's EU "legacy" preset
+// (869.525 MHz, SF11, BW250, CR 4/5, sync word 0x12 = "private") through the
+// std IF chain while the multi-SF LoRaWAN layout stays on radio 0.
 //
-// Differences from DefaultEU868:
-//   - lorawan_public=false. The SX1301 only knows two preamble-sync modes
-//     (LoRaWAN public ≈ 0x34 / private ≈ 0x12 FRAME_SYNCH peak pairs); 0x2B
-//     matches neither. Private mode is the best-effort fallback — decode
-//     degrades to "heuristic preamble lock" and weak packets may be missed.
-//   - Radio 1 moves 868.5 → 869.2 MHz so the 869.525 MHz mesh channel lands
-//     at IF +325 kHz on the std (IF8) chain: |IF| + BW/2 = 450 kHz fits the
-//     500 kHz BW250 RF window (rf1=868.5 would need IF +1025 kHz — out of
-//     band). The multi-SF channels on rf1 are therefore no longer TTN-valid;
-//     mesh mode is opt-in, radio 0 keeps the TTN 867.x plan intact.
-//   - IF8 (std LoRa modem) is locked to SF11/BW250 at that IF. The 8 multi-SF
-//     chains stay enabled (harmless); IF9 (FSK) stays disabled.
+// Sync-word reality on this hardware: the SX1301 can only express two sync
+// words (public 0x34 vs private 0x12 via FRAME_SYNCH_PEAK register pairs;
+// 0x2B — Meshtastic's default — is not representable on this silicon).
+// So this preset listens for MeshCore and other private-sync protocols but
+// is deliberately deaf to Meshtastic traffic, MATTER OF FACT.
+//
+// Trade: lorawan_public=false makes LoRaWAN public frames equally inaudible
+// — toggling mesh mode pauses TTN/ChirpStack uplinks until flipped back.
+// Radio 1 moves 868.5 → 869.2 MHz so the 869.525 MHz channel lands at
+// IF +325 kHz on IF8's 250 kHz modem passband (it must stay ≤ 500 kHz).
 func MeshWatch() Config {
 	c := DefaultEU868()
 	c.Board.LorawanPublic = false
@@ -99,6 +97,9 @@ type Gateway struct {
 	maxLog   int
 	subs     []func([]hal.RxPacket)
 
+	// Spectrum runs optional periodic spectral sweeps (see spectrum.go).
+	Spectrum *SpectrumRunner
+
 	lastCfg     Config
 	hasCfg      bool
 	rxErrStreak int
@@ -118,6 +119,7 @@ type Gateway struct {
 // the last maxLog entries from today/yesterday are preloaded.
 func New(maxLog int, logDir string) *Gateway {
 	g := &Gateway{maxLog: maxLog}
+	g.Spectrum = newSpectrumRunner(g)
 	if logDir != "" {
 		w, err := NewHistoryWriter(logDir)
 		if err != nil {
@@ -133,6 +135,35 @@ func New(maxLog int, logDir string) *Gateway {
 		}
 	}
 	return g
+}
+
+// InjectRaw registers a frame received through a non-card source (MQTT
+// meshtastic relays, other taps). meta fields honored: freq_hz, snr(float),
+// rssi(float), mod(string), src(string) — everything else rides along into
+// the frame JSON as "meta".
+func (g *Gateway) InjectRaw(dir string, hexPayload string, meta map[string]any) {
+	payload, _ := hex.DecodeString(hexPayload)
+	ep := &hal.RxPacket{
+		Datarate:   hal.DRLoraSF11,
+		Bandwidth:  hal.BW250kHz,
+		Modulation: hal.ModLora,
+		Size:       uint16(len(payload)),
+		Payload:    payload,
+	}
+	if v, ok := meta["freq_hz"].(uint32); ok {
+		ep.FreqHz = v
+	} else {
+		ep.FreqHz = 869525000
+	}
+	if v, ok := meta["mqtt_portnum"].(uint32); ok {
+		ep.IFChain = uint8(v % 32)
+	}
+	log.Printf("gw: mqtt rx %d bytes via %v", len(payload), meta["topic"])
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.seq++
+	e := LogEntry{Seq: g.seq, Time: time.Now(), Dir: dir, Rx: ep, Source: "mqtt"}
+	g.appendEntryLocked(e)
 }
 
 // appendEntry registers a frame in the ring and the persistent history.
@@ -443,7 +474,16 @@ func (g *Gateway) Send(pkt hal.TxPacket) error {
 	err := g.H.Send(pkt)
 	g.mu.Unlock()
 	if err != nil {
-		log.Printf("gw: tx failed (%v), running self-heal and retrying once", err)
+		// TX NAK diagnostics (T5 drift investigation): capture everything a
+		// later postmortem can correlate — tx modem state, MCU heartbeat,
+		// uptime at failure. The MCU's NAK has no error string, so this is
+		// the highest-signal data available without reflashing the bridge.
+		st, _ := g.H.TxStatus()
+		cnt, _ := g.H.TrigCount()
+		g.mu.Lock()
+		txs := fmt.Sprintf("txstatus=%d trigcnt=%d recoveries=%d errstreak=%d", st, cnt, g.recoveries, g.rxErrStreak)
+		g.mu.Unlock()
+		log.Printf("gw: tx failed (%v; %s), running self-heal and retrying once", err, txs)
 		g.txRetries++
 		g.recover()
 		g.mu.Lock()

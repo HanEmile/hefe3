@@ -43,6 +43,25 @@ Next uplink in 300 s
   SNR/RSSI per packet; expect strong signal (RSSI ≈ −30..−60 dBm) in-room,
   plus gateway header counters tick up in Prometheus (`lora8_headers_total`).
 
+## Over-the-air updates (WiFi)
+
+The sketch includes WiFi OTA (password-protected ArduinoOTA) once it has
+joined the network:
+
+1. copy `secrets.example.h` to `secrets.h` and fill in SSID/PSK plus a
+   fresh OTA upload pasword. These live only in the firmware.
+2. build + flash once over USB (this example or your PlatformIO copy).
+3. after joining, the device appears as `lora8-node.local` on your LAN and
+   `pio run -t upload --upload-port lora8-node.local` (or IDE host entry)
+   flashes wirelessly with the OTA password.
+
+Careful: OTA only listens **after** the LoRaWAN join succeeded (its timeout
+lands in the uplink-wait chunk so RX windows stay unobstructed).
+
+If you ever want the official multi-receiver-update protocol (FUOTA /
+ChirpStack multicast): entirely a different game and roughly gigabytes of
+effort vs this trivial path; ping me and we'll wire chirpstack-fuota-server.
+
 ## Notes
 
 - Antenna on the V3! The little u.FL whip is mandatory, otherwise the

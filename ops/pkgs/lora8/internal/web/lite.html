@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>lora8-lite</title>
+<style>
+  :root { --bg:#0b0f14; --panel:#101820; --border:#2c3a48; --fg:#e6edf3; --dim:#8a97a6; --ok:#39d353; --warn:#e3b341; --bad:#ff6a5e; --acc:#4cc2ff; --purple:#a371f7; }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--bg); color:var(--fg); font:14px/1.5 system-ui,sans-serif; }
+  header { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:baseline; gap:14px; font-family:ui-monospace,monospace; }
+  header h1 { font-size:16px; color:var(--acc); font-weight:600; }
+  header a { color:var(--dim); font-size:11px; text-decoration:none; border:1px solid var(--border); padding:2px 8px; }
+  header a:hover { color:var(--acc); border-color:var(--acc); }
+  main { max-width:880px; margin:0 auto; padding:16px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; margin-bottom:16px; }
+  .card { background:var(--panel); border:1px solid var(--border); padding:14px; }
+  .card h2 { font-size:11px; text-transform:uppercase; color:var(--dim); letter-spacing:.08em; margin-bottom:6px; font-weight:600; }
+  .big { font-size:18px; font-weight:600; }
+  .sub { font-size:11px; color:var(--dim); margin-top:4px; }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; background:var(--bad); vertical-align:baseline; }
+  .dot.on { background:var(--ok); }
+  .dot.warn { background:var(--warn); }
+  #events { background:var(--panel); border:1px solid var(--border); }
+  #events h2 { padding:12px 14px 6px; font-size:11px; text-transform:uppercase; color:var(--dim); letter-spacing:.08em; font-weight:600; }
+  .ev { padding:8px 14px; border-top:1px solid #1b242f; display:flex; gap:10px; align-items:baseline; font-family:ui-monospace,monospace; font-size:12px; }
+  .ev .arrow { font-weight:700; flex:0 0 18px; }
+  .ev.rx .arrow { color:var(--ok); }
+  .ev.tx .arrow { color:var(--purple); }
+  .ev .t { color:var(--dim); flex:0 0 78px; }
+  .ev .sf { color:var(--acc); flex:0 0 60px; }
+  .ev .rssi-strong { color:var(--ok); }
+  .ev .rssi-mid { color:var(--warn); }
+  .ev .rssi-weak { color:var(--bad); }
+  .ev .ascii { color:var(--ok); }
+  .ev .dim { color:var(--dim); }
+  .note { max-width:880px; margin:14px auto 0; color:var(--dim); font-size:12px; padding:0 16px 20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>lora8</h1>
+  <span style="color:var(--dim)" id="eui"></span>
+  <span style="flex:1"></span>
+  <a href="/pro">power user view →</a>
+</header>
+<main>
+  <div class="cards">
+    <div class="card"><h2>Concentrator</h2><div class="big" id="st-conc">…</div><div class="sub" id="sub-conc"></div></div>
+    <div class="card"><h2>The Things Network</h2><div class="big" id="st-ttn">…</div><div class="sub" id="sub-ttn"></div></div>
+    <div class="card"><h2>ChirpStack (own network)</h2><div class="big" id="st-cs">…</div><div class="sub" id="sub-cs"></div></div>
+    <div class="card"><h2>Spectrum watch</h2><div class="big" id="st-spec">…</div><div class="sub" id="sub-spec"></div></div>
+  </div>
+
+  <div id="events">
+    <h2>recent radio traffic (newest first)</h2>
+    <div id="evlist"></div>
+  </div>
+</main>
+<p class="note">Green dots mean the gateway is listening, talking to The Things
+Network, and your own ChirpStack at the same time. Frames go the other way
+too: "lte" rows are frames the gateway heard over the air; "tx" rows are
+answers the gateway transmitted.</p>
+
+<script>
+const $ = id => document.getElementById(id);
+const base = '';
+let lastSeq = 0;
+const frames = [];
+async function jget(p){ try { const r = await fetch(base+p); return await r.json(); } catch(e){ return null; } }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function hexAscii(hex){ if(!hex||hex.length%2) return null; let out=''; for(let i=0;i<hex.length;i+=2){const c=parseInt(hex.substr(i,2),16); out+=(c>=32&&c<127)?String.fromCharCode(c):'';} return (out.match(/[ -~]/g)||[]).length/(hex.length/2) > 0.9 ? out : null; }
+
+async function poll(){
+  const st = await jget('/api/status');
+  const fw = await jget('/api/fwd');
+  const sp = await jget('/api/spectrum');
+
+  if (st) {
+    $('eui').textContent = 'gateway EUI ' + (st.eui||'?');
+    $('st-conc').innerHTML = `<span class="dot ${st.started?'on':''}"></span>${st.started?'listening':'stopped'}`;
+    $('sub-conc').textContent = `sx1301 v${st.chip||'?'} · bridge fw ${st.mcu_fw||'?'}`;
+  }
+  if (fw) {
+    const srv = fw.server||'';
+    const isLocal = srv.startsWith('127.') || srv.startsWith('127.0.0.1');
+    $('st-ttn').innerHTML = `<span class="dot ${fw.connected?'on':(fw.running?'warn':'')}"></span>${fw.connected?'linked':(fw.running?'waiting for ack':'stopped')}`;
+    $('sub-ttn').textContent = fw.running ? `→ ${srv}` : 'forwarder off';
+    $('st-cs').innerHTML = `<span class="dot ${fw.running&&isLocal&&fw.connected?'on':(fw.running?'warn':'')}"></span>${fw.running&&isLocal?'local path active':'n/a'}`;
+    $('sub-cs').textContent = fw.running&&isLocal ? 'via multiplexer to local chirpstack' : 'forwarder not pointing at local chirpstack';
+  }
+  if (sp && !sp.error) {
+    $('st-spec').innerHTML = `<span class="dot ${sp.enabled?'on':''}"></span>${sp.enabled?'sweeping':'off'}`;
+    $('sub-spec').textContent = sp.sweeps ? `${sp.sweeps} sweeps · ${sp.points?sp.points.length:0} bins` : '';
+  }
+
+  const pk = await jget('/api/packets?since='+lastSeq);
+  if (pk && pk.length) {
+    for (const f of pk) { frames.push(f); lastSeq = Math.max(lastSeq, f.seq); }
+    if (frames.length > 40) frames.splice(0, frames.length-40);
+    render();
+  }
+}
+function render(){
+  const el = $('evlist');
+  el.innerHTML = frames.slice().reverse().map(f=>{
+    const a = hexAscii(f.hex);
+    const rssiCls = f.rssi===undefined?'':(f.rssi>=-100?'rssi-strong':f.rssi>=-130?'rssi-mid':'rssi-weak');
+    const meta = f.dir==='rx'
+      ? `${f.mod||''} SF${f.sf||''} @${f.freq_mhz}MHz · rssi ${f.rssi} · snr ${f.snr} · ${f.crc==='ok'?'crc ok':'crc '+f.crc}`
+      : `tx @${f.freq_mhz}MHz SF${f.sf||''} · ${f.status==='ok'?'sent'+(f.toa_ms?` (${f.toa_ms}ms)`:'') : 'failed: '+(f.err||'')}`;
+    return `<div class="ev ${f.dir}"><span class="arrow">${f.dir==='tx'?'▲':'▼'}</span><span class="t">${f.time}</span><span class="sf">${f.dir==='rx'?f.mod+' '+ (f.sf?'SF'+f.sf:''):'tx'}</span><span class="${rssiCls}">${meta}${a?` · <span class="ascii">"${esc(a)}"</span>`:''}</span></div>`;
+  }).join('');
+}
+setInterval(poll, 2000);
+poll();
+</script>
+</body>
+</html>
