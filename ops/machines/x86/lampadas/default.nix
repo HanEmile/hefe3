@@ -178,6 +178,7 @@ in
       secrets."/lampadas_initrd_pull_ed25519" = "/root/lampadas_initrd_pull_ed25519";
       extraUtilsCommands = ''
         copy_bin_and_libs ${pkgs.openssh}/bin/ssh
+        mkdir -p $out/etc
         # medano's MAIN sshd host key (initrd sshd on :2222 has a different
         # one; if medano itself is in initrd we simply retry until it's up)
         echo '95.217.35.60 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDo2MqY7BD6rd/L3UURx/2kTuHMC7V7WmW74bCsejChq' > $out/etc/medano_pull_known_hosts

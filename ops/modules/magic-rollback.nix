@@ -31,7 +31,7 @@ let
       mkdir -p "$STATE"
 
       log() { echo "$(date -Is) $*" | tee -a "$LOG"; }
-      say() { "${syswatch}/bin/syswatch --tls --server irc.emile.space:6697 --channel '#emile' --say "$(hostname -s): $1" || true; }
+      say() { "${syswatch}/bin/syswatch" --tls --server irc.emile.space:6697 --channel '#emile' --say "$(hostname -s): $1" || true; }
 
       # ---------------------------- leave-alone gates --------------------------
       state=$(systemctl is-system-running 2>/dev/null || true)
