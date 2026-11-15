@@ -16,6 +16,10 @@
 #   08:00  fleet-report.service
 #            posts a summary into #emile via syswatch --say: upgrade result,
 #            who is back up, stale backups, kernel freshness (kernel.org).
+#   */2m   fleet-rescue.service
+#            magic-rollback watchdog (deploy-rs style): a DEGRADED lampadas
+#            re-activates its profile, rolls back a generation if that's not
+#            enough. Backstop for interrupted activations (2026-11-15).
 #
 # Mutual unlock: lampadas holds medano's ZFS passphrase + an initrd ssh key
 # (fleet_unlock_medano_ed25519, authorized in ops/machines/x86/medano/boot.nix);
@@ -108,6 +112,12 @@ let
     runtimeInputs = with pkgs; [ nix openssh coreutils gnugrep ];
     text = builtins.readFile ./fleet-self-upgrade.sh;
   };
+
+  rescueScript = pkgs.writeShellApplication {
+    name = "fleet-rescue";
+    runtimeInputs = with pkgs; [ nix openssh coreutils gnugrep gawk procps ];
+    text = builtins.readFile ./fleet-rescue.sh;
+  };
 in
 {
   options.fleetUpgrade = {
@@ -194,6 +204,12 @@ in
       description = "nightly fleet upgrade: bump nixpkgs pin, deploy VMs + medano, reboot/unlock";
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
+      # Never let a concurrent lampadas switch (e.g. fleet-self-upgrade at
+      # 03:30 while the 02:00 run is still deploying) SIGTERM this unit just
+      # because its unit file changed - that would strand the fleet
+      # mid-upgrade the way 2026-11-15 stranded lampadas mid-switch.
+      stopIfChanged = false;
+      restartIfChanged = false;
       serviceConfig = {
         Type = "oneshot";
         StateDirectory = "fleet";
@@ -227,6 +243,15 @@ in
       description = "lampadas upgrades + reboots itself (medano unlocks it)";
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
+      # Load-bearing (2026-11-15 incident): this service RUNS a
+      # switch-to-configuration on lampadas via loopback ssh. If the new
+      # generation changes this unit's file, the switch's restart/stop
+      # sweep SIGTERMs the service itself, its ssh client dies, and the
+      # in-flight switch is killed mid-teardown - everything stopped,
+      # nothing restarted. These flags make PID1 leave the running unit
+      # alone across the switch; fleet-rescue is the backstop.
+      stopIfChanged = false;
+      restartIfChanged = false;
       serviceConfig = {
         Type = "oneshot";
         StateDirectory = "fleet";
@@ -237,6 +262,34 @@ in
         FLEET_MEDANO = cfg.medanoSsh;
       };
       script = "exec ${selfUpgradeScript}/bin/fleet-self-upgrade";
+    };
+
+    # Magic-rollback watchdog (deploy-rs style): a degraded lampadas heals
+    # itself - re-activate the current profile, roll back a generation if
+    # that isn't enough. See ops/modules/fleet-rescue.sh.
+    systemd.services.fleet-rescue = {
+      description = "heal lampadas if an activation left it degraded (magic rollback)";
+      # Same self-protection as the fleet units: the rescue can itself run
+      # switch-to-configuration while its own unit file changed.
+      stopIfChanged = false;
+      restartIfChanged = false;
+      serviceConfig = {
+        Type = "oneshot";
+        StateDirectory = "fleet";
+        TimeoutStartSec = "15min";
+      };
+      environment = {
+        FLEET_SYSWATCH = "${syswatch}/bin/syswatch";
+      };
+      script = "exec ${rescueScript}/bin/fleet-rescue";
+    };
+
+    systemd.timers.fleet-rescue = {
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnCalendar = "*:0/2:00";
+        Persistent = true;
+      };
     };
 
     systemd.timers.fleet-self-upgrade = {
