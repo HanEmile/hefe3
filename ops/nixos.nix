@@ -217,9 +217,28 @@ let
       ssh ${sshOpts} root@${target} \
         "nix-env -p /nix/var/nix/profiles/system --set \"$OUT\""
 
-      echo "[STEP 4/4]: Switching to configuration on target"
+      echo "[STEP 4/4]: Switching to configuration on target (detached)"
+      # The switch restarts sshd/tailscaled and drops THIS ssh session -
+      # which used to kill switch-to-configuration mid-run and leave the
+      # target with services stopped and no autostart (lampadas 2026-11-15
+      # twice incl. an interactive deploy). Run it as a transient unit
+      # owned by PID1; poll completion over fresh short ssh calls.
       ssh ${sshOpts} root@${target} \
-        /nix/var/nix/profiles/system/bin/switch-to-configuration switch
+        "systemd-run --collect --unit=hefe-deploy-switch \
+           /nix/var/nix/profiles/system/bin/switch-to-configuration switch"
+      echo "activation running detached as hefe-deploy-switch.service; polling..."
+      for _ in $(seq 1 120); do
+        st=$(ssh -o ConnectTimeout=10 ${sshOpts} root@${target} \
+          "systemctl show hefe-deploy-switch.service -p ActiveState --value" 2>/dev/null || echo unknown)
+        [ "$st" = activating ] || [ "$st" = active ] || [ "$st" = unknown ] || break
+        sleep 5
+      done
+      ssh -o ConnectTimeout=10 ${sshOpts} root@${target} \
+        "journalctl -u hefe-deploy-switch.service --no-pager -n 30" || true
+      rc=$(ssh -o ConnectTimeout=10 ${sshOpts} root@${target} \
+        "systemctl show hefe-deploy-switch.service -p ExecMainStatus --value" 2>/dev/null || echo ssh-failed)
+      [ "$rc" = 0 ] || { echo "activation FAILED (ExecMainStatus=$rc)"; exit 1; }
+      echo "activation OK"
     ''
     else
     pkgs.writeShellScriptBin "deploy" ''
@@ -242,9 +261,25 @@ let
           -p /nix/var/nix/profiles/system \
           --set $(readlink ./result)
 
-      echo "[STEP 4/4]: Switching to configuration"
+      echo "[STEP 4/4]: Switching to configuration (detached)"
+      # See the buildOnTarget variant: the switch restarts sshd/tailscaled
+      # and would otherwise be killed when this ssh session drops.
       ssh ${sshOpts} root@${target} \
-        /nix/var/nix/profiles/system/bin/switch-to-configuration switch --verbose --show-trace
+        "systemd-run --collect --unit=hefe-deploy-switch \
+           /nix/var/nix/profiles/system/bin/switch-to-configuration switch --verbose --show-trace"
+      echo "activation running detached as hefe-deploy-switch.service; polling..."
+      for _ in $(seq 1 120); do
+        st=$(ssh -o ConnectTimeout=10 ${sshOpts} root@${target} \
+          "systemctl show hefe-deploy-switch.service -p ActiveState --value" 2>/dev/null || echo unknown)
+        [ "$st" = activating ] || [ "$st" = active ] || [ "$st" = unknown ] || break
+        sleep 5
+      done
+      ssh -o ConnectTimeout=10 ${sshOpts} root@${target} \
+        "journalctl -u hefe-deploy-switch.service --no-pager -n 30" || true
+      rc=$(ssh -o ConnectTimeout=10 ${sshOpts} root@${target} \
+        "systemctl show hefe-deploy-switch.service -p ExecMainStatus --value" 2>/dev/null || echo ssh-failed)
+      [ "$rc" = 0 ] || { echo "activation FAILED (ExecMainStatus=$rc)"; exit 1; }
+      echo "activation OK"
     '';
 
   deployScriptFor =
@@ -523,9 +558,25 @@ let
       ssh root@${name} \
         nix-env -p /nix/var/nix/profiles/system --set $(readlink ./result)
 
-      echo "[STEP 4/4]: Switching to configuration"
+      echo "[STEP 4/4]: Switching to configuration (detached)"
+      # Same protection as the interactive deploys: a switch restarts ssh
+      # and would otherwise be killed mid-run with this session.
       ssh root@${name} \
-        /nix/var/nix/profiles/system/bin/switch-to-configuration switch
+        "systemd-run --collect --unit=hefe-deploy-switch \
+           /nix/var/nix/profiles/system/bin/switch-to-configuration switch"
+      echo "activation running detached as hefe-deploy-switch.service; polling..."
+      for _ in $(seq 1 120); do
+        st=$(ssh -o ConnectTimeout=10 root@${name} \
+          "systemctl show hefe-deploy-switch.service -p ActiveState --value" 2>/dev/null || echo unknown)
+        [ "$st" = activating ] || [ "$st" = active ] || [ "$st" = unknown ] || break
+        sleep 5
+      done
+      ssh -o ConnectTimeout=10 root@${name} \
+        "journalctl -u hefe-deploy-switch.service --no-pager -n 30" || true
+      rc=$(ssh -o ConnectTimeout=10 root@${name} \
+        "systemctl show hefe-deploy-switch.service -p ExecMainStatus --value" 2>/dev/null || echo ssh-failed)
+      [ "$rc" = 0 ] || { echo "activation FAILED (ExecMainStatus=$rc)"; exit 1; }
+      echo "activation OK"
     '';
 
   # ── Per-type conf builders ─────────────────────────────────────────────
