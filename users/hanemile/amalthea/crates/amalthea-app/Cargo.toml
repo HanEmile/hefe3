@@ -1,0 +1,34 @@
+[package]
+name = "amalthea-app"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+eframe.workspace = true
+egui.workspace = true
+egui_extras.workspace = true
+image.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+reqwest.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+url.workspace = true
+uuid.workspace = true
+wgpu.workspace = true
+urlencoding = "2"
+rustfft.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio.workspace = true
+# Rayon is host-only — wasm32-unknown-unknown lacks a thread runtime
+# without extra setup. The `align` module's parallel paths are
+# `cfg(not(target_arch = "wasm32"))`-gated and fall back to serial
+# loops on wasm.
+rayon.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = ["Window", "Performance", "Document", "Element", "HtmlElement"] }
+wasm-bindgen = "0.2"

@@ -1,0 +1,6 @@
+;; test-write.lun
+(print "Testing write...")
+(define result (write-file "wiki/output/test-write.html" "<html><body>Test</body></html>"))
+(print "Write result:")
+(print result)
+(print "Done")

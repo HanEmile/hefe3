@@ -1,0 +1,125 @@
+;; demo-dsl.lun - Complete DSL Demonstration
+
+(require "macro-dsl.lun")
+
+(print "🎨 Lun HTML/Content DSL Demonstration")
+(print "======================================")
+(print "")
+
+;; ============================================================================
+;; Example 1: Low-Level HTML DSL
+;; ============================================================================
+
+(print "Example 1: Low-Level HTML DSL")
+(print "------------------------------")
+
+(define example1
+  (html
+    (head (title "Demo"))
+    (body
+      (h1 "Low-Level DSL")
+      (p "Direct HTML tag functions"))))
+
+(print example1)
+(print "")
+
+;; ============================================================================
+;; Example 2: Content DSL
+;; ============================================================================
+
+(print "Example 2: Content DSL")
+(print "-----------------------")
+
+(define example2
+  (str-concat
+    (heading 1 "Content DSL")
+    (paragraph "Higher-level content functions")
+    (unordered-list
+      (item "Semantic functions")
+      (item "Easy composition")
+      (item "Clean syntax"))))
+
+(print example2)
+(print "")
+
+;; ============================================================================
+;; Example 3: Macro DSL
+;; ============================================================================
+
+(print "Example 3: Macro DSL")
+(print "--------------------")
+
+(define example3
+  (str-concat
+    (hero "Macro DSL" "Most natural syntax")
+    (text "Use " (b "bold") ", " (i "italic") ", and " (c "code") " easily!")
+    (features
+      (item "Short aliases")
+      (item "Convenience macros")
+      (item "Page builders"))))
+
+(print example3)
+(print "")
+
+;; ============================================================================
+;; Example 4: Complete Page Generation
+;; ============================================================================
+
+(print "Example 4: Complete Page")
+(print "-------------------------")
+
+(defpage "demo-complete" "Complete Demo" (lambda ()
+  (str-concat
+    ;; Hero
+    (hero "Complete DSL Demo" "All features in one page")
+    
+    ;; Introduction
+    (section-with "Introduction"
+      (list
+        (text "This page demonstrates " (b "all three levels") " of the DSL.")
+        (text "From low-level HTML tags to high-level page builders.")))
+    
+    ;; Features
+    (heading 2 "Key Features")
+    (features
+      (item (str-concat (b "S-Expressions") " - Write HTML as Lisp code"))
+      (item (str-concat (b "Composable") " - Build complex pages from simple functions"))
+      (item (str-concat (b "Type-Safe") " - Catch errors at generation time"))
+      (item (str-concat (b "Fast") " - Pure static HTML output")))
+    
+    ;; Code Example
+    (heading 2 "Code Example")
+    (text "Creating a heading is simple:")
+    (paragraph (c "(heading 1 \"My Title\")"))
+    
+    ;; Blog Post
+    (heading 2 "Blog Post Example")
+    (blog-post
+      "My First Post"
+      "2025-12-09"
+      "Lun Developer"
+      (str-concat
+        (text "This is a complete blog post created with the DSL!")
+        (text "It includes:")
+        (list-of
+          (item "Structured content")
+          (item "Inline formatting")
+          (item "Lists and links"))
+        (text "Check out " (l "https://github.com" "the source") " for more!")))
+    
+    ;; Cards
+    (heading 2 "Project Cards")
+    (card "HTML DSL" "Low-level HTML tag generation")
+    (card "Content DSL" "Semantic content creation")
+    (card "Macro DSL" "High-level page builders")
+    
+    ;; Conclusion
+    (heading 2 "Conclusion")
+    (text "The Lun Content DSL makes it " (i "easy") " and " (i "fun") " to generate beautiful HTML using pure functional code!"))))
+
+(print "")
+(print "✨ All examples generated successfully!")
+(print "📂 Files created:")
+(print "   - demo-complete.html")
+(print "")
+(print "🎉 DSL Demonstration Complete!")

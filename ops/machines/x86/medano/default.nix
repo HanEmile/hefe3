@@ -54,18 +54,42 @@ in
     IOWeight=40
   '';
 
-  # --- fleet-upgrade: unlock lampadas after its nightly self-reboot --------
-  # lampadas' fleet-self-upgrade arms this over ssh right before rebooting;
-  # we then poll for its initrd sshd (tailnet, port 22, root shell =
-  # cryptsetup-askpass) and pipe the LUKS passphrase in.
-  age.secrets.fleet_unlock_lampadas_ed25519 = {
-    file = hefe.ops.secrets."fleet_unlock_lampadas_ed25519.age";
-    mode = "0600";
-  };
+  # --- lampadas pulls its LUKS passphrase from here during initrd ----------
+  # (2026-11-15 review: the old fleet-unlock-lampadas watcher pushed to
+  # lampadas' TAILNET IP - a tailnet that does not exist in initrd, so the
+  # watcher could never connect and every self-reboot would have stranded
+  # lampadas at the LUKS prompt. Reversed the flow: lampadas' initrd PULLS
+  # over the public internet; outbound works in initrd, inbound does not.)
   age.secrets.lampadas_luks_passphrase = {
     file = hefe.ops.secrets."lampadas_luks_passphrase.age";
-    mode = "0400";
+    mode = "0440";
+    owner = "fleet-unlock-pull";
+    group = "fleet-unlock-pull";
   };
+  users.groups.fleet-unlock-pull = { };
+  users.users.fleet-unlock-pull = {
+    isSystemUser = true;
+    group = "fleet-unlock-pull";
+    description = "serves lampadas' LUKS passphrase to its initrd (forced command)";
+    shell = pkgs.writeShellScript "fleet-luks-cat" ''
+      exec ${pkgs.coreutils}/bin/cat /run/agenix/lampadas_luks_passphrase
+    '';
+    openssh.authorizedKeys.keys = [
+      # private half lives on lampadas at /root/lampadas_initrd_pull_ed25519,
+      # baked into its initrd via boot.initrd.secrets
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM/nmvMERO4KvBAVuc7L2SaoDFXvMmpYrDk0I0mjSKmE lampadas-initrd-pull"
+    ];
+  };
+  # belt & suspenders: the key must not be able to do anything except the
+  # forced-command shell
+  services.openssh.extraConfig = ''
+    Match User fleet-unlock-pull
+        AllowTcpForwarding no
+        AllowAgentForwarding no
+        PermitTunnel no
+        X11Forwarding no
+        PermitTTY no
+  '';
   # Second copy of lampadas' backup repos on grave (2026-11-01: the status
   # page only ever showed the small metadata repo; the ~430 GiB immich
   # library had exactly ONE copy, on the bx11). bx11 and medano are both
@@ -148,30 +172,16 @@ in
     path = with pkgs; [ openssh netcat-gnu coreutils ];
     script = ''
       set -u
-      HOST=${hefe.ops.ipam.tailscale.lampadas.v4}
-      KEY=${config.age.secrets.fleet_unlock_lampadas_ed25519.path}
-      PASS=$(cat ${config.age.secrets.lampadas_luks_passphrase.path})
-      if [ "$PASS" = "REPLACE_ME" ]; then
-        echo "lampadas_luks_passphrase.age still contains REPLACE_ME; not watching"
-        exit 1
-      fi
-      deadline=$(( $(date +%s) + 1500 ))
-      while [ "$(date +%s)" -lt "$deadline" ]; do
-        if nc -z -w 3 "$HOST" 22 2>/dev/null; then
-          # initrd sshd is up; cryptsetup-askpass (the initrd root shell)
-          # reads the passphrase from the tty stdin, forwards it to the
-          # waiting cryptsetup and the session ends when boot continues.
-          if printf '%s\n' "$PASS" | ssh -tt -o ConnectTimeout=10 \
-               -o StrictHostKeyChecking=accept-new \
-               -o UserKnownHostsFile=/var/lib/fleet/unlock_known_hosts \
-               -i "$KEY" -p 22 "root@$HOST"; then
-            echo "passphrase delivered to lampadas initrd"
-            exit 0
-          fi
-        fi
-        sleep 10
-      done
-      echo "timed out waiting for lampadas initrd"
+      ${
+        # 2026-11-15: replaced by the pull flow - lampadas' initrd fetches
+        # the passphrase from medano's fleet-unlock-pull user itself. The
+        # old push watcher polled lampadas' TAILNET IP, which does not
+        # exist in initrd; it could literally never succeed. Removed after
+        # the self-recovery review; keeping the (dead) unit would only
+        # confuse. This stub fails loudly if something stale still arms it.
+        ""
+      }
+      echo "fleet-unlock-lampadas is retired: lampadas pulls its own LUKS passphrase during initrd (see lampadas boot config)"
       exit 1
     '';
   };

@@ -162,21 +162,59 @@ in
       availableKernelModules = [ "r8168" ];
       kernelModules = [ "r8168" ];
       systemd.users.root.shell = "/bin/cryptsetup-askpass";
+
+      # initrd PULL unlock (2026-11-15): fetch our own LUKS passphrase from
+      # medano's forced-command fleet-unlock-pull user. The retired
+      # fleet-unlock-lampadas watcher on medano pushed to our TAILNET IP,
+      # which does not exist in initrd - it could never have worked.
+      # Outbound internet works in initrd; inbound does not. Private half of
+      # the pair lives on this box at /root/lampadas_initrd_pull_ed25519.
+      secrets."/lampadas_initrd_pull_ed25519" = "/root/lampadas_initrd_pull_ed25519";
+      extraUtilsCommands = ''
+        copy_bin_and_libs ${pkgs.openssh}/bin/ssh
+        # medano's MAIN sshd host key (initrd sshd on :2222 has a different
+        # one; if medano itself is in initrd we simply retry until it's up)
+        echo '95.217.35.60 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDo2MqY7BD6rd/L3UURx/2kTuHMC7V7WmW74bCsejChq' > $out/etc/medano_pull_known_hosts
+      '';
+
       network = {
         enable = true;
         ssh = {
           enable = true;
           port = 22;
           hostKeys = [ "/initrd_ssh_host_key_ed25519" ];
-          authorizedKeys = emile_keys ++ [
-            # fleet-upgrade: medano feeds the LUKS passphrase when lampadas
-            # reboots itself during the nightly run (fleet-unlock-lampadas
-            # watcher on medano, see ops/modules/fleet-upgrade.nix)
-            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII5wbIU/e6bumXnR3Zq9yZ/zxUOQrNMW6JMdp34ffizg fleet-upgrade-medano-initrd"
-          ];
+          authorizedKeys = emile_keys;
         };
         postCommands = ''
           echo 'cryptsetup-askpass' > /root/.profile
+
+          # Background: watch for LUKS prompts and answer them from medano.
+          # Feeds /crypt-ramfs exactly like cryptsetup-askpass does (rm the
+          # device marker, then write the passphrase). Manual entry via
+          # console or initrd sshd keeps working in parallel.
+          (
+            PASS=
+            for _ in $(seq 1 150); do
+              if [ -e /crypt-ramfs/device ]; then
+                dev=$(cat /crypt-ramfs/device)
+                if [ -z "$PASS" ]; then
+                  PASS=$(ssh -i /lampadas_initrd_pull_ed25519 \
+                    -o BatchMode=yes -o ConnectTimeout=8 \
+                    -o StrictHostKeyChecking=yes \
+                    -o UserKnownHostsFile=/etc/medano_pull_known_hosts \
+                    fleet-unlock-pull@95.217.35.60 2>/dev/null || true)
+                  [ "$PASS" = REPLACE_ME ] && PASS=
+                fi
+                if [ -n "$PASS" ] && [ -e /crypt-ramfs/device ] \
+                   && [ "$(cat /crypt-ramfs/device)" = "$dev" ]; then
+                  rm /crypt-ramfs/device
+                  echo -n "$PASS" > /crypt-ramfs/passphrase
+                  echo "initrd-pull: fed passphrase for $dev (from medano)"
+                fi
+              fi
+              sleep 4
+            done
+          ) &
         '';
       };
       luks.devices = {

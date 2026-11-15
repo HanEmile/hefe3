@@ -1,0 +1,17 @@
+{{define "edit"}}
+{{template "layout" .}}
+{{end}}
+
+{{define "content"}}
+<h1>{{if .New}}New Page{{else}}Editing {{.Title}}{{end}}</h1>
+<form action="/{{.Title}}?save" method="POST">
+    {{if .New}}
+    <label>Title: <input type="text" name="title" required></label><br><br>
+    {{end}}
+    <textarea name="content">{{.Raw}}</textarea><br><br>
+    <input type="text" name="message" placeholder="Commit message (optional)"
+        style="width: 100%; margin-bottom: 10px;"><br>
+    <button type="submit">Save</button>
+    <a href="/{{.Title}}">Cancel</a>
+</form>
+{{end}}

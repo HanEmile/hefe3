@@ -1,0 +1,65 @@
+;; example-macro.lun - Example using the Macro DSL
+
+(require "macro-dsl.lun")
+
+(print "Creating page with Macro DSL...")
+
+;; ============================================================================
+;; Define a page using the macro-style DSL
+;; ============================================================================
+
+(defpage "my-awesome-page" "My Awesome Page" (lambda ()
+  (str-concat
+    ;; Hero section
+    (hero 
+      "Build Websites with Lun"
+      "A functional approach to web development")
+    
+    ;; Features
+    (features
+      (item (str-concat (b "S-Expression Syntax") " - Write HTML as Lisp code"))
+      (item (str-concat (b "Functional Composition") " - Build complex pages from simple functions"))
+      (item (str-concat (b "Type Safe") " - Catch errors at generation time"))
+      (item (str-concat (b "Zero Runtime") " - Pure static HTML output")))
+    
+    ;; About section
+    (section-with "About This Project"
+      (list
+        (text "This demonstrates a " (b "complete DSL") " for web development in Lun.")
+        (text "You can use " (i "inline formatting") " and " (c "code snippets") " easily.")
+        (text "Check out the " (l "https://github.com" "source code") " for more!")))
+    
+    ;; Example code
+    (heading 2 "Quick Example")
+    
+    (text "Creating a page is as simple as:")
+    
+    (paragraph (c "(defpage \"index\" \"Home\" (lambda () (hero \"Welcome\" \"To my site\")))"))
+    
+    ;; List example
+    (heading 3 "What You Can Build")
+    
+    (list-of
+      (item "Landing pages")
+      (item "Documentation sites")
+      (item "Blogs")
+      (item "Portfolios")
+      (item "Any static website!"))
+    
+    ;; Blog post
+    (heading 2 "Latest Post")
+    
+    (blog-post
+      "Introducing the Lun Content DSL"
+      "2025-12-09"
+      "Emile"
+      (str-concat
+        (text "Today I'm excited to share a new way to build websites using " (b "pure Lun code") ".")
+        (text "The DSL provides:")
+        (list-of
+          (item "Clean, composable syntax")
+          (item "Full power of Lisp")
+          (item "Static HTML output"))
+        (text "Try it out and let me know what you think!"))))))
+
+(print "✨ Page generation complete!")

@@ -1,0 +1,24 @@
+;; markdown-macros.lun - Macro definitions for markdown constructs
+;; These convert markdown S-expressions to HTML DSL
+
+(require "content-dsl.lun")
+
+;; ============================================================================
+;; Markdown Macro Definitions
+;; ============================================================================
+
+;; heading: (heading 1 "Title") -> (h1 "Title")
+;; Already defined in content-dsl.lun
+
+;; par: (par "text") -> (p "text")
+(define par (lambda (text) (p text)))
+
+;; par with inline content: (par "text" (link ...) "more") -> (p ...)
+(define par-inline (lambda parts
+  (p (join "" parts))))
+
+;; link: (link "text" "url") -> (a "url" "text")
+(define link (lambda (text url)
+  (a url text)))
+
+(print "Markdown macros loaded!")

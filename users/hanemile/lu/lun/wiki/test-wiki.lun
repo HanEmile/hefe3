@@ -1,0 +1,22 @@
+;; debug-wiki.lun - Debug version
+
+(print "Step 1: Testing html-wrap")
+(define test-html (str-concat "<!DOCTYPE html><html><body>Test</body></html>"))
+(print test-html)
+
+(print "Step 2: Testing list-dir")
+(define blog-files (list-dir "wiki/content/blog"))
+(print "Blog files:")
+(print blog-files)
+
+(print "Step 3: Testing write-file")
+(define result (write-file "wiki/output/test.html" "<html><body>Test</body></html>"))
+(print "Write result:")
+(print result)
+
+(print "Step 4: Testing read-file")
+(define content (read-file "wiki/output/test.html"))
+(print "Read content:")
+(print content)
+
+(print "All tests passed!")

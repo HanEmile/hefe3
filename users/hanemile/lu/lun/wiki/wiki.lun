@@ -1,0 +1,96 @@
+;; wiki.lun - Lun Wiki Generator (Fixed)
+;; A complete static site generator written in pure Lun
+
+(print "🚀 Lun Wiki Generator Starting...")
+
+;; ============================================================================
+;; Core HTML Functions
+;; ============================================================================
+
+(define make-style (lambda ()
+  "body{font-family:system-ui;max-width:900px;margin:40px auto;padding:0 40px;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh}.content{background:white;padding:40px;border-radius:10px}h1{color:#2c3e50;border-bottom:3px solid #667eea}a{color:#667eea;text-decoration:none}a:hover{text-decoration:underline}.post-list{list-style:none;padding:0}.post-list li{margin:20px 0;padding:20px;background:#f8f9fa;border-left:4px solid #667eea}.project-card{background:#f8f9fa;padding:20px;margin:20px 0;border-radius:5px}nav{background:#2c3e50;padding:20px;margin:-40px -40px 40px}nav a{color:white;margin-right:20px}"))
+
+(define make-nav (lambda ()
+  "<nav><a href='index.html'>Home</a><a href='blog.html'>Blog</a><a href='projects.html'>Projects</a><a href='about.html'>About</a><a href='events.html'>Events</a></nav>"))
+
+(define make-page (lambda (title body)
+  (str-concat
+    "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>" title 
+    "</title><style>" (make-style) "</style></head><body>"
+    (make-nav) "<div class='content'>" body 
+    "<footer style='margin-top:60px;text-align:center;color:#888'>"
+    "<p>Generated with Lun © 2025</p></footer></div></body></html>")))
+
+;; ============================================================================
+;; List Processing
+;; ============================================================================
+
+(define clean-name (lambda (filename)
+  (str-replace (str-replace filename ".md" "") "-" " ")))
+
+(define make-blog-item (lambda (file)
+  (str-concat
+    "<li><h3><a href='" (str-replace file ".md" ".html") "'>"
+    (clean-name file) "</a></h3></li>")))
+
+(define make-blog-list (lambda (files)
+  (if (empty? files)
+      ""
+      (str-concat (make-blog-item (first files)) (make-blog-list (rest files))))))
+
+(define make-project-card (lambda (file)
+  (str-concat
+    "<div class='project-card'><h3><a href='" (str-replace file ".md" ".html") "'>"
+    (clean-name file) "</a></h3></div>")))
+
+(define make-project-list (lambda (files)
+  (if (empty? files)
+      ""
+      (str-concat (make-project-card (first files)) (make-project-list (rest files))))))
+
+;; ============================================================================
+;; Page Generators
+;; ============================================================================
+
+;; Generate index page
+(print "Generating index...")
+(write-file "wiki/output/index.html" 
+  (make-page "Home" 
+    "<h1>Welcome to My Lun Wiki</h1><p>This wiki is generated entirely using Lun, a minimal Lisp dialect!</p><h2>Quick Links</h2><ul><li><a href='blog.html'>Blog Posts</a></li><li><a href='projects.html'>Projects</a></li><li><a href='about.html'>About Me</a></li><li><a href='events.html'>Events</a></li></ul>"))
+(print "✓ index.html")
+
+;; Generate blog page
+(print "Generating blog...")
+(write-file "wiki/output/blog.html"
+  (make-page "Blog"
+    (str-concat "<h1>Blog Posts</h1><ul class='post-list'>" 
+      (make-blog-list (list-dir "wiki/content/blog")) 
+      "</ul>")))
+(print "✓ blog.html")
+
+;; Generate projects page
+(print "Generating projects...")
+(write-file "wiki/output/projects.html"
+  (make-page "Projects"
+    (str-concat "<h1>Projects</h1>" 
+      (make-project-list (list-dir "wiki/content/projects")))))
+(print "✓ projects.html")
+
+;; Generate about page
+(print "Generating about...")
+(write-file "wiki/output/about.html"
+  (make-page "About" (read-file "wiki/content/about.md")))
+(print "✓ about.html")
+
+;; Generate events page
+(print "Generating events...")
+(write-file "wiki/output/events.html"
+  (make-page "Events" (read-file "wiki/content/events.md")))
+(print "✓ events.html")
+
+(print "")
+(print "✨ Wiki generation complete!")
+(print "📂 Output: wiki/output/")
+(print "🌐 Open wiki/output/index.html in your browser")
+
+0

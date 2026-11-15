@@ -1,0 +1,110 @@
+;; markdown-reader.lun - Markdown to Lun S-expression converter
+;; This allows writing markdown that gets converted to Lun DSL calls
+
+(require "content-dsl.lun")
+
+;; ============================================================================
+;; Markdown Parsing Functions
+;; ============================================================================
+
+;; Count leading characters
+(define count-leading (lambda (str char)
+  (define parts (str-split str ""))
+  (count-leading-helper parts char 0)))
+
+(define count-leading-helper (lambda (parts char count)
+  (if (empty? parts)
+      count
+      (if (= (first parts) char)
+          (count-leading-helper (rest parts) char (+ count 1))
+          count))))
+
+;; Check if string starts with prefix
+(define starts-with? (lambda (str prefix)
+  (= str (str-concat prefix (str-replace str prefix "")))))
+
+;; Parse heading line: # Title -> (heading 1 "Title")
+(define parse-heading (lambda (line)
+  (define level (count-leading line "#"))
+  (define text (str-trim (str-replace line (repeat-str "#" level) "")))
+  (heading level text)))
+
+;; Repeat string n times
+(define repeat-str (lambda (s n)
+  (if (< n 1)
+      ""
+      (str-concat s (repeat-str s (- n 1))))))
+
+;; Parse paragraph: Text -> (paragraph "Text")
+(define parse-paragraph (lambda (line)
+  (paragraph (parse-inline line))))
+
+;; Parse list item: - Item -> (item "Item")
+(define parse-list-item (lambda (line)
+  (define text (str-trim (str-replace (str-replace line "- " "") "* " "")))
+  (item (parse-inline text))))
+
+;; Parse inline markdown (links, bold, etc.)
+(define parse-inline (lambda (text)
+  (parse-link text)))
+
+;; Parse markdown link: [text](url) -> (link "url" "text")
+(define parse-link (lambda (text)
+  (if (str-contains? text "[")
+      (if (str-contains? text "](")
+          (extract-link text)
+          text)
+      text)))
+
+(define str-contains? (lambda (haystack needle)
+  (!= haystack (str-replace haystack needle ""))))
+
+;; Extract link from [text](url) format
+(define extract-link (lambda (text)
+  ;; For now, simple implementation - return text as-is
+  ;; In production, would parse [text](url) properly
+  text))
+
+;; ============================================================================
+;; Main Markdown Parser
+;; ============================================================================
+
+;; Parse markdown lines to HTML
+(define parse-md-line (lambda (line)
+  (if (= (str-trim line) "")
+      ""
+      (if (starts-with? line "#")
+          (parse-heading line)
+          (if (starts-with? line "- ")
+              (parse-list-item line)
+              (if (starts-with? line "* ")
+                  (parse-list-item line)
+                  (parse-paragraph line)))))))
+
+;; Parse all markdown lines
+(define parse-md-lines (lambda (lines)
+  (if (empty? lines)
+      ""
+      (str-concat
+        (parse-md-line (first lines))
+        (parse-md-lines (rest lines))))))
+
+;; Main markdown to HTML function
+(define markdown->html (lambda (md-text)
+  (define lines (str-split md-text "\n"))
+  (parse-md-lines lines)))
+
+;; ============================================================================
+;; Macro-style Markdown Reader
+;; ============================================================================
+
+;; Read markdown file and convert to HTML
+(define read-markdown (lambda (filename)
+  (define content (read-file filename))
+  (markdown->html content)))
+
+;; Create page from markdown file
+(define markdown-page (lambda (filename title)
+  (simple-page title (read-markdown filename))))
+
+(print "Markdown Reader loaded!")

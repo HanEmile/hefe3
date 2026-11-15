@@ -1,0 +1,12 @@
+{{define "list"}}
+{{template "layout" .}}
+{{end}}
+
+{{define "content"}}
+<h1>List</h1>
+<ul>
+    {{range .Pages}}
+    <li><a href="/{{.}}">{{.}}</a></li>
+    {{end}}
+</ul>
+{{end}}

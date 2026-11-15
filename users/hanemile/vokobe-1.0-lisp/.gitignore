@@ -1,0 +1,5 @@
+# nix result symlinks
+result
+
+# fasl binaries I generate from time to time from within emacs
+vokobe2.fasl

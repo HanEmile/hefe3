@@ -1,0 +1,42 @@
+{{define "comment"}}
+{{template "layout" .}}
+{{end}}
+
+{{define "content"}}
+<h1>{{.Title}}</h1>
+{{if .ContextSnippet}}
+<div class="comment-context"
+    style="background: rgba(0,0,0,0.05); padding: 10px; margin-bottom: 20px; border-left: 4px solid #ccc;">
+    {{.ContextSnippet}}
+</div>
+{{end}}
+<p>
+    {{if .New}}
+    Replying to: <strong>{{.TargetName}}</strong>
+    {{else}}
+    Editing comment by: <strong>{{.TargetName}}</strong>
+    {{end}}
+</p>
+
+<form action="/comment" method="POST">
+    <input type="hidden" name="page" value="{{.PageTitle}}">
+    <input type="hidden" name="parent" value="{{.ParentID}}">
+    {{if not .New}}
+    <input type="hidden" name="action" value="update">
+    {{end}}
+
+    <div class="form-group">
+        <textarea name="content" rows="10" style="width: 100%;" placeholder="Write your comment here..."
+            required>{{if .Raw}}{{.Raw}}{{end}}</textarea>
+    </div>
+
+    <div class="actions">
+        <button type="submit">{{if .New}}Post Comment{{else}}Update Comment{{end}}</button>
+        {{if .New}}
+        <a href="/{{.PageTitle}}" class="button">Cancel</a>
+        {{else}}
+        <a href="/comment?action=view&page={{.PageTitle}}&parent={{.ParentID}}" class="button">Cancel</a>
+        {{end}}
+    </div>
+</form>
+{{end}}

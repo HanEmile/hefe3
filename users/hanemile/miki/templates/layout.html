@@ -1,0 +1,44 @@
+{{define "layout"}}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - Miki</title>
+    <link rel="stylesheet" href="https://emile.space/miki.css">
+</head>
+
+<body>
+    <header>
+        <div class="prenav">
+            <ul>
+                <li><a href="https://emile.space">emile.space</a></li>
+            </ul>
+        </div>
+
+        <nav>
+            <ul>
+                <li><a href="/">Home</a></li>
+                <li><a href="/list">All Pages</a></li>
+                {{if .IsAdmin}}
+                <li><a href="/Admin">Admin</a></li>
+                {{end}}
+                {{if .User}}
+            </ul>
+            <ul style="float: right;">
+                <li><span>{{.User}}</span></li>
+                <li><a href="/logout">Logout</a></li>
+                {{else}}
+                <li><a href="/login">Login</a></li>
+                {{end}}
+            </ul>
+        </nav>
+    </header>
+    <main>
+        {{template "content" .}}
+    </main>
+</body>
+
+</html>
+{{end}}

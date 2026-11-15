@@ -1,0 +1,86 @@
+;; example-page.lun - Example using the Content DSL
+
+(require "content-dsl.lun")
+
+(print "Creating example page with Content DSL...")
+
+;; ============================================================================
+;; Define page content using the DSL
+;; ============================================================================
+
+(define my-page-content
+  (str-concat
+    ;; Main heading
+    (heading 1 "Welcome to My Lun-Powered Site")
+    
+    ;; Introduction paragraph
+    (paragraph "This page is written entirely using Lun's Content DSL!")
+    
+    ;; Subheading
+    (heading 2 "Features")
+    
+    ;; Unordered list
+    (unordered-list
+      (item "Write HTML as S-expressions")
+      (item "Use markdown-like functions")
+      (item "Compose pages functionally")
+      (item "No external dependencies"))
+    
+    ;; Another section
+    (heading 2 "Why This is Cool")
+    
+    (paragraph (str-concat
+      "You can use "
+      (bold "bold text")
+      ", "
+      (italic "italic text")
+      ", and even "
+      (inline-code "inline code")
+      " easily!"))
+    
+    ;; Links
+    (paragraph (str-concat
+      "Check out "
+      (link "https://github.com" "GitHub")
+      " for more projects."))
+    
+    ;; Code section
+    (heading 3 "Example Code")
+    
+    (paragraph (str-concat
+      "Here's how you create a heading: "
+      (inline-code "(heading 1 \"My Title\")")))
+    
+    ;; Blog post example
+    (heading 2 "Blog Post Example")
+    
+    (blog-post
+      "My First Post"
+      "2025-12-09"
+      "Emile"
+      (str-concat
+        (paragraph "This is the content of my blog post.")
+        (paragraph "It can have multiple paragraphs!")
+        (unordered-list
+          (item "And lists")
+          (item "With multiple items"))))
+    
+    ;; Cards
+    (heading 2 "Project Cards")
+    
+    (card "Project Alpha" "A cool project built with Lun")
+    (card "Project Beta" "Another awesome Lun application")))
+
+;; ============================================================================
+;; Generate the complete page
+;; ============================================================================
+
+(define complete-page (simple-page "My Lun Page" my-page-content))
+
+;; Write to file
+(write-file "example-dsl-page.html" complete-page)
+
+(print "✓ Page generated: example-dsl-page.html")
+(print "")
+(print "Preview:")
+(print complete-page)

@@ -29,12 +29,13 @@ if [ "$(readlink /run/booted-system/kernel)" = "$(readlink /run/current-system/k
   exit 0
 fi
 
-echo "kernel changed - arming medano unlock watcher, then rebooting" | tee -a "$LOG"
+echo "kernel changed - rebooting" | tee -a "$LOG"
 
-# arm the watcher on medano; it polls for lampadas' initrd sshd (port 22)
-ssh -o ConnectTimeout=10 -o BatchMode=yes medano-root \
-  'systemctl start fleet-unlock-lampadas' >>"$LOG" 2>&1 || \
-  echo "WARNING: could not arm medano watcher - manual unlock will be needed" | tee -a "$LOG"
+# lampadas' initrd PULLS its LUKS passphrase from medano itself since
+# 2026-11-15 (forced-command fleet-unlock-pull user; the old medano-side
+# fleet-unlock-lampadas push watcher could never reach the initrd). As
+# long as medano is up, the reboot is self-unlocking; medano's own
+# standby unlock is covered by medano-watch on lampadas.
 
 # record our own reboot intent for the 08:00 report
 if [ -f "$STATE/results.json" ]; then

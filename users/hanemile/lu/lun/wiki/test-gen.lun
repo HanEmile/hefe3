@@ -1,0 +1,29 @@
+;; test-gen.lun - Test individual generators
+
+(print "Test 1: make-style")
+(define make-style (lambda ()
+  "body{font-family:system-ui}"))
+(print (make-style))
+
+(print "Test 2: make-nav")
+(define make-nav (lambda ()
+  "<nav><a href='index.html'>Home</a></nav>"))
+(print (make-nav))
+
+(print "Test 3: make-page")
+(define make-page (lambda (title body)
+  (str-concat
+    "<!DOCTYPE html><html><head><title>" title 
+    "</title><style>" (make-style) "</style></head><body>"
+    (make-nav) body "</body></html>")))
+
+(define test-page (make-page "Test" "<h1>Hello</h1>"))
+(print "Generated page:")
+(print test-page)
+
+(print "Test 4: write file")
+(define write-result (write-file "wiki/output/test-gen.html" test-page))
+(print "Write result:")
+(print write-result)
+
+(print "All tests passed!")

@@ -1,0 +1,22 @@
+[package]
+name = "amalthea-web"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+amalthea-app = { path = "../amalthea-app" }
+eframe = { workspace = true, features = ["wgpu"] }
+tracing-subscriber.workspace = true
+tracing-web = "0.1"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+web-sys = "0.3"
+# uuid v4 needs an RNG backend. The base uuid dep in amalthea-app does
+# not enable one because that crate is platform-agnostic. Pull uuid in
+# here with `js` (which transitively enables getrandom's `wasm_js`
+# backend) so the WASM build resolves the RNG implementation.
+uuid = { workspace = true, features = ["js"] }
+getrandom = { version = "0.4", features = ["wasm_js"] }

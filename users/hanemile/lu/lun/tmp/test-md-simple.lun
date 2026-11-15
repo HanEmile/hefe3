@@ -1,0 +1,17 @@
+;; test-md-simple.lun - Simple markdown conversion test
+
+(require "markdown-to-lun.lun")
+
+(print "Testing markdown conversion...")
+
+(define lines (read-lines "test-content.md"))
+(print "✓ Read lines")
+
+(define html (parse-md-lines lines))
+(print "✓ Parsed to HTML")
+
+(print "Result:")
+(print html)
+
+(write-file "test-simple-output.html" html)
+(print "✓ Written to file")

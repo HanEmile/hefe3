@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Taint — &lt;all sinks&gt;</title>
+<style>
+:root{
+  --bg:#0d1117;--s:#161b22;--b:#30363d;--b2:#21262d;
+  --t:#c9d1d9;--m:#8b949e;--a:#58a6ff;
+  --red:#f85149;--orange:#e09b52;--yel:#e3b341;--grn:#3fb950;--purple:#bc8cff;
+  --hit:#1a2d1a;--hitborder:#3fb950;
+  --mono:"JetBrains Mono","Cascadia Code","Fira Code",ui-monospace,monospace;
+  --fs:12px;--lh:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-size:var(--fs);line-height:var(--lh)}
+body{background:var(--bg);color:var(--t);font-family:system-ui,sans-serif;
+  padding:0;min-height:100vh}
+
+/* ════ HEADER ════════════════════════════════════════════════════════════════*/
+.topbar{
+  background:linear-gradient(135deg,#0d1117 0%,#161b22 100%);
+  border-bottom:1px solid var(--b);
+  padding:10px 16px;position:sticky;top:0;z-index:100;
+}
+.topbar-inner{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.logo{font-size:14px;font-weight:800;letter-spacing:-.02em;
+  background:linear-gradient(90deg,var(--red),var(--orange),var(--yel));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  white-space:nowrap}
+.target-chip{background:var(--b2);border:1px solid var(--b);
+  border-radius:4px;padding:2px 8px;font-size:10px;color:var(--m);
+  font-family:var(--mono);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:300px}
+.stat-chips{display:flex;gap:6px;margin-left:auto}
+.stat-chip{padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;
+  letter-spacing:.04em}
+.stat-chip.full{background:rgba(248,81,73,.18);color:var(--red);
+  border:1px solid rgba(248,81,73,.35)}
+.stat-chip.partial{background:rgba(227,179,65,.15);color:var(--yel);
+  border:1px solid rgba(227,179,65,.3)}
+.stat-chip.none{background:var(--b2);color:var(--m);border:1px solid var(--b)}
+
+/* ════ FILTER BAR ════════════════════════════════════════════════════════════*/
+.filterbar{
+  background:var(--s);border-bottom:1px solid var(--b);
+  padding:6px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  font-size:11px;
+}
+.filterbar label{color:var(--m);white-space:nowrap}
+.filterbar select,
+.filterbar input[type=range]{
+  background:var(--b2);border:1px solid var(--b);color:var(--t);
+  border-radius:3px;padding:2px 6px;font-size:11px;height:22px;
+}
+.filterbar select:focus{outline:1px solid var(--a);border-color:var(--a)}
+.filter-sep{width:1px;background:var(--b);height:18px;flex-shrink:0}
+.sort-btn{background:var(--b2);border:1px solid var(--b);color:var(--t);
+  border-radius:3px;padding:2px 8px;font-size:10px;cursor:pointer;height:22px;
+  display:flex;align-items:center;gap:4px}
+.sort-btn:hover{border-color:var(--a);color:var(--a)}
+.sort-btn.active{border-color:var(--a);color:var(--a);background:rgba(88,166,255,.08)}
+.filter-count{color:var(--m);font-size:10px;margin-left:auto;white-space:nowrap}
+.clear-btn{background:transparent;border:1px solid var(--b);color:var(--m);
+  border-radius:3px;padding:2px 8px;font-size:10px;cursor:pointer;height:22px}
+.clear-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* ════ MAIN CONTENT ══════════════════════════════════════════════════════════*/
+.content{padding:10px 16px;max-width:1400px}
+
+/* ════ FINDING CARD ══════════════════════════════════════════════════════════*/
+.card{
+  border:1px solid var(--b);border-radius:6px;
+  margin-bottom:8px;overflow:hidden;
+  transition:box-shadow .15s;
+}
+.card:hover{box-shadow:0 0 0 1px var(--b2)}
+.card.full   {border-left:3px solid var(--red)}
+.card.partial{border-left:3px solid var(--yel)}
+.card.hidden {display:none!important}
+
+/* ── card header bar ── */
+.card-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--s);padding:5px 10px;border-bottom:1px solid var(--b);
+  gap:8px;flex-wrap:wrap;
+}
+.card-hdr-left{display:flex;align-items:center;gap:8px}
+.sev-pill{
+  font-size:9px;font-weight:800;padding:2px 6px;border-radius:3px;
+  text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;
+}
+.sev-pill.full   {background:var(--red);color:#fff}
+.sev-pill.partial{background:var(--yel);color:#000}
+.finding-num{font-size:11px;color:var(--m);font-weight:600}
+.cross-file{
+  font-size:9px;background:rgba(188,140,255,.12);border:1px solid rgba(188,140,255,.25);
+  color:var(--purple);border-radius:3px;padding:1px 6px;font-family:var(--mono);
+}
+.same-file{
+  font-size:9px;color:var(--m);font-family:var(--mono);
+  background:var(--b2);border:1px solid var(--b);border-radius:3px;padding:1px 6px;
+}
+.card-hdr-pills{display:flex;align-items:center;gap:5px}
+.meta-pill{
+  font-size:9px;padding:1px 7px;border-radius:10px;white-space:nowrap;cursor:default;
+}
+.steps-pill{background:rgba(88,166,255,.1);color:var(--a);border:1px solid rgba(88,166,255,.2)}
+.guards-pill-hdr{background:rgba(227,179,65,.1);color:var(--yel);border:1px solid rgba(227,179,65,.2)}
+.src-pill{background:rgba(63,185,80,.1);color:var(--grn);border:1px solid rgba(63,185,80,.2);
+  font-family:var(--mono)}
+
+/* ── quick flow ── */
+.quick-flow{
+  display:grid;grid-template-columns:1fr auto 1fr;
+  align-items:center;gap:0;
+  background:var(--bg);border-bottom:1px solid var(--b);
+  min-height:0;
+}
+.qf-from,.qf-to{
+  padding:5px 10px;overflow:hidden;min-width:0;
+}
+.qf-label{
+  display:inline-block;font-size:8px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.1em;
+  padding:1px 4px;border-radius:2px;margin-right:5px;
+  vertical-align:middle;
+}
+.qf-label.src{background:rgba(248,81,73,.2);color:var(--red)}
+.qf-label.snk{background:rgba(88,166,255,.15);color:var(--a)}
+.qf-loc{
+  font-family:var(--mono);color:var(--a);font-size:10px;
+  display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.qf-desc{
+  font-family:var(--mono);font-size:9px;color:var(--m);
+  display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  margin-top:1px;
+}
+.qf-arrow{
+  padding:0 12px;color:var(--m);font-size:10px;white-space:nowrap;
+  text-align:center;font-family:var(--mono);
+  border-left:1px solid var(--b);border-right:1px solid var(--b);
+  background:var(--s);min-height:100%;display:flex;align-items:center;
+}
+
+/* ── pipeline toggle ── */
+details.pipeline-wrap>summary.pipeline-toggle{
+  cursor:pointer;list-style:none;
+  padding:4px 10px;background:var(--b2);
+  color:var(--m);font-size:10px;user-select:none;
+  display:flex;align-items:center;gap:6px;
+  border-bottom:1px solid transparent;
+}
+details.pipeline-wrap>summary.pipeline-toggle::-webkit-details-marker{display:none}
+.tog-arrow{font-size:8px;transition:transform .15s;display:inline-block}
+details.pipeline-wrap[open]>summary.pipeline-toggle .tog-arrow{transform:rotate(90deg)}
+details.pipeline-wrap[open]>summary.pipeline-toggle{border-bottom-color:var(--b)}
+.tog-sub{color:var(--m);font-size:9px;opacity:.7}
+
+/* ── pipeline ── */
+.pipeline{
+  padding:10px;display:flex;flex-direction:column;
+  align-items:flex-start;gap:0;background:var(--bg);
+}
+.pipe-node{
+  width:100%;border:1px solid var(--b);border-radius:4px;
+  overflow:hidden;
+}
+.pipe-node.pn-source{border-left:3px solid var(--red)}
+.pipe-node.pn-sink  {border-left:3px solid var(--a)}
+.pipe-node.pn-step  {border-left:3px solid var(--b)}
+
+.pn-header{
+  display:flex;align-items:center;gap:6px;
+  padding:3px 8px;background:rgba(255,255,255,.03);
+  border-bottom:1px solid var(--b);
+}
+.pn-icon{font-size:8px}
+.pn-source .pn-icon{color:var(--red)}
+.pn-sink   .pn-icon{color:var(--a)}
+.pn-step   .pn-icon{color:var(--m)}
+.pn-kind{
+  font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.07em;white-space:nowrap;
+}
+.pn-source .pn-kind{color:var(--red)}
+.pn-sink   .pn-kind{color:var(--a)}
+.pn-step   .pn-kind{color:var(--m)}
+.pn-file{font-family:var(--mono);font-size:10px;color:var(--t);flex:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pn-loc{font-family:var(--mono);font-size:9px;color:var(--m)}
+.guards-pill{
+  font-size:8px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.25);
+  color:var(--yel);border-radius:8px;padding:0 5px;cursor:help;
+}
+
+/* ── node details ── */
+details.pn-details>summary.pn-desc{
+  cursor:pointer;list-style:none;
+  padding:3px 8px;font-family:var(--mono);font-size:10px;
+  color:var(--t);user-select:none;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  display:flex;align-items:center;gap:4px;
+}
+details.pn-details>summary.pn-desc::-webkit-details-marker{display:none}
+details.pn-details>summary.pn-desc::before{
+  content:"▶";font-size:7px;transition:transform .1s;flex-shrink:0;color:var(--m);
+}
+details.pn-details[open]>summary.pn-desc::before{transform:rotate(90deg)}
+
+/* guards inside node */
+.node-guards{padding:4px 8px 0;}
+.guard-item{
+  font-family:var(--mono);font-size:9px;color:var(--yel);
+  padding:1px 0;padding-left:12px;position:relative;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.guard-item::before{content:"if";position:absolute;left:0;color:var(--m)}
+
+/* code in nodes */
+pre.code{
+  margin:4px 0 0;padding:4px 8px;
+  background:var(--bg);font-family:var(--mono);
+  font-size:11px;line-height:16px;
+  overflow-x:auto;border-top:1px solid var(--b);
+  tab-size:4;
+}
+.ln{display:inline-block;width:32px;color:var(--m);
+  user-select:none;text-align:right;margin-right:8px}
+.cl{display:block;height:16px;line-height:16px;
+  white-space:pre;overflow:hidden;text-overflow:ellipsis}
+.cl.hit{background:var(--hit);border-left:2px solid var(--hitborder);
+  margin-left:-2px;padding-left:2px;color:#acf2a0;height:16px;line-height:16px}
+
+/* ── pipe arrow connector ── */
+.pipe-arrow{
+  align-self:flex-start;margin-left:16px;
+  font-size:12px;color:var(--b);padding:1px 0;
+  line-height:14px;user-select:none;
+}
+
+.group-header{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 10px 3px;margin-top:8px;
+  border-bottom:1px solid var(--b);
+  font-size:10px;font-weight:700;color:var(--a);
+  letter-spacing:.04em;text-transform:uppercase;
+}
+.gh-count{background:rgba(88,166,255,.12);border:1px solid rgba(88,166,255,.2);
+  color:var(--a);border-radius:8px;padding:0 6px;font-size:9px}
+
+footer{padding:10px 16px 20px;color:var(--m);font-size:10px;
+  border-top:1px solid var(--b);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="logo">⚡ TAINT</span>
+    <span class="target-chip">target: &lt;all sinks&gt;</span>
+    <div class="stat-chips">
+      <span class="stat-chip full">1 FULL</span>
+      <span class="stat-chip partial">0 PARTIAL</span>
+      <span class="stat-chip none">1 total</span>
+    </div>
+  </div>
+</div>
+
+<div class="filterbar">
+  <input type="search" id="fText" placeholder="Search…" oninput="applyFilters()"
+    style="background:var(--b2);border:1px solid var(--b);color:var(--t);
+      border-radius:3px;padding:2px 8px;font-size:11px;height:22px;width:160px">
+
+  <div class="filter-sep"></div>
+  <label>Sev</label>
+  <select id="fSev" onchange="applyFilters()">
+    <option value="">all</option>
+    <option value="full">FULL</option>
+    <option value="partial">PARTIAL</option>
+  </select>
+
+  <div class="filter-sep"></div>
+  <label>Source fn</label>
+  <select id="fSrc" onchange="applyFilters()">
+    <option value="">any</option>
+    <option value="functions  ← f.read()">functions  ← f.read()</option>
+  </select>
+
+  <div class="filter-sep"></div>
+  <label>Min guards</label>
+  <input type="range" id="fGuards" min="0" max="20" value="0"
+    oninput="document.getElementById('guardVal').textContent=this.value;applyFilters()"
+    style="width:80px">
+  <span id="guardVal" style="color:var(--yel);font-size:10px;min-width:16px">0</span>
+
+  <div class="filter-sep"></div>
+  <label>Group</label>
+  <select id="fGroup" onchange="applyFilters()">
+    <option value="">none</option>
+    <option value="source">by source fn</option>
+    <option value="sinkfile">by sink file</option>
+    <option value="sev">by severity</option>
+  </select>
+
+  <div class="filter-sep"></div>
+  <label>Sort</label>
+  <button class="sort-btn active" id="sIdx"    onclick="sortBy('idx')">   # </button>
+  <button class="sort-btn"        id="sSteps"  onclick="sortBy('steps')"> steps </button>
+  <button class="sort-btn"        id="sGuards" onclick="sortBy('guards')">guards </button>
+  <button class="sort-btn"        id="sSev"    onclick="sortBy('sev')">   sev </button>
+
+  <div class="filter-sep"></div>
+  <button class="clear-btn" onclick="clearFilters()">✕ reset</button>
+  <span class="filter-count" id="fCount">1 finding(s)</span>
+</div>
+
+<div class="content" id="cardContainer">
+<div class="card full" id="c0"
+  data-sev="full"
+  data-source="functions  ← f.read()"
+  data-steps="2"
+  data-guards="6"
+  data-srcfile="build_cmd_buffer_lib.py"
+  data-sinkfile="build_cmd_buffer_lib.py">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#0</span>
+      <span class="same-file">build_cmd_buffer_lib.py</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">6&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">functions  ← f.read()</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/chromium.googlesource.com/chromium/chromium/src/gpu/command_buffer/build_cmd_buffer_lib.py:6250:19</span>
+      <span class="qf-desc">functions  ← f.read()</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/chromium.googlesource.com/chromium/chromium/src/gpu/command_buffer/build_cmd_buffer_lib.py:6298:5</span>
+      <span class="qf-desc">self.Log(&quot;Auto Generated Functions    : %d&quot; %</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">build_cmd_buffer_lib.py</span>
+    <span class="pn-loc">:6250</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">functions  ← f.read()</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">6247</span>      &quot;&quot;&quot;Parses the cmd_buffer_functions.txt file and extracts the functions&quot;&quot;&quot;</div><div class="cl"><span class="ln">6248</span>      filename = os.path.join(self.chromium_root_dir, filename)</div><div class="cl"><span class="ln">6249</span>      with open(filename, &quot;r&quot;) as f:</div><div class="cl hit"><span class="ln">6250</span>        functions = f.read()</div><div class="cl"><span class="ln">6251</span>      for line in functions.splitlines():</div><div class="cl"><span class="ln">6252</span>        if self._whitespace_re.match(line) or self._comment_re.match(line):</div><div class="cl"><span class="ln">6253</span>          continue</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">build_cmd_buffer_lib.py</span>
+    <span class="pn-loc">:6298</span>
+    <span class="guards-pill" title="6 guard(s)">6</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">self.Log(&quot;Auto Generated Functions    : %d&quot; %</summary>
+    <div class="node-guards"><div class="guard-item">if self._whitespace_re.match(line) or self._comment_re.match(line)</div><div class="guard-item">if func_info['type'] == 'Noop'</div><div class="guard-item">if func_type != 'NoCommand'</div><div class="guard-item">if 'immediate' in methods</div><div class="guard-item">if 'bucket' in methods</div><div class="guard-item">if 'shm' in methods</div></div>
+    <pre class="code"><div class="cl"><span class="ln">6295</span>          self.Error(&quot;Could not parse function: %s using regex: %s&quot; %</div><div class="cl"><span class="ln">6296</span>                     (line, self._function_re.pattern))</div><div class="cl"><span class="ln">6297</span>  </div><div class="cl hit"><span class="ln">6298</span>      self.Log(&quot;Auto Generated Functions    : %d&quot; %</div><div class="cl"><span class="ln">6299</span>               len([f for f in self.functions if f.can_auto_generate or</div><div class="cl"><span class="ln">6300</span>                    (not f.IsType('') and not f.IsType('Custom') and</div><div class="cl"><span class="ln">6301</span>                     not f.IsType('Todo'))]))</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+
+</div>
+
+<footer>taint — source-level data-flow tracer &nbsp;·&nbsp; 1 finding(s) for target <code>&lt;all sinks&gt;</code></footer>
+
+<script>
+const cards = Array.from(document.querySelectorAll('.card'));
+let sortKey = 'idx';
+let sortAsc = true;
+
+function applyFilters() {
+  const sev    = document.getElementById('fSev').value;
+  const src    = document.getElementById('fSrc').value;
+  const guards = parseInt(document.getElementById('fGuards').value, 10);
+  const txt    = (document.getElementById('fText').value || '').toLowerCase();
+  const group  = document.getElementById('fGroup').value;
+
+  // Remove existing group headers
+  document.querySelectorAll('.group-header').forEach(h => h.remove());
+
+  let visible = 0;
+  cards.forEach(c => {
+    const textMatch = !txt ||
+      c.dataset.source.toLowerCase().includes(txt) ||
+      c.dataset.srcfile.toLowerCase().includes(txt) ||
+      c.dataset.sinkfile.toLowerCase().includes(txt) ||
+      c.textContent.toLowerCase().includes(txt);
+    const hide =
+      (sev    && c.dataset.sev    !== sev)  ||
+      (src    && c.dataset.source !== src)  ||
+      (parseInt(c.dataset.guards,10) < guards) ||
+      !textMatch;
+    c.classList.toggle('hidden', hide);
+    if (!hide) visible++;
+  });
+  document.getElementById('fCount').textContent = visible + ' finding(s)';
+
+  // Apply grouping if requested
+  if (group) applyGrouping(group);
+}
+
+function applyGrouping(key) {
+  const container = document.getElementById('cardContainer');
+  const visible = cards.filter(c => !c.classList.contains('hidden'));
+  if (!visible.length) return;
+
+  // Group by key
+  const groups = {};
+  visible.forEach(c => {
+    const gk = key === 'source' ? c.dataset.source :
+               key === 'sinkfile' ? c.dataset.sinkfile :
+               key === 'sev' ? c.dataset.sev : '';
+    if (!groups[gk]) groups[gk] = [];
+    groups[gk].push(c);
+  });
+
+  // Re-render with group headers
+  Object.keys(groups).sort().forEach(gk => {
+    const hdr = document.createElement('div');
+    hdr.className = 'group-header';
+    hdr.innerHTML = '<span class="gh-key">' + escapeHtml(gk) + '</span>' +
+      '<span class="gh-count">' + groups[gk].length + '</span>';
+    container.appendChild(hdr);
+    groups[gk].forEach(c => container.appendChild(c));
+  });
+}
+
+const sevOrder = { full: 0, partial: 1, none: 2 };
+function sortBy(key) {
+  if (sortKey === key) { sortAsc = !sortAsc; }
+  else { sortKey = key; sortAsc = key === 'idx'; }
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('s' + key.charAt(0).toUpperCase() + key.slice(1)).classList.add('active');
+  const container = document.getElementById('cardContainer');
+  const sorted = [...cards].sort((a, b) => {
+    let av, bv;
+    if (key === 'idx')         { av = parseInt(a.id.slice(1));        bv = parseInt(b.id.slice(1)); }
+    else if (key === 'steps')  { av = parseInt(a.dataset.steps);       bv = parseInt(b.dataset.steps); }
+    else if (key === 'guards') { av = parseInt(a.dataset.guards);      bv = parseInt(b.dataset.guards); }
+    else if (key === 'sev')    { av = sevOrder[a.dataset.sev]||9;      bv = sevOrder[b.dataset.sev]||9; }
+    return sortAsc ? av - bv : bv - av;
+  });
+  sorted.forEach(c => container.appendChild(c));
+  applyFilters(); // re-apply to handle grouping
+}
+
+function clearFilters() {
+  document.getElementById('fSev').value    = '';
+  document.getElementById('fSrc').value    = '';
+  document.getElementById('fGuards').value = 0;
+  document.getElementById('fText').value   = '';
+  document.getElementById('fGroup').value  = '';
+  document.getElementById('guardVal').textContent = '0';
+  document.querySelectorAll('.group-header').forEach(h => h.remove());
+  cards.forEach(c => c.classList.remove('hidden'));
+  document.getElementById('fCount').textContent = cards.length + ' finding(s)';
+  sortKey = 'idx'; sortAsc = true;
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('sIdx').classList.add('active');
+  const container = document.getElementById('cardContainer');
+  [...cards].sort((a,b) => parseInt(a.id.slice(1)) - parseInt(b.id.slice(1)))
+    .forEach(c => container.appendChild(c));
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Keyboard shortcut: / to focus search
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'SELECT') {
+    e.preventDefault();
+    document.getElementById('fText').focus();
+  }
+});
+</script>
+</body>
+</html>

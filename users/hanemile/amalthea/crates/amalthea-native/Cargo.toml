@@ -1,0 +1,10 @@
+[package]
+name = "amalthea-native"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+amalthea-app = { path = "../amalthea-app" }
+eframe = { workspace = true, features = ["default", "wgpu"] }
+tokio.workspace = true
+tracing-subscriber.workspace = true

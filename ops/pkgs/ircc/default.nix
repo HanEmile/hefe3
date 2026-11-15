@@ -3,7 +3,7 @@
 # A tiny web-based IRC client (bonsai_web frontend + a cohttp/async_rpc_websocket
 # backend that itself speaks IRC to a soju bouncer), meant to be hosted
 # tailscale-only on the irc VM, the-lounge-style. See
-# //users/hanemile/projects/ocaml/ircc for the actual dune project; this file
+# //users/hanemile/ircc for the actual dune project; this file
 # is just the nix packaging for it.
 #
 # Jane Street's "bonsai" (incl. Bonsai_web) is not packaged in nixpkgs, so it's
@@ -175,7 +175,7 @@ ocamlPackages.buildDunePackage {
   pname = "ircc";
   version = "0.1.0";
 
-  src = ../../../users/hanemile/projects/ocaml/ircc;
+  src = ../../../users/hanemile/ircc;
 
   minimalOCamlVersion = "5.1";
   duneVersion = "3";
@@ -208,7 +208,7 @@ ocamlPackages.buildDunePackage {
 
   meta = {
     description = "A tiny the-lounge-style web IRC client for a personal soju bouncer, built with Bonsai_web";
-    homepage = "https://github.com/HanEmile/hefe3/tree/main/users/hanemile/projects/ocaml/ircc";
+    homepage = "https://github.com/HanEmile/hefe3/tree/main/users/hanemile/ircc";
     license = pkgs.lib.licenses.mit;
     maintainers = with pkgs.lib.maintainers; [ hanemile ];
     mainProgram = "ircc";

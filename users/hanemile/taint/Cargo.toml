@@ -1,0 +1,42 @@
+[package]
+name = "taint"
+version = "0.1.0"
+edition = "2021"
+description = "Source-level taint/data-flow tracer for manual security analysis (C/C++/Rust/Go/Python)"
+
+[[bin]]
+name = "taint"
+path = "src/main.rs"
+
+[dependencies]
+# tree-sitter core runtime
+tree-sitter = "0.22"
+
+# per-language grammars
+tree-sitter-c       = "0.21"
+tree-sitter-cpp     = "0.22"
+tree-sitter-rust    = "0.21"
+tree-sitter-go      = "0.21"
+tree-sitter-python  = "0.21"
+
+# fast hash
+ahash = "0.8"
+
+# parallel file processing
+rayon = "1.10"
+
+# pretty terminal output
+colored = "2.1"
+
+# CLI arg parsing
+clap = { version = "4.5", features = ["derive"] }
+
+# serialise the path report to JSON (optional --json flag)
+serde       = { version = "1", features = ["derive"] }
+serde_json  = "1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+strip = true

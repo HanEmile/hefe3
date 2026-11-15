@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About - emile.space</title>
+  <style>
+* { word-wrap:break-word !important; font-family: monospace; margin: 0; padding: 0; }
+
+/* light/dark theme */
+@media (prefers-color-scheme: light) {
+    html { background: #ffffff; color: #040404; }
+    a:hover {
+      box-sizing: border-box;
+      -moz-box-sizing: border-box;
+      -webkit-box-sizing: border-box;
+      box-shadow:inset 0px 0px 0px 1px black;
+    }
+    :target a { color: #ffffff; background: #040404; }
+    a { color: #040404; background: #ffffff; text-decoration: none;}
+    nav a:hover, a:active { color: #ffffff; background: #040404 }
+    nav { background: #eeeeee }
+    nav a { display:block; background: #eeeeee }
+    h1 { margin: 2ex 0 1ex 0; width: 100%; background-color: #eeeeee }
+    h2 { margin: 1ex 0 1ex 0; width: 100%; background-color: #eeeeee }
+    h3 { margin: 1ex 0 1ex 0; width: 100%; font-size: 1em; background-color: #eeeeee }
+    h4 { margin: 1ex 0 1ex 0; width: 100%; font-size: 1em; }
+    h5 { margin: 1ex 0 1ex 0; width: 100%; font-size: 1em; }
+    .code { border-left: 1px solid #040404; margin-left: 2ex; padding-left: 1ex; }
+    table, th, td { border: 1px solid #040404; }
+    .object-meta { background: #fafafa; border-left: 1px solid #cccccc; }
+    .toc { background: #fafafa; border-right: 1px solid #cccccc; }
+}
+@media (prefers-color-scheme: dark) {
+    html { background: #040404; color: #dddddd; }
+    a:hover {
+      box-sizing: border-box;
+      -moz-box-sizing: border-box;
+      -webkit-box-sizing: border-box;
+      box-shadow:inset 0px 0px 0px 1px #dddddd;
+    }
+    :target a { color: #040404; background: #dddddd; }
+    a { color: #dddddd; background: #040404; text-decoration: none; }
+    nav a:hover, a:active { color: #040404; background: #dddddd }
+    nav { background: #dddddd }
+    nav a { display:block; background: #dddddd }
+    h1 { margin: 2ex 0 1ex 0; width: 100%; background-color: #dddddd }
+    h2 { margin: 1ex 0 1ex 0; width: 100%; background-color: #dddddd }
+    h3 { margin: 1ex 0 1ex 0; width: 100%; font-size: 1em; background-color: #dddddd }
+    h4 { margin: 1ex 0 1ex 0; width: 100%; font-size: 1em; }
+    h5 { margin: 1ex 0 1ex 0; width: 100%; font-size: 1em; }
+    .code { border-left: 1px solid #dddddd; margin-left: 2ex; padding-left: 1ex; }
+    .webring { -webkit-filter: invert(100%); filter: invert(100%); }
+    table, th, td { border: 1px solid #dddddd; }
+    .object-meta { background: #0a0a0a; border-left: 1px solid #333333; }
+    .toc { background: #0a0a0a; border-right: 1px solid #333333; }
+}
+
+/* mobile */
+@media only screen and (max-width: 768px) {
+  body { margin: 1ex; width: calc(100% - 2ex) !important; }
+  img { max-width: 100% !important; max-height: 500px; }
+}
+img { max-width: 100ex; max-height: 500px; }
+body { margin-left: auto; margin-right: auto; margin-top: 1ex; margin-bottom: 1ex; width: 100ex; }
+
+/* dense tables (vokobe-style) */
+table { border-collapse: collapse; }
+td, th { padding: 0 1ex; text-align: left; }
+th { font-weight: bold; }
+
+/* display internal links using [] */
+body pre a:not([class*="local"]):before,
+.query-list a:before,
+.query-table a:before,
+.backlinks a:before { content: "["; }
+body pre a:not([class*="local"]):after,
+.query-list a:after,
+.query-table a:after,
+.backlinks a:after { content: "]"; }
+/* external links use {} */
+a[href*="//"]:not([class*="icon"]):before { content: '{'; }
+a[href*="//"]:not([class*="icon"]):after { content: '}'; }
+/* don't bracket heading anchors, nav, meta, toc, or footer links */
+h1 a:before, h1 a:after,
+h2 a:before, h2 a:after,
+h3 a:before, h3 a:after,
+h4 a:before, h4 a:after,
+h5 a:before, h5 a:after,
+header a:before, header a:after,
+nav a:before, nav a:after,
+.object-meta a:before, .object-meta a:after,
+.toc a:before, .toc a:after,
+footer a:before, footer a:after { content: "" !important; }
+
+ul { list-style-type: none; }
+
+/* navigation bar */
+nav { margin: 1ex 0; }
+nav * { color: #040404; }
+nav ul { list-style: none; position: relative; display: inline-block; }
+nav ul li { display:inline-block; }
+nav ul li > a::after { content: " /"; }
+nav ul li > a:only-child::after { content: ""; }
+nav ul li:last-of-type a::after { content: ""; }
+nav + ul li { display: inline-block;}
+nav + ul.vert li { display: block; }
+
+/* headings */
+h1 a, h2 a, h3 a { padding-right: 1ex; text-decoration: none; }
+h1 { display: inline-block; text-indent: 3.3ex hanging; }
+h2 { display: inline-block; text-indent: 5.5ex hanging; }
+h3 { display: inline-block; text-indent: 7.7ex hanging; }
+h4 { display: inline-block; text-indent: 9.9ex hanging; }
+h5 { display: inline-block; text-indent: 12.1ex hanging; }
+
+pre { white-space: pre-wrap; hyphens: auto; }
+pre.code { white-space: pre-wrap; hyphens: none; }
+
+/* ---- object metadata (right sidebar on wide screens) ---- */
+.object-meta {
+  font-size: 0.9em;
+  padding: 1ex;
+  line-height: 1.2;
+}
+.object-meta .meta-item {
+  padding: 0;
+}
+.object-meta .meta-item strong::after {
+  content: " ";
+}
+.object-meta a { text-decoration: none; background: inherit; }
+.object-meta a:hover { background: inherit; }
+
+/* ---- table of contents (left sidebar on wide screens) ---- */
+.toc {
+  padding: 1ex;
+  line-height: 1.2;
+}
+.toc pre { margin: 0; line-height: 1.2; }
+.toc a { background: inherit; }
+.toc a:hover { background: inherit; }
+
+/* ---- wide screen: sidebars aligned at same height ---- */
+@media only screen and (min-width: 1360px) {
+  .toc, .object-meta {
+    position: sticky;
+    top: 1ex;
+    width: 30ex;
+    max-height: calc(100vh - 2ex);
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .toc::-webkit-scrollbar,
+  .object-meta::-webkit-scrollbar { width: 0; height: 0; }
+
+  .toc {
+    float: left;
+    margin-left: -33ex;
+  }
+  .object-meta {
+    float: right;
+    margin-right: -33ex;
+  }
+}
+
+/* query results */
+.query-table { width: 100%; margin: 0.5ex 0; }
+.query-list { list-style: none; padding: 0; }
+.query-list li { padding: 0.1ex 0; }
+
+/* backlinks */
+.backlinks { list-style: none; padding: 0; margin: 0; }
+.backlinks li { padding: 0; margin: 0; line-height: 1.4; }
+.backlinks li::before { content: "← "; }
+
+/* visibility indicators — pages */
+.page-private { border-left: 3px solid #cc3333; padding-left: 1ex; }
+.page-internal { border-left: 3px solid #cc8833; padding-left: 1ex; }
+
+/* visibility indicators — inline sections.
+   The border hangs in the left margin (via negative margin-left + matching
+   padding-left) so headings inside stay aligned with headings outside. The
+   vertical margins of the first/last children are zeroed so the border
+   hugs the content instead of the heading's top margin or trailing gap. */
+.visibility-private,
+.visibility-internal {
+  border-left: 3px solid;
+  margin: 0.5ex 0 0.5ex -1ex;
+  padding-left: calc(1ex - 3px);
+}
+.visibility-private { border-color: #cc3333; }
+.visibility-internal { border-color: #cc8833; }
+.visibility-private > :first-child,
+.visibility-internal > :first-child,
+.visibility-private > span:first-child + *,
+.visibility-internal > span:first-child + * { margin-top: 0; }
+.visibility-private > :last-child,
+.visibility-internal > :last-child { margin-bottom: 0; }
+
+/* visibility indicators — backlink items */
+.bl-private::after { content: " 🔴"; font-size: 0.7em; }
+.bl-internal::after { content: " 🟠"; font-size: 0.7em; }
+
+/* visibility indicators — inline links */
+.link-private { border-bottom: 1px dashed #cc3333; }
+.link-internal { border-bottom: 1px dashed #cc8833; }
+
+/* SVG topology diagrams */
+.topo-svg { display: block; margin: 1ex auto; }
+
+/* SVG shelf view */
+.shelf-svg { display: block; margin: 1ex auto; }
+
+/* lisp eval errors */
+.eval-error { color: #cc0000; font-style: italic; }
+
+/* search */
+header { display: flex; align-items: center; gap: 1ex; position: relative; }
+#search { font-family: monospace; font-size: 1em; border: 1px solid currentColor; background: inherit; color: inherit; padding: 0.25ex 0.5ex; margin-left: auto; width: 20ex; }
+#search:focus { outline: none; width: 30ex; }
+#search-results { display: none; position: absolute; right: 0; top: 100%; z-index: 999; font-size: 0.9em; padding: 1ex; max-height: 60vh; overflow-y: auto; width: 40ex; border: 1px solid currentColor; }
+#search-results.active { display: block; }
+#search-results a { display: block; padding: 0.3ex 0.5ex; }
+#search-results a:hover { opacity: 0.7; }
+#search-results small { opacity: 0.5; margin-left: 0.5ex; }
+@media (prefers-color-scheme: light) {
+  #search-results { background: #ffffff; }
+}
+@media (prefers-color-scheme: dark) {
+  #search-results { background: #040404; }
+
+/* code blocks */
+pre.code[data-lang]::before { content: attr(data-lang); display: block; opacity: 0.5; font-size: 0.8em; margin-bottom: 0.5ex; }
+
+/* images */
+figure { margin: 1ex 0; }
+figure img { max-width: 100%; }
+figcaption { font-size: 0.85em; opacity: 0.7; }
+
+/* footer */
+footer { margin-top: 2ex; padding-top: 0.5ex; }
+footer pre { font-size: 0.85em; }
+
+  </style>
+</head>
+<body class="page-public">
+<header>
+  <a href="/">emile.space</a>
+  <input type="text" id="search" placeholder="search..." autocomplete="off">
+  <div id="search-results"></div>
+</header>
+<nav>
+  <ul>
+  </ul>
+  <ul style="float: right">
+    <li><a href="about.md">.md</a></li>
+  </ul>
+</nav>
+<div class="toc"><pre>
+<a href="#about">1. about</a>
+   <a href="#contact">1.1. Contact</a>
+   <a href="#doings">1.2. Doings</a>
+   <a href="#cv-like-foo">1.3. CV like foo</a>
+      <a href="#work">1.3.1. Work</a>
+      <a href="#associations">1.3.2. Associations</a>
+      <a href="#internships">1.3.3. Internships</a>
+      <a href="#university">1.3.4. University</a>
+      <a href="#languages">1.3.5. Languages</a>
+</pre></div>
+<div class="object-meta">
+  <div class="meta-item"><strong>last-edited</strong> <a href="/2026/">2026</a>-<a href="/2026-04/">04</a>-<a href="/2026-04-18/">18</a></div>
+  <div class="meta-item"><strong>type</strong> <a href="/page/">page</a></div>
+  <div class="meta-item"><strong>visibility</strong> <a href="/public/">public</a></div>
+</div>
+<pre>
+</pre><span id="about"></span>
+<h1><a href="#about">1. about</a></h1><pre>
+
+I'm Emile.
+
+You can find me in all parts of the internet under the name "hanemile" with the following image as my avatar:
+
+&lt;img style="height: 200px" src="/profile_dither.png"&gt;
+<a href="/profile.jpg">full size link (3.42 MB)</a>
+
+</pre><span id="contact"></span>
+<h2><a href="#contact">1.1. Contact</a></h2><pre>
+I'm reachable using the nickname @hanemile on most platforms. From a social media perspective, I occasionally look into the following platforms:
+
+- <a href="https://social.emile.space/@hanemile">@hanemile@emile.space</a> (activitypub)
+- <a href="https://signal.me/#eu/rg6GodPbDPqIYqzvr8JcV8jNinW0S1Tbu1PXR4DQxFXZtYMyW2VJIbhDbeaj0Dfc">hanemile.1337</a> (signal)
+
+Another way to reach me is by email:
+
+- <a href="mailto:about@emile.space">about@emile.space</a>
+
+I won't distribute my pgp public-key anymore. If you really need to contact me in an encypted way, use my <a href="/ssh.keys">ssh public-keys</a> and the <a href="https://github.com/FiloSottile/age">age</a> project as <a href="https://github.com/FiloSottile/age#ssh-keys">described here</a> or contact me via <a href="https://signal.me/#eu/rg6GodPbDPqIYqzvr8JcV8jNinW0S1Tbu1PXR4DQxFXZtYMyW2VJIbhDbeaj0Dfc">signal</a>.
+
+</pre><pre class="code">curl https://emile.space/ssh.keys | age -R - plaintext.txt &gt; crypted.txt.age</pre>
+<pre>
+here's how I'd decrypt it, mostly as a note for myself:
+
+</pre><pre class="code">age -d -i ~/.ssh/id_ed25519 crypted.txt.age &gt; plaintext.txt</pre>
+<pre>
+
+</pre><span id="doings"></span>
+<h2><a href="#doings">1.2. Doings</a></h2><pre>
+A lot.
+
+People always ask "what programming language" and in the end, it's kind of irrelevant, but if you really want to know: mostly <a href="https://www.rust-lang.org">Rust</a>, <a href="https://go.dev">Go</a>, <a href="https://www.python.org">Python</a>, <a href="https://en.wikipedia.org/wiki/C_(programming_language">C</a>, <a href="https://lisp-lang.org">Common-Lisp</a> and others sprinkled in.
+
+</pre><span id="cv-like-foo"></span>
+<h2><a href="#cv-like-foo">1.3. CV like foo</a></h2><pre>
+People do this a lot, let's give it a shot:
+
+</pre><span id="work"></span>
+<h3><a href="#work">1.3.1. Work</a></h3><pre>
+<a href="https://redmimicry.com">RedMimicry</a>
+- 2025-12-01 - now          "Senior Security Engineer"
+
+<a href="https://kpmg.com">KPMG</a> <a href="https://kpmg.com/de/de/home/dienstleistungen/advisory/consulting/services/cyber-security/">Cybersecurity</a>
+- 2025-02-01 - 2025-07-31   "Assistant Manager"
+
+<a href="https://www.capgemini.de">Capgemini</a> <a href="https://www.capgemini.com/services/cybersecurity/">Cybersecurity</a>
+- 2024-01-01 - 2025-01-31   "Chapter lead for the Cyber Defense Service"
+
+<a href="https://www.sogeti.de">Sogeti</a> <a href="https://www.sogeti.de/dienstleistungen/cybersecurity/">Cybersecurity</a>
+- 2022-01-01 - 2023-12-31   "Consultant"
+- 2020-01-01 - 2021-12-31   "Working Student"
+- 2019-10-01 - 2019-12-31   "Intern"
+
+<a href="https://www.mint-duesseldorf.de/zdi-in-duesseldorf/">ZDI Düsseldorf</a>
+- 2019-02-23 - 2019-07-05
+- worked as a mentor giving workshops teaching students <a href="https://blender.org">blender</a>
+
+</pre><span id="associations"></span>
+<h3><a href="#associations">1.3.2. Associations</a></h3><pre>
+<a href="https://chaosdorf.de">chaosdorf e.V.</a>
+- 2017-03-11 First time there
+- 2017-11-12 Became member
+- 2021-11-09 Got voted as "2. Vorsitzender"
+- 2023-11-04 End of first term as "2. Vorsitzender", got voted in again
+- 2025-12-13 End of second term as "2. Vorsitzender", resigned as a member
+
+<a href="https://darknebu.la">darknebu.la e.V. i.G.</a>
+- 2017-10 - now          "Gründungsmitglied" (Founding member)
+
+<a href="https://github.com/allesctf">ALLES! e.V.</a>
+- 2022-03 - now          "Gründungsmitglied" (Founding member)
+
+</pre><span id="internships"></span>
+<h3><a href="#internships">1.3.3. Internships</a></h3><pre>
+<a href="https://www.physi.uni-heidelberg.de">Astronomisches Recheninstitut Universität Heidelberg</a>
+- 2017-07 (2 week)
+- worked on visualizing galaxies
+
+<a href="https://www.wassersportcenter-heiligenhafen.de">Wassersportcenter Heiligenhafen</a>
+- 2017-07 - 2017-08 (4 week)
+- worked as a windsurf instructor
+
+<a href="https://sogeti.de">Sogeti Deutschland GmbH</a>
+- 2019-09 - 2019-12 (3 months)
+- worked as an IT-Security consultant
+
+</pre><span id="university"></span>
+<h3><a href="#university">1.3.4. University</a></h3><pre>
+Computer Science at the <a href="https://hhu.de">University of Düsseldorf</a>
+- 2018-10 - 2021-10
+
+Computer Science at <a href="https://www.fernuni-hagen.de">Fern Universität Hagen</a>
+- 2021-10 - now
+
+</pre><span id="languages"></span>
+<h3><a href="#languages">1.3.5. Languages</a></h3><pre>
+Read      Write     Speak
+<a href="https://en.wikipedia.org/wiki/German_language">German</a>      100%      100%      100%
+<a href="https://en.wikipedia.org/wiki/English_language">English</a>     100%      100%      100%
+<a href="https://en.wikipedia.org/wiki/French_language">French</a>       75%       25%       75%
+<a href="https://en.wikipedia.org/wiki/Spanish_language">Spanish</a>       5%        5%        5%
+
+</pre><h2>Backlinks</h2>
+<ul class="backlinks"><li><a href="/">README</a></li></ul><br><br><br>
+<footer>
+  <pre>generated by <a href="https://github.com/hanemile/order">order</a> 2026-04-18 17:10:25</pre>
+</footer>
+<script>
+(function(){
+var d=null,i=document.getElementById('search'),r=document.getElementById('search-results');
+var matches=[];
+function hide(){r.innerHTML='';r.classList.remove('active');matches=[]}
+function doSearch(){
+  var q=i.value.toLowerCase();matches=[];
+  if(q.length<2){hide();return}
+  if(!d){fetch('/search.json').then(function(x){return x.json()}).then(function(j){d=j;doSearch()});return}
+  var h='';for(var x=0;x<d.length&&matches.length<15;x++){
+    var o=d[x];if(o.t.toLowerCase().indexOf(q)>=0||o.s.toLowerCase().indexOf(q)>=0||o.y.toLowerCase().indexOf(q)>=0||o.p.toLowerCase().indexOf(q)>=0){
+      matches.push(o);h+='<a href="'+o.u+'">'+o.t+' <small>'+o.y+'</small></a>'}}
+  r.innerHTML=matches.length?h:'<small>no results</small>';r.classList.add('active')}
+i.addEventListener('input',doSearch);
+i.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){i.value='';hide();i.blur()}
+  if(e.key==='Enter'){e.preventDefault();if(matches.length)window.location=matches[0].u}
+});
+document.addEventListener('click',function(e){if(!r.contains(e.target)&&e.target!==i)hide()});
+})();
+</script>
+</body>
+</html>

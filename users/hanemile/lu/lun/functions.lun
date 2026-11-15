@@ -1,0 +1,76 @@
+;; functions.lun - Basic functions implementation in Lun
+;; These define the language standard library
+;; NOTE: Core arithmetic and list construction are now in lun.lun
+
+;; Math
+(define abs (lambda (x)
+  (if (< x 0) (- 0 x) x)))
+
+(define max (lambda (a b)
+  (if (> a b) a b)))
+
+(define min (lambda (a b)
+  (if (< a b) a b)))
+
+(define square (lambda (x)
+  (* x x)))
+
+;; List operations
+
+;; map: apply function f to each element of list l
+(define map (lambda (f l)
+  (if (empty? l)
+      (list)
+      (cons (f (first l)) (map f (rest l))))))
+
+;; filter: return elements of l for which f returns true
+(define filter (lambda (f l)
+  (if (empty? l)
+      (list)
+      (if (f (first l))
+          (cons (first l) (filter f (rest l)))
+          (filter f (rest l))))))
+
+
+;; nth: get n-th element (0-indexed)
+(define nth (lambda (n l)
+  (if (if (< n 1) (> n -1) 0) ;; (= n 0) check
+      (first l)
+      (nth (- n 1) (rest l)))))
+
+;; range: create list from start to end (exclusive)
+;; Relies on < which is now bound in lun.lun
+(define range (lambda (start end)
+  (if (< start end)
+      (cons start (range (+ start 1) end))
+      (list))))
+
+;; String helpers
+(define str-contains? (lambda (haystack needle)
+  (!= haystack (str-replace haystack needle ""))))
+
+(define str-ends-with? (lambda (s suffix)
+  (define s-len (length (str-split s "")))
+  (define suf-len (length (str-split suffix "")))
+  (if (< s-len suf-len)
+      0
+      (= suffix (str-concat (nth (- s-len suf-len) (str-split s "")))))))
+
+;; List helpers
+(define append (lambda (l1 l2)
+  (if (empty? l1) 
+      l2 
+      (cons (first l1) (append (rest l1) l2)))))
+
+(define reverse (lambda (l)
+  (if (empty? l)
+      (list)
+      (append (reverse (rest l)) (list (first l))))))
+
+(define join (lambda (sep lst)
+  (if (empty? lst)
+      ""
+      (if (empty? (rest lst))
+          (first lst)
+          (str-concat (first lst) sep (join sep (rest lst)))))))
+

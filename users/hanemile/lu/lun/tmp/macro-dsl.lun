@@ -1,0 +1,58 @@
+;; macro-dsl.lun - Macro-style DSL for content creation (Fixed)
+;; This provides a more natural syntax for writing content
+
+(require "content-dsl.lun")
+
+;; ============================================================================
+;; Macro-style Content Builders
+;; ============================================================================
+
+;; Define a page using a more natural syntax
+(define defpage (lambda (name title content-fn)
+  (write-file 
+    (str-concat name ".html") 
+    (simple-page title (content-fn)))
+  (print (str-concat "✓ Generated " name ".html"))))
+
+;; Section builder
+(define section-with (lambda (title items)
+  (str-concat
+    (heading 2 title)
+    (join "" items))))
+
+;; List builder
+(define list-of (lambda items
+  (unordered-list (join "" items))))
+
+;; Paragraph builder with inline formatting
+(define text (lambda parts
+  (paragraph (join "" parts))))
+
+;; ============================================================================
+;; Inline Formatting Helpers
+;; ============================================================================
+
+(define b bold)
+(define i italic)
+(define c inline-code)
+(define l link)
+
+;; ============================================================================
+;; Document Structure Macros
+;; ============================================================================
+
+;; Hero section
+(define hero (lambda (title subtitle)
+  (div
+    (heading 1 title)
+    (paragraph subtitle))))
+
+;; Feature list
+(define features (lambda items
+  (section-with "Features" items)))
+
+;; Navigation menu
+(define menu (lambda items
+  (nav (join " | " items))))
+
+(print "Macro DSL loaded!")

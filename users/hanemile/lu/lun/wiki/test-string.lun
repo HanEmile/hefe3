@@ -1,0 +1,22 @@
+;; test-long-string.lun
+
+(print "Testing long string concatenation...")
+
+(define test1 (str-concat "Hello" " " "World"))
+(print test1)
+
+(define test2 (str-concat
+  "<html>"
+  "<body>"
+  "<h1>Test</h1>"
+  "</body>"
+  "</html>"))
+(print test2)
+
+(define make-html (lambda (content)
+  (str-concat "<html><body>" content "</body></html>")))
+
+(define result (make-html "Test content"))
+(print result)
+
+(print "All tests passed!")

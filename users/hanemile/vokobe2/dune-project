@@ -1,0 +1,20 @@
+(lang dune 3.23)
+
+(name vokobe2)
+
+(generate_opam_files true)
+
+(source
+ (github hanemile/vokobe2))
+
+(authors "Emile")
+
+(maintainers "Emile")
+
+(package
+ (name vokobe2)
+ (synopsis "vokobe2 — static site generator for emile.space")
+ (depends ocaml)
+ (tags ("static-site-generator")))
+
+; See the complete stanza docs at https://dune.readthedocs.io/en/stable/reference/dune-project/index.html

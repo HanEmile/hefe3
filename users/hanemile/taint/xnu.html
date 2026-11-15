@@ -1,0 +1,2581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Taint — &lt;all sinks&gt;</title>
+<style>
+:root{
+  --bg:#0d1117;--s:#161b22;--b:#30363d;--b2:#21262d;
+  --t:#c9d1d9;--m:#8b949e;--a:#58a6ff;
+  --red:#f85149;--orange:#e09b52;--yel:#e3b341;--grn:#3fb950;--purple:#bc8cff;
+  --hit:#1a2d1a;--hitborder:#3fb950;
+  --mono:"JetBrains Mono","Cascadia Code","Fira Code",ui-monospace,monospace;
+  --fs:12px;--lh:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-size:var(--fs);line-height:var(--lh)}
+body{background:var(--bg);color:var(--t);font-family:system-ui,sans-serif;
+  padding:0;min-height:100vh}
+
+/* ════ HEADER ════════════════════════════════════════════════════════════════*/
+.topbar{
+  background:linear-gradient(135deg,#0d1117 0%,#161b22 100%);
+  border-bottom:1px solid var(--b);
+  padding:10px 16px;position:sticky;top:0;z-index:100;
+}
+.topbar-inner{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.logo{font-size:14px;font-weight:800;letter-spacing:-.02em;
+  background:linear-gradient(90deg,var(--red),var(--orange),var(--yel));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  white-space:nowrap}
+.target-chip{background:var(--b2);border:1px solid var(--b);
+  border-radius:4px;padding:2px 8px;font-size:10px;color:var(--m);
+  font-family:var(--mono);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:300px}
+.stat-chips{display:flex;gap:6px;margin-left:auto}
+.stat-chip{padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;
+  letter-spacing:.04em}
+.stat-chip.full{background:rgba(248,81,73,.18);color:var(--red);
+  border:1px solid rgba(248,81,73,.35)}
+.stat-chip.partial{background:rgba(227,179,65,.15);color:var(--yel);
+  border:1px solid rgba(227,179,65,.3)}
+.stat-chip.none{background:var(--b2);color:var(--m);border:1px solid var(--b)}
+
+/* ════ FILTER BAR ════════════════════════════════════════════════════════════*/
+.filterbar{
+  background:var(--s);border-bottom:1px solid var(--b);
+  padding:6px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  font-size:11px;
+}
+.filterbar label{color:var(--m);white-space:nowrap}
+.filterbar select,
+.filterbar input[type=range]{
+  background:var(--b2);border:1px solid var(--b);color:var(--t);
+  border-radius:3px;padding:2px 6px;font-size:11px;height:22px;
+}
+.filterbar select:focus{outline:1px solid var(--a);border-color:var(--a)}
+.filter-sep{width:1px;background:var(--b);height:18px;flex-shrink:0}
+.sort-btn{background:var(--b2);border:1px solid var(--b);color:var(--t);
+  border-radius:3px;padding:2px 8px;font-size:10px;cursor:pointer;height:22px;
+  display:flex;align-items:center;gap:4px}
+.sort-btn:hover{border-color:var(--a);color:var(--a)}
+.sort-btn.active{border-color:var(--a);color:var(--a);background:rgba(88,166,255,.08)}
+.filter-count{color:var(--m);font-size:10px;margin-left:auto;white-space:nowrap}
+.clear-btn{background:transparent;border:1px solid var(--b);color:var(--m);
+  border-radius:3px;padding:2px 8px;font-size:10px;cursor:pointer;height:22px}
+.clear-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* ════ MAIN CONTENT ══════════════════════════════════════════════════════════*/
+.content{padding:10px 16px;max-width:1400px}
+
+/* ════ FINDING CARD ══════════════════════════════════════════════════════════*/
+.card{
+  border:1px solid var(--b);border-radius:6px;
+  margin-bottom:8px;overflow:hidden;
+  transition:box-shadow .15s;
+}
+.card:hover{box-shadow:0 0 0 1px var(--b2)}
+.card.full   {border-left:3px solid var(--red)}
+.card.partial{border-left:3px solid var(--yel)}
+.card.hidden {display:none!important}
+
+/* ── card header bar ── */
+.card-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--s);padding:5px 10px;border-bottom:1px solid var(--b);
+  gap:8px;flex-wrap:wrap;
+}
+.card-hdr-left{display:flex;align-items:center;gap:8px}
+.sev-pill{
+  font-size:9px;font-weight:800;padding:2px 6px;border-radius:3px;
+  text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;
+}
+.sev-pill.full   {background:var(--red);color:#fff}
+.sev-pill.partial{background:var(--yel);color:#000}
+.finding-num{font-size:11px;color:var(--m);font-weight:600}
+.cross-file{
+  font-size:9px;background:rgba(188,140,255,.12);border:1px solid rgba(188,140,255,.25);
+  color:var(--purple);border-radius:3px;padding:1px 6px;font-family:var(--mono);
+}
+.same-file{
+  font-size:9px;color:var(--m);font-family:var(--mono);
+  background:var(--b2);border:1px solid var(--b);border-radius:3px;padding:1px 6px;
+}
+.card-hdr-pills{display:flex;align-items:center;gap:5px}
+.meta-pill{
+  font-size:9px;padding:1px 7px;border-radius:10px;white-space:nowrap;cursor:default;
+}
+.steps-pill{background:rgba(88,166,255,.1);color:var(--a);border:1px solid rgba(88,166,255,.2)}
+.guards-pill-hdr{background:rgba(227,179,65,.1);color:var(--yel);border:1px solid rgba(227,179,65,.2)}
+.src-pill{background:rgba(63,185,80,.1);color:var(--grn);border:1px solid rgba(63,185,80,.2);
+  font-family:var(--mono)}
+
+/* ── quick flow ── */
+.quick-flow{
+  display:grid;grid-template-columns:1fr auto 1fr;
+  align-items:center;gap:0;
+  background:var(--bg);border-bottom:1px solid var(--b);
+  min-height:0;
+}
+.qf-from,.qf-to{
+  padding:5px 10px;overflow:hidden;min-width:0;
+}
+.qf-label{
+  display:inline-block;font-size:8px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.1em;
+  padding:1px 4px;border-radius:2px;margin-right:5px;
+  vertical-align:middle;
+}
+.qf-label.src{background:rgba(248,81,73,.2);color:var(--red)}
+.qf-label.snk{background:rgba(88,166,255,.15);color:var(--a)}
+.qf-loc{
+  font-family:var(--mono);color:var(--a);font-size:10px;
+  display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.qf-desc{
+  font-family:var(--mono);font-size:9px;color:var(--m);
+  display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  margin-top:1px;
+}
+.qf-arrow{
+  padding:0 12px;color:var(--m);font-size:10px;white-space:nowrap;
+  text-align:center;font-family:var(--mono);
+  border-left:1px solid var(--b);border-right:1px solid var(--b);
+  background:var(--s);min-height:100%;display:flex;align-items:center;
+}
+
+/* ── pipeline toggle ── */
+details.pipeline-wrap>summary.pipeline-toggle{
+  cursor:pointer;list-style:none;
+  padding:4px 10px;background:var(--b2);
+  color:var(--m);font-size:10px;user-select:none;
+  display:flex;align-items:center;gap:6px;
+  border-bottom:1px solid transparent;
+}
+details.pipeline-wrap>summary.pipeline-toggle::-webkit-details-marker{display:none}
+.tog-arrow{font-size:8px;transition:transform .15s;display:inline-block}
+details.pipeline-wrap[open]>summary.pipeline-toggle .tog-arrow{transform:rotate(90deg)}
+details.pipeline-wrap[open]>summary.pipeline-toggle{border-bottom-color:var(--b)}
+.tog-sub{color:var(--m);font-size:9px;opacity:.7}
+
+/* ── pipeline ── */
+.pipeline{
+  padding:10px;display:flex;flex-direction:column;
+  align-items:flex-start;gap:0;background:var(--bg);
+}
+.pipe-node{
+  width:100%;border:1px solid var(--b);border-radius:4px;
+  overflow:hidden;
+}
+.pipe-node.pn-source{border-left:3px solid var(--red)}
+.pipe-node.pn-sink  {border-left:3px solid var(--a)}
+.pipe-node.pn-step  {border-left:3px solid var(--b)}
+
+.pn-header{
+  display:flex;align-items:center;gap:6px;
+  padding:3px 8px;background:rgba(255,255,255,.03);
+  border-bottom:1px solid var(--b);
+}
+.pn-icon{font-size:8px}
+.pn-source .pn-icon{color:var(--red)}
+.pn-sink   .pn-icon{color:var(--a)}
+.pn-step   .pn-icon{color:var(--m)}
+.pn-kind{
+  font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.07em;white-space:nowrap;
+}
+.pn-source .pn-kind{color:var(--red)}
+.pn-sink   .pn-kind{color:var(--a)}
+.pn-step   .pn-kind{color:var(--m)}
+.pn-file{font-family:var(--mono);font-size:10px;color:var(--t);flex:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pn-loc{font-family:var(--mono);font-size:9px;color:var(--m)}
+.guards-pill{
+  font-size:8px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.25);
+  color:var(--yel);border-radius:8px;padding:0 5px;cursor:help;
+}
+
+/* ── node details ── */
+details.pn-details>summary.pn-desc{
+  cursor:pointer;list-style:none;
+  padding:3px 8px;font-family:var(--mono);font-size:10px;
+  color:var(--t);user-select:none;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  display:flex;align-items:center;gap:4px;
+}
+details.pn-details>summary.pn-desc::-webkit-details-marker{display:none}
+details.pn-details>summary.pn-desc::before{
+  content:"▶";font-size:7px;transition:transform .1s;flex-shrink:0;color:var(--m);
+}
+details.pn-details[open]>summary.pn-desc::before{transform:rotate(90deg)}
+
+/* guards inside node */
+.node-guards{padding:4px 8px 0;}
+.guard-item{
+  font-family:var(--mono);font-size:9px;color:var(--yel);
+  padding:1px 0;padding-left:12px;position:relative;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.guard-item::before{content:"if";position:absolute;left:0;color:var(--m)}
+
+/* code in nodes */
+pre.code{
+  margin:4px 0 0;padding:4px 8px;
+  background:var(--bg);font-family:var(--mono);
+  font-size:11px;line-height:16px;
+  overflow-x:auto;border-top:1px solid var(--b);
+  tab-size:4;
+}
+.ln{display:inline-block;width:32px;color:var(--m);
+  user-select:none;text-align:right;margin-right:8px}
+.cl{display:block;height:16px;line-height:16px;
+  white-space:pre;overflow:hidden;text-overflow:ellipsis}
+.cl.hit{background:var(--hit);border-left:2px solid var(--hitborder);
+  margin-left:-2px;padding-left:2px;color:#acf2a0;height:16px;line-height:16px}
+
+/* ── pipe arrow connector ── */
+.pipe-arrow{
+  align-self:flex-start;margin-left:16px;
+  font-size:12px;color:var(--b);padding:1px 0;
+  line-height:14px;user-select:none;
+}
+
+.group-header{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 10px 3px;margin-top:8px;
+  border-bottom:1px solid var(--b);
+  font-size:10px;font-weight:700;color:var(--a);
+  letter-spacing:.04em;text-transform:uppercase;
+}
+.gh-count{background:rgba(88,166,255,.12);border:1px solid rgba(88,166,255,.2);
+  color:var(--a);border-radius:8px;padding:0 6px;font-size:9px}
+
+footer{padding:10px 16px 20px;color:var(--m);font-size:10px;
+  border-top:1px solid var(--b);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="logo">⚡ TAINT</span>
+    <span class="target-chip">target: &lt;all sinks&gt;</span>
+    <div class="stat-chips">
+      <span class="stat-chip full">25 FULL</span>
+      <span class="stat-chip partial">0 PARTIAL</span>
+      <span class="stat-chip none">25 total</span>
+    </div>
+  </div>
+</div>
+
+<div class="filterbar">
+  <input type="search" id="fText" placeholder="Search…" oninput="applyFilters()"
+    style="background:var(--b2);border:1px solid var(--b);color:var(--t);
+      border-radius:3px;padding:2px 8px;font-size:11px;height:22px;width:160px">
+
+  <div class="filter-sep"></div>
+  <label>Sev</label>
+  <select id="fSev" onchange="applyFilters()">
+    <option value="">all</option>
+    <option value="full">FULL</option>
+    <option value="partial">PARTIAL</option>
+  </select>
+
+  <div class="filter-sep"></div>
+  <label>Source fn</label>
+  <select id="fSrc" onchange="applyFilters()">
+    <option value="">any</option>
+    <option value="(result)  ← amfi-&gt;TrustCache.query(&amp;ppl_trust_cache_rt, query_type, cdhash, query_token)">(result)  ← amfi-&gt;TrustCache.query(&amp;ppl_trust_cache_rt, query_type, cdhash, query_token)</option><option value="(result)  ← amfi-&gt;TrustCache.query(trust_cache_rt, query_type, cdhash, query_token)">(result)  ← amfi-&gt;TrustCache.query(trust_cache_rt, query_type, cdhash, query_token)</option><option value="(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</option><option value="addr  ← self.socket.accept()">addr  ← self.socket.accept()</option><option value="cmd_data  ← fh.read(data_size)">cmd_data  ← fh.read(data_size)</option><option value="data  ← self.read(len(bytes))">data  ← self.read(len(bytes))</option><option value="decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</option><option value="lines  ← src.readlines()">lines  ← src.readlines()</option><option value="parse_data  ← f.read()">parse_data  ← f.read()</option><option value="response_str  ← response.read()">response_str  ← response.read()</option><option value="size  ← file.read(reinterpret_cast&lt;char *&gt;(contents.data()), size)  [fills: size]">size  ← file.read(reinterpret_cast&lt;char *&gt;(contents.data()), size)  [fills: size]</option>
+  </select>
+
+  <div class="filter-sep"></div>
+  <label>Min guards</label>
+  <input type="range" id="fGuards" min="0" max="20" value="0"
+    oninput="document.getElementById('guardVal').textContent=this.value;applyFilters()"
+    style="width:80px">
+  <span id="guardVal" style="color:var(--yel);font-size:10px;min-width:16px">0</span>
+
+  <div class="filter-sep"></div>
+  <label>Group</label>
+  <select id="fGroup" onchange="applyFilters()">
+    <option value="">none</option>
+    <option value="source">by source fn</option>
+    <option value="sinkfile">by sink file</option>
+    <option value="sev">by severity</option>
+  </select>
+
+  <div class="filter-sep"></div>
+  <label>Sort</label>
+  <button class="sort-btn active" id="sIdx"    onclick="sortBy('idx')">   # </button>
+  <button class="sort-btn"        id="sSteps"  onclick="sortBy('steps')"> steps </button>
+  <button class="sort-btn"        id="sGuards" onclick="sortBy('guards')">guards </button>
+  <button class="sort-btn"        id="sSev"    onclick="sortBy('sev')">   sev </button>
+
+  <div class="filter-sep"></div>
+  <button class="clear-btn" onclick="clearFilters()">✕ reset</button>
+  <span class="filter-count" id="fCount">25 finding(s)</span>
+</div>
+
+<div class="content" id="cardContainer">
+<div class="card full" id="c0"
+  data-sev="full"
+  data-source="(result)  ← amfi-&gt;TrustCache.query(trust_cache_rt, query_type, cdhash, query_token)"
+  data-steps="1"
+  data-guards="1"
+  data-srcfile="kern_trustcache.c"
+  data-sinkfile="kern_trustcache.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#0</span>
+      <span class="same-file">kern_trustcache.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">1&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← amfi-&gt;TrustCache.query(trust_cache_rt, query_type, cdhash, query_token)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/bsd/kern/kern_trustcache.c:748:22</span>
+      <span class="qf-desc">(result)  ← amfi-&gt;TrustCache.query(trust_cache_rt, query_type, cdhash, query_token)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/bsd/kern/kern_trustcache.c:748:22</span>
+      <span class="qf-desc">(result)  ← amfi-&gt;TrustCache.query(trust_cache_rt, query_type, cdhash, query_token)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">kern_trustcache.c</span>
+    <span class="pn-loc">:748</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← amfi-&gt;TrustCache.query(trust_cache_rt, query_type, cdhash, query_token)</summary>
+    <div class="node-guards"><div class="guard-item">if (query_type &gt;= kTCQueryTypeTotal)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 745</span>  	/* Lock the runtime as shared */</div><div class="cl"><span class="ln"> 746</span>  	lck_rw_lock_shared(&amp;trust_cache_rt_lock);</div><div class="cl"><span class="ln"> 747</span>  </div><div class="cl hit"><span class="ln"> 748</span>  	TCReturn_t tc_ret = amfi-&gt;TrustCache.query(</div><div class="cl"><span class="ln"> 749</span>  		trust_cache_rt,</div><div class="cl"><span class="ln"> 750</span>  		query_type,</div><div class="cl"><span class="ln"> 751</span>  		cdhash,</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c1"
+  data-sev="full"
+  data-source="(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)"
+  data-steps="1"
+  data-guards="68"
+  data-srcfile="rtsock.c"
+  data-sinkfile="rtsock.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#1</span>
+      <span class="same-file">rtsock.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">68&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/bsd/net/rtsock.c:866:4</span>
+      <span class="qf-desc">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/bsd/net/rtsock.c:866:4</span>
+      <span class="qf-desc">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">rtsock.c</span>
+    <span class="pn-loc">:866</span>
+    <span class="guards-pill" title="68 guard(s)">68</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</summary>
+    <div class="node-guards"><div class="guard-item">if (m == NULL || ((m-&gt;m_len &lt; sizeof(intptr_t)) &amp;&amp;
+	    (m = m_pullup(m, sizeof(intptr_t))) == NULL))</div><div class="guard-item">if (len &lt; sizeof(*RTM) ||
+	    len != mtod(m, struct rt_msghdr_prelude *)-&gt;rtm_msglen)</div><div class="guard-item">if (rtm_tmpbuf == NULL)</div><div class="guard-item">if (RTM-&gt;rtm_version != RTM_VERSION)</div><div class="guard-item">if (RTM-&gt;rtm_type == RTM_GET_SILENT)</div><div class="guard-item">if (!(so-&gt;so_options &amp; SO_USELOOPBACK))</div><div class="guard-item">if (RTM-&gt;rtm_type != RTM_GET &amp;&amp; !(so-&gt;so_state &amp; SS_PRIV))</div><div class="guard-item">if (rt_xaddrs(rtm_buf + sizeof(struct rt_msghdr), rtm_buf + rtm_len, &amp;info, tiny_sa_storage))</div><div class="guard-item">if (info.rti_info[RTAX_DST] == NULL ||
+	    info.rti_info[RTAX_DST]-&gt;sa_family &gt;= AF_MAX ||
+	    (info.rti_info[RTAX_GATEWAY] != NULL &amp;&amp;
+	    info.rti_info[RTAX_GATEWAY]-&gt;sa_family &gt;= AF_MAX))</div><div class="guard-item">if (info.rti_info[RTAX_DST]-&gt;sa_family == AF_INET &amp;&amp;
+	    info.rti_info[RTAX_DST]-&gt;sa_len != sizeof(struct sockaddr_in))</div><div class="guard-item">if (info.rti_info[RTAX_DST]-&gt;sa_len &lt;
+		    offsetof(struct sockaddr_in, sin_zero))</div><div class="guard-item">if (info.rti_info[RTAX_DST]-&gt;sa_family == AF_INET6 &amp;&amp;
+	    info.rti_info[RTAX_DST]-&gt;sa_len &lt; sizeof(struct sockaddr_in6))</div><div class="guard-item">if (info.rti_info[RTAX_GATEWAY] != NULL)</div><div class="guard-item">if (info.rti_info[RTAX_GATEWAY]-&gt;sa_family == AF_INET &amp;&amp;
+		    info.rti_info[RTAX_GATEWAY]-&gt;sa_len != sizeof(struct sockaddr_in))</div><div class="guard-item">if (info.rti_info[RTAX_GATEWAY]-&gt;sa_len &lt;
+			    offsetof(struct sockaddr_in, sin_zero))</div><div class="guard-item">if (info.rti_info[RTAX_GATEWAY]-&gt;sa_family == AF_INET6 &amp;&amp;
+		    info.rti_info[RTAX_GATEWAY]-&gt;sa_len &lt; sizeof(struct sockaddr_in6))</div><div class="guard-item">if (info.rti_info[RTAX_GENMASK])</div><div class="guard-item">if (t != NULL &amp;&amp; SOCKADDR_CMP(genmask, rn_get_key(t), genmask-&gt;sa_len) == 0)</div><div class="guard-item">if (RTM-&gt;rtm_flags &amp; RTF_IFSCOPE)</div><div class="guard-item">if (info.rti_info[RTAX_DST]-&gt;sa_family != AF_INET &amp;&amp;
+		    info.rti_info[RTAX_DST]-&gt;sa_family != AF_INET6)</div><div class="guard-item">if (ifscope != IFSCOPE_NONE)</div><div class="guard-item">if (IFNET_IS_INTCOPROC(ifp))</div><div class="guard-item">if (intcoproc_scope == ifscope &amp;&amp; proc_getpid(current_proc()) != 0)</div><div class="guard-item">if (management_control_unrestricted == false &amp;&amp; if_management_interface_check_needed == true &amp;&amp;
+	    ifscope != IFSCOPE_NONE &amp;&amp; proc_getpid(current_proc()) != 0)</div><div class="guard-item">if (IF_INDEX_IN_RANGE(ifscope))</div><div class="guard-item">if (ifp != NULL &amp;&amp; IFNET_IS_MANAGEMENT(ifp))</div><div class="guard-item">if (is_management &amp;&amp; !IOCurrentTaskHasEntitlement(MANAGEMENT_CONTROL_ENTITLEMENT))</div><div class="guard-item">if (RTM-&gt;rtm_flags &amp; RTF_PROXY)</div><div class="guard-item">if (info.rti_info[RTAX_DST]-&gt;sa_family == AF_INET)</div><div class="guard-item">if (info.rti_info[RTAX_GATEWAY] != NULL &amp;&amp;
+	    info.rti_info[RTAX_GATEWAY]-&gt;sa_family == AF_INET)</div><div class="guard-item">if (info.rti_info[RTAX_DST]-&gt;sa_family == AF_INET6 &amp;&amp;
+	    IN6_IS_SCOPE_EMBED(&amp;SIN6(info.rti_info[RTAX_DST])-&gt;sin6_addr) &amp;&amp;
+	    !IN6_IS_ADDR_UNICAST_BASED_MULTICAST(&amp;SIN6(info.rti_info[RTAX_DST])-&gt;sin6_addr) &amp;&amp;
+	    SIN6(info.rti_info[RTAX_DST])-&gt;sin6_scope_id == 0)</div><div class="guard-item">if (RTM-&gt;rtm_type)</div><div class="guard-item">if (info.rti_info[RTAX_GATEWAY] == NULL)</div><div class="guard-item">if (error == 0 &amp;&amp; saved_nrt != NULL)</div><div class="guard-item">if ((saved_nrt-&gt;rt_flags &amp; (RTF_UP | RTF_LLINFO)) ==
+			    (RTF_UP | RTF_LLINFO))</div><div class="guard-item">if (error == 0)</div><div class="guard-item">if (rnh == NULL)</div><div class="guard-item">if (rt == NULL)</div><div class="guard-item">if (RTM-&gt;rtm_type)</div><div class="guard-item">if (RTM-&gt;rtm_addrs &amp; (RTA_IFP | RTA_IFA))</div><div class="guard-item">if (ifp != NULL)</div><div class="guard-item">if ((ifp = rt-&gt;rt_ifp) != NULL)</div><div class="guard-item">if (ifa2 != NULL)</div><div class="guard-item">if (ifa2 != NULL)</div><div class="guard-item">if (rtm_tmpbuf == NULL)</div><div class="guard-item">if (ifa2 != NULL)</div><div class="guard-item">if (ifa2 != NULL)</div><div class="guard-item">if (ifa2 != NULL)</div><div class="guard-item">if (ifa2 != NULL)</div><div class="guard-item">if (info.rti_info[RTAX_GATEWAY] != NULL &amp;&amp;
+			    (error = rt_setgate(rt, rt_key(rt),
+			    info.rti_info[RTAX_GATEWAY])))</div><div class="guard-item">if ((rt-&gt;rt_flags &amp; RTF_GATEWAY) &amp;&amp;
+			    info.rti_info[RTAX_GATEWAY] == NULL)</div><div class="guard-item">if ((error = rt_setmetrics(RTM-&gt;rtm_inits,
+			    &amp;RTM-&gt;rtm_rmx, rt)))</div><div class="guard-item">if (info.rti_info[RTAX_GENMASK])</div><div class="guard-item">if (is_router)</div><div class="guard-item">if (RTM != NULL)</div><div class="guard-item">if (error)</div><div class="guard-item">if (rt != NULL)</div><div class="guard-item">if (!(so-&gt;so_options &amp; SO_USELOOPBACK))</div><div class="guard-item">if (route_cb.any_count &lt;= 1)</div><div class="guard-item">if (rtm_buf != NULL)</div><div class="guard-item">if (m-&gt;m_pkthdr.len &lt; RTM-&gt;rtm_msglen)</div><div class="guard-item">if (m-&gt;m_pkthdr.len &gt; RTM-&gt;rtm_msglen)</div><div class="guard-item">if (sendonlytoself &amp;&amp; m != NULL)</div><div class="guard-item">if (sbappendaddr(&amp;so-&gt;so_rcv, &amp;route_src, m,
+		    NULL, &amp;error) != 0)</div><div class="guard-item">if (error)</div><div class="guard-item">if (rp != NULL)</div><div class="guard-item">if (dst_sa_family != 0)</div><div class="guard-item">if (m != NULL)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 863</span>  		}</div><div class="cl"><span class="ln"> 864</span>  		if (m != NULL) {</div><div class="cl"><span class="ln"> 865</span>  			socket_unlock(so, 0);</div><div class="cl hit"><span class="ln"> 866</span>  			raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst);</div><div class="cl"><span class="ln"> 867</span>  			socket_lock(so, 0);</div><div class="cl"><span class="ln"> 868</span>  		}</div><div class="cl"><span class="ln"> 869</span>  		if (rp != NULL) {</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c2"
+  data-sev="full"
+  data-source="(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)"
+  data-steps="1"
+  data-guards="2"
+  data-srcfile="rtsock.c"
+  data-sinkfile="rtsock.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#2</span>
+      <span class="same-file">rtsock.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">2&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/bsd/net/rtsock.c:1535:2</span>
+      <span class="qf-desc">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/bsd/net/rtsock.c:1535:2</span>
+      <span class="qf-desc">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">rtsock.c</span>
+    <span class="pn-loc">:1535</span>
+    <span class="guards-pill" title="2 guard(s)">2</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</summary>
+    <div class="node-guards"><div class="guard-item">if (route_cb.any_count == 0)</div><div class="guard-item">if (m == NULL)</div></div>
+    <pre class="code"><div class="cl"><span class="ln">1532</span>  	rtmh-&gt;rtm_errno = error;</div><div class="cl"><span class="ln">1533</span>  	rtmh-&gt;rtm_addrs = rtinfo-&gt;rti_addrs;</div><div class="cl"><span class="ln">1534</span>  	route_proto.sp_family = sa ? sa-&gt;sa_family : 0;</div><div class="cl hit"><span class="ln">1535</span>  	raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst);</div><div class="cl"><span class="ln">1536</span>  }</div><div class="cl"><span class="ln">1537</span>  </div><div class="cl"><span class="ln">1538</span>  /*</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c3"
+  data-sev="full"
+  data-source="(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)"
+  data-steps="1"
+  data-guards="2"
+  data-srcfile="rtsock.c"
+  data-sinkfile="rtsock.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#3</span>
+      <span class="same-file">rtsock.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">2&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/bsd/net/rtsock.c:1563:2</span>
+      <span class="qf-desc">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/bsd/net/rtsock.c:1563:2</span>
+      <span class="qf-desc">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">rtsock.c</span>
+    <span class="pn-loc">:1563</span>
+    <span class="guards-pill" title="2 guard(s)">2</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</summary>
+    <div class="node-guards"><div class="guard-item">if (route_cb.any_count == 0)</div><div class="guard-item">if (m == NULL)</div></div>
+    <pre class="code"><div class="cl"><span class="ln">1560</span>  	ifm-&gt;ifm_flags = (u_short)ifp-&gt;if_flags;</div><div class="cl"><span class="ln">1561</span>  	if_data_internal_to_if_data(ifp, &amp;ifp-&gt;if_data, &amp;ifm-&gt;ifm_data);</div><div class="cl"><span class="ln">1562</span>  	ifm-&gt;ifm_addrs = 0;</div><div class="cl hit"><span class="ln">1563</span>  	raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst);</div><div class="cl"><span class="ln">1564</span>  }</div><div class="cl"><span class="ln">1565</span>  </div><div class="cl"><span class="ln">1566</span>  /*</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c4"
+  data-sev="full"
+  data-source="(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)"
+  data-steps="1"
+  data-guards="7"
+  data-srcfile="rtsock.c"
+  data-sinkfile="rtsock.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#4</span>
+      <span class="same-file">rtsock.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">7&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/bsd/net/rtsock.c:1651:3</span>
+      <span class="qf-desc">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/bsd/net/rtsock.c:1651:3</span>
+      <span class="qf-desc">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">rtsock.c</span>
+    <span class="pn-loc">:1651</span>
+    <span class="guards-pill" title="7 guard(s)">7</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</summary>
+    <div class="node-guards"><div class="guard-item">if (route_cb.any_count == 0)</div><div class="guard-item">if pass &lt; 3</div><div class="guard-item">if ((cmd == RTM_ADD &amp;&amp; pass == 1) ||
+		    (cmd == RTM_DELETE &amp;&amp; pass == 2))</div><div class="guard-item">if ((m = rt_msg1(ncmd, &amp;info)) == NULL)</div><div class="guard-item">if ((cmd == RTM_ADD &amp;&amp; pass == 2) ||
+		    (cmd == RTM_DELETE &amp;&amp; pass == 1))</div><div class="guard-item">if (rt == NULL)</div><div class="guard-item">if ((m = rt_msg1(cmd, &amp;info)) == NULL)</div></div>
+    <pre class="code"><div class="cl"><span class="ln">1648</span>  			rtm-&gt;rtm_addrs = info.rti_addrs;</div><div class="cl"><span class="ln">1649</span>  		}</div><div class="cl"><span class="ln">1650</span>  		route_proto.sp_protocol = sa ? sa-&gt;sa_family : 0;</div><div class="cl hit"><span class="ln">1651</span>  		raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst);</div><div class="cl"><span class="ln">1652</span>  	}</div><div class="cl"><span class="ln">1653</span>  }</div><div class="cl"><span class="ln">1654</span>  </div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c5"
+  data-sev="full"
+  data-source="(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)"
+  data-steps="1"
+  data-guards="2"
+  data-srcfile="rtsock.c"
+  data-sinkfile="rtsock.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#5</span>
+      <span class="same-file">rtsock.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">2&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/bsd/net/rtsock.c:1698:2</span>
+      <span class="qf-desc">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/bsd/net/rtsock.c:1698:2</span>
+      <span class="qf-desc">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">rtsock.c</span>
+    <span class="pn-loc">:1698</span>
+    <span class="guards-pill" title="2 guard(s)">2</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst)</summary>
+    <div class="node-guards"><div class="guard-item">if (route_cb.any_count == 0)</div><div class="guard-item">if ((m = rt_msg1(cmd, &amp;info)) == NULL)</div></div>
+    <pre class="code"><div class="cl"><span class="ln">1695</span>  	route_proto.sp_protocol = ifma-&gt;ifma_addr-&gt;sa_family;</div><div class="cl"><span class="ln">1696</span>  	IFMA_UNLOCK(ifma);</div><div class="cl"><span class="ln">1697</span>  	ifnet_lock_done(ifp);</div><div class="cl hit"><span class="ln">1698</span>  	raw_input(m, &amp;route_proto, &amp;route_src, &amp;route_dst);</div><div class="cl"><span class="ln">1699</span>  }</div><div class="cl"><span class="ln">1700</span>  </div><div class="cl"><span class="ln">1701</span>  const char *</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c6"
+  data-sev="full"
+  data-source="(result)  ← amfi-&gt;TrustCache.query(&amp;ppl_trust_cache_rt, query_type, cdhash, query_token)"
+  data-steps="1"
+  data-guards="1"
+  data-srcfile="pmap.c"
+  data-sinkfile="pmap.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#6</span>
+      <span class="same-file">pmap.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">1&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← amfi-&gt;TrustCache.query(&amp;ppl_trust_cache_rt, query_type, cdhash, query_token)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/osfmk/arm/pmap/pmap.c:13190:22</span>
+      <span class="qf-desc">(result)  ← amfi-&gt;TrustCache.query(&amp;ppl_trust_cache_rt, query_type, cdhash, query_token)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/osfmk/arm/pmap/pmap.c:13190:22</span>
+      <span class="qf-desc">(result)  ← amfi-&gt;TrustCache.query(&amp;ppl_trust_cache_rt, query_type, cdhash, query_token)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">pmap.c</span>
+    <span class="pn-loc">:13190</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← amfi-&gt;TrustCache.query(&amp;ppl_trust_cache_rt, query_type, cdhash, query_token)</summary>
+    <div class="node-guards"><div class="guard-item">if (query_type &gt;= kTCQueryTypeTotal)</div></div>
+    <pre class="code"><div class="cl"><span class="ln">13187</span>  	/* Lock the runtime as shared */</div><div class="cl"><span class="ln">13188</span>  	lck_rw_lock_shared(&amp;ppl_trust_cache_rt_lock);</div><div class="cl"><span class="ln">13189</span>  </div><div class="cl hit"><span class="ln">13190</span>  	TCReturn_t tc_ret = amfi-&gt;TrustCache.query(</div><div class="cl"><span class="ln">13191</span>  		&amp;ppl_trust_cache_rt,</div><div class="cl"><span class="ln">13192</span>  		query_type,</div><div class="cl"><span class="ln">13193</span>  		cdhash,</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c7"
+  data-sev="full"
+  data-source="size  ← file.read(reinterpret_cast&lt;char *&gt;(contents.data()), size)  [fills: size]"
+  data-steps="2"
+  data-guards="0"
+  data-srcfile="kt-dump.cpp"
+  data-sinkfile="kt-dump.cpp">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#7</span>
+      <span class="same-file">kt-dump.cpp</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">size  ← file.read(reinterpret_cast&lt;char *&gt;(contents.data()), size)  [fills: size]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/kt-dump/kt-dump.cpp:574:2</span>
+      <span class="qf-desc">size  ← file.read(reinterpret_cast&lt;char *&gt;(contents.data()), size)  [fills: size]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/kt-dump/kt-dump.cpp:573:2</span>
+      <span class="qf-desc">contents.resize(size)     (tainted arg: size)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">kt-dump.cpp</span>
+    <span class="pn-loc">:574</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">size  ← file.read(reinterpret_cast&lt;char *&gt;(contents.data()), size)  [fills: size]</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln"> 571</span>  	size_t size(std::filesystem::file_size(path));</div><div class="cl"><span class="ln"> 572</span>  </div><div class="cl"><span class="ln"> 573</span>  	contents.resize(size);</div><div class="cl hit"><span class="ln"> 574</span>  	file.read(reinterpret_cast&lt;char *&gt;(contents.data()), size);</div><div class="cl"><span class="ln"> 575</span>  	file.close();</div><div class="cl"><span class="ln"> 576</span>  }</div><div class="cl"><span class="ln"> 577</span>  </div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">kt-dump.cpp</span>
+    <span class="pn-loc">:573</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">contents.resize(size)     (tainted arg: size)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln"> 570</span>  	std::ifstream file(path, std::ifstream::binary);</div><div class="cl"><span class="ln"> 571</span>  	size_t size(std::filesystem::file_size(path));</div><div class="cl"><span class="ln"> 572</span>  </div><div class="cl hit"><span class="ln"> 573</span>  	contents.resize(size);</div><div class="cl"><span class="ln"> 574</span>  	file.read(reinterpret_cast&lt;char *&gt;(contents.data()), size);</div><div class="cl"><span class="ln"> 575</span>  	file.close();</div><div class="cl"><span class="ln"> 576</span>  }</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c8"
+  data-sev="full"
+  data-source="data  ← self.read(len(bytes))"
+  data-steps="2"
+  data-guards="0"
+  data-srcfile="io.py"
+  data-sinkfile="io.py">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#8</span>
+      <span class="same-file">io.py</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">data  ← self.read(len(bytes))</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/core/io.py:83:16</span>
+      <span class="qf-desc">data  ← self.read(len(bytes))</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/core/io.py:85:20</span>
+      <span class="qf-desc">len(data)  (tainted arg: data)  via [self.read(len(bytes)) at line 83]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">io.py</span>
+    <span class="pn-loc">:83</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">data  ← self.read(len(bytes))</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">  80</span>  </div><div class="cl"><span class="ln">  81</span>      def readinto(self, bytes):</div><div class="cl"><span class="ln">  82</span>          &quot;&quot;&quot; Reads data into existing object. &quot;&quot;&quot;</div><div class="cl hit"><span class="ln">  83</span>          data = self.read(len(bytes))</div><div class="cl"><span class="ln">  84</span>          if data:</div><div class="cl"><span class="ln">  85</span>              bytes[:len(data)] = data</div><div class="cl"><span class="ln">  86</span>          return len(data)</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">io.py</span>
+    <span class="pn-loc">:85</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">len(data)  (tainted arg: data)  via [self.read(len(bytes)) at line 83]</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">  82</span>          &quot;&quot;&quot; Reads data into existing object. &quot;&quot;&quot;</div><div class="cl"><span class="ln">  83</span>          data = self.read(len(bytes))</div><div class="cl"><span class="ln">  84</span>          if data:</div><div class="cl hit"><span class="ln">  85</span>              bytes[:len(data)] = data</div><div class="cl"><span class="ln">  86</span>          return len(data)</div><div class="cl"><span class="ln">  87</span>  </div><div class="cl"><span class="ln">  88</span>      def readlines(self, hint=-1):</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c9"
+  data-sev="full"
+  data-source="decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()"
+  data-steps="3"
+  data-guards="0"
+  data-srcfile="kcdata.py"
+  data-sinkfile="kcdata.py">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#9</span>
+      <span class="same-file">kcdata.py</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">3&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2398:32</span>
+      <span class="qf-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+    <div class="qf-arrow">
+      ── 1 step(s) ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2373:25</span>
+      <span class="qf-desc">KCObject.FromKCItem(next(iterator))     (tainted arg: iterator)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">3 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2398</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2395</span>              import gzip</div><div class="cl"><span class="ln">2396</span>              from io import BytesIO</div><div class="cl"><span class="ln">2397</span>              try:</div><div class="cl hit"><span class="ln">2398</span>                  decompressed = gzip.GzipFile(fileobj=BytesIO(data[:])).read()</div><div class="cl"><span class="ln">2399</span>              except Exception:</div><div class="cl"><span class="ln">2400</span>                  pass</div><div class="cl"><span class="ln">2401</span>              else:</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2373</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">kcdata_buffer  =  KCObject.FromKCItem(next(iterator))     (taint from: iterator)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2370</span>  def iterate_kcdatas(kcdata_file):</div><div class="cl"><span class="ln">2371</span>      with data_from_stream(kcdata_file) as data:</div><div class="cl"><span class="ln">2372</span>          iterator = kcdata_item_iterator(data)</div><div class="cl hit"><span class="ln">2373</span>          kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2374</span>  </div><div class="cl"><span class="ln">2375</span>          if isinstance(kcdata_buffer, KCCompressedBufferObject):</div><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2373</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">KCObject.FromKCItem(next(iterator))     (tainted arg: iterator)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2370</span>  def iterate_kcdatas(kcdata_file):</div><div class="cl"><span class="ln">2371</span>      with data_from_stream(kcdata_file) as data:</div><div class="cl"><span class="ln">2372</span>          iterator = kcdata_item_iterator(data)</div><div class="cl hit"><span class="ln">2373</span>          kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2374</span>  </div><div class="cl"><span class="ln">2375</span>          if isinstance(kcdata_buffer, KCCompressedBufferObject):</div><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c10"
+  data-sev="full"
+  data-source="decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()"
+  data-steps="3"
+  data-guards="0"
+  data-srcfile="kcdata.py"
+  data-sinkfile="kcdata.py">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#10</span>
+      <span class="same-file">kcdata.py</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">3&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2398:32</span>
+      <span class="qf-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+    <div class="qf-arrow">
+      ── 1 step(s) ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2376:13</span>
+      <span class="qf-desc">kcdata_buffer.ReadItems(iterator)     (tainted arg: iterator)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">3 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2398</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2395</span>              import gzip</div><div class="cl"><span class="ln">2396</span>              from io import BytesIO</div><div class="cl"><span class="ln">2397</span>              try:</div><div class="cl hit"><span class="ln">2398</span>                  decompressed = gzip.GzipFile(fileobj=BytesIO(data[:])).read()</div><div class="cl"><span class="ln">2399</span>              except Exception:</div><div class="cl"><span class="ln">2400</span>                  pass</div><div class="cl"><span class="ln">2401</span>              else:</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2373</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">kcdata_buffer  =  KCObject.FromKCItem(next(iterator))     (taint from: iterator)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2370</span>  def iterate_kcdatas(kcdata_file):</div><div class="cl"><span class="ln">2371</span>      with data_from_stream(kcdata_file) as data:</div><div class="cl"><span class="ln">2372</span>          iterator = kcdata_item_iterator(data)</div><div class="cl hit"><span class="ln">2373</span>          kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2374</span>  </div><div class="cl"><span class="ln">2375</span>          if isinstance(kcdata_buffer, KCCompressedBufferObject):</div><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2376</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">kcdata_buffer.ReadItems(iterator)     (tainted arg: iterator)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2373</span>          kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2374</span>  </div><div class="cl"><span class="ln">2375</span>          if isinstance(kcdata_buffer, KCCompressedBufferObject):</div><div class="cl hit"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div><div class="cl"><span class="ln">2377</span>              decompressed = kcdata_buffer.Decompress(data)</div><div class="cl"><span class="ln">2378</span>              iterator = kcdata_item_iterator(decompressed)</div><div class="cl"><span class="ln">2379</span>              kcdata_buffer = KCObject.FromKCItem(next(iterator))</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c11"
+  data-sev="full"
+  data-source="decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()"
+  data-steps="5"
+  data-guards="0"
+  data-srcfile="kcdata.py"
+  data-sinkfile="kcdata.py">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#11</span>
+      <span class="same-file">kcdata.py</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">5&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2398:32</span>
+      <span class="qf-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+    <div class="qf-arrow">
+      ── 3 step(s) ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2378:24</span>
+      <span class="qf-desc">kcdata_item_iterator(decompressed)     (tainted arg: decompressed)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">5 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2398</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2395</span>              import gzip</div><div class="cl"><span class="ln">2396</span>              from io import BytesIO</div><div class="cl"><span class="ln">2397</span>              try:</div><div class="cl hit"><span class="ln">2398</span>                  decompressed = gzip.GzipFile(fileobj=BytesIO(data[:])).read()</div><div class="cl"><span class="ln">2399</span>              except Exception:</div><div class="cl"><span class="ln">2400</span>                  pass</div><div class="cl"><span class="ln">2401</span>              else:</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2373</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">kcdata_buffer  =  KCObject.FromKCItem(next(iterator))     (taint from: iterator)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2370</span>  def iterate_kcdatas(kcdata_file):</div><div class="cl"><span class="ln">2371</span>      with data_from_stream(kcdata_file) as data:</div><div class="cl"><span class="ln">2372</span>          iterator = kcdata_item_iterator(data)</div><div class="cl hit"><span class="ln">2373</span>          kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2374</span>  </div><div class="cl"><span class="ln">2375</span>          if isinstance(kcdata_buffer, KCCompressedBufferObject):</div><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2377</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">decompressed  =  kcdata_buffer.Decompress(data)     (taint from: kcdata_buffer)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2374</span>  </div><div class="cl"><span class="ln">2375</span>          if isinstance(kcdata_buffer, KCCompressedBufferObject):</div><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div><div class="cl hit"><span class="ln">2377</span>              decompressed = kcdata_buffer.Decompress(data)</div><div class="cl"><span class="ln">2378</span>              iterator = kcdata_item_iterator(decompressed)</div><div class="cl"><span class="ln">2379</span>              kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2380</span>  </div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2378</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">iterator  =  kcdata_item_iterator(decompressed)     (taint from: decompressed)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2375</span>          if isinstance(kcdata_buffer, KCCompressedBufferObject):</div><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div><div class="cl"><span class="ln">2377</span>              decompressed = kcdata_buffer.Decompress(data)</div><div class="cl hit"><span class="ln">2378</span>              iterator = kcdata_item_iterator(decompressed)</div><div class="cl"><span class="ln">2379</span>              kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2380</span>  </div><div class="cl"><span class="ln">2381</span>          if not isinstance(kcdata_buffer, KCBufferObject):</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2378</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">kcdata_item_iterator(decompressed)     (tainted arg: decompressed)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2375</span>          if isinstance(kcdata_buffer, KCCompressedBufferObject):</div><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div><div class="cl"><span class="ln">2377</span>              decompressed = kcdata_buffer.Decompress(data)</div><div class="cl hit"><span class="ln">2378</span>              iterator = kcdata_item_iterator(decompressed)</div><div class="cl"><span class="ln">2379</span>              kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2380</span>  </div><div class="cl"><span class="ln">2381</span>          if not isinstance(kcdata_buffer, KCBufferObject):</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c12"
+  data-sev="full"
+  data-source="decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()"
+  data-steps="6"
+  data-guards="0"
+  data-srcfile="kcdata.py"
+  data-sinkfile="kcdata.py">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#12</span>
+      <span class="same-file">kcdata.py</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">6&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2398:32</span>
+      <span class="qf-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+    <div class="qf-arrow">
+      ── 4 step(s) ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2379:29</span>
+      <span class="qf-desc">KCObject.FromKCItem(next(iterator))     (tainted arg: iterator)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">6 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2398</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2395</span>              import gzip</div><div class="cl"><span class="ln">2396</span>              from io import BytesIO</div><div class="cl"><span class="ln">2397</span>              try:</div><div class="cl hit"><span class="ln">2398</span>                  decompressed = gzip.GzipFile(fileobj=BytesIO(data[:])).read()</div><div class="cl"><span class="ln">2399</span>              except Exception:</div><div class="cl"><span class="ln">2400</span>                  pass</div><div class="cl"><span class="ln">2401</span>              else:</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2373</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">kcdata_buffer  =  KCObject.FromKCItem(next(iterator))     (taint from: iterator)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2370</span>  def iterate_kcdatas(kcdata_file):</div><div class="cl"><span class="ln">2371</span>      with data_from_stream(kcdata_file) as data:</div><div class="cl"><span class="ln">2372</span>          iterator = kcdata_item_iterator(data)</div><div class="cl hit"><span class="ln">2373</span>          kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2374</span>  </div><div class="cl"><span class="ln">2375</span>          if isinstance(kcdata_buffer, KCCompressedBufferObject):</div><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2377</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">decompressed  =  kcdata_buffer.Decompress(data)     (taint from: kcdata_buffer)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2374</span>  </div><div class="cl"><span class="ln">2375</span>          if isinstance(kcdata_buffer, KCCompressedBufferObject):</div><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div><div class="cl hit"><span class="ln">2377</span>              decompressed = kcdata_buffer.Decompress(data)</div><div class="cl"><span class="ln">2378</span>              iterator = kcdata_item_iterator(decompressed)</div><div class="cl"><span class="ln">2379</span>              kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2380</span>  </div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2378</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">iterator  =  kcdata_item_iterator(decompressed)     (taint from: decompressed)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2375</span>          if isinstance(kcdata_buffer, KCCompressedBufferObject):</div><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div><div class="cl"><span class="ln">2377</span>              decompressed = kcdata_buffer.Decompress(data)</div><div class="cl hit"><span class="ln">2378</span>              iterator = kcdata_item_iterator(decompressed)</div><div class="cl"><span class="ln">2379</span>              kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2380</span>  </div><div class="cl"><span class="ln">2381</span>          if not isinstance(kcdata_buffer, KCBufferObject):</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2379</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">kcdata_buffer  =  KCObject.FromKCItem(next(iterator))     (taint from: iterator)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div><div class="cl"><span class="ln">2377</span>              decompressed = kcdata_buffer.Decompress(data)</div><div class="cl"><span class="ln">2378</span>              iterator = kcdata_item_iterator(decompressed)</div><div class="cl hit"><span class="ln">2379</span>              kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2380</span>  </div><div class="cl"><span class="ln">2381</span>          if not isinstance(kcdata_buffer, KCBufferObject):</div><div class="cl"><span class="ln">2382</span>              # ktrace stackshot chunk</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2379</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">KCObject.FromKCItem(next(iterator))     (tainted arg: iterator)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div><div class="cl"><span class="ln">2377</span>              decompressed = kcdata_buffer.Decompress(data)</div><div class="cl"><span class="ln">2378</span>              iterator = kcdata_item_iterator(decompressed)</div><div class="cl hit"><span class="ln">2379</span>              kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2380</span>  </div><div class="cl"><span class="ln">2381</span>          if not isinstance(kcdata_buffer, KCBufferObject):</div><div class="cl"><span class="ln">2382</span>              # ktrace stackshot chunk</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c13"
+  data-sev="full"
+  data-source="decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()"
+  data-steps="7"
+  data-guards="0"
+  data-srcfile="kcdata.py"
+  data-sinkfile="kcdata.py">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#13</span>
+      <span class="same-file">kcdata.py</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">7&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2398:32</span>
+      <span class="qf-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+    <div class="qf-arrow">
+      ── 5 step(s) ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2384:29</span>
+      <span class="qf-desc">KCObject.FromKCItem(next(iterator))     (tainted arg: iterator)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">7 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2398</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2395</span>              import gzip</div><div class="cl"><span class="ln">2396</span>              from io import BytesIO</div><div class="cl"><span class="ln">2397</span>              try:</div><div class="cl hit"><span class="ln">2398</span>                  decompressed = gzip.GzipFile(fileobj=BytesIO(data[:])).read()</div><div class="cl"><span class="ln">2399</span>              except Exception:</div><div class="cl"><span class="ln">2400</span>                  pass</div><div class="cl"><span class="ln">2401</span>              else:</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2373</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">kcdata_buffer  =  KCObject.FromKCItem(next(iterator))     (taint from: iterator)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2370</span>  def iterate_kcdatas(kcdata_file):</div><div class="cl"><span class="ln">2371</span>      with data_from_stream(kcdata_file) as data:</div><div class="cl"><span class="ln">2372</span>          iterator = kcdata_item_iterator(data)</div><div class="cl hit"><span class="ln">2373</span>          kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2374</span>  </div><div class="cl"><span class="ln">2375</span>          if isinstance(kcdata_buffer, KCCompressedBufferObject):</div><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2377</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">decompressed  =  kcdata_buffer.Decompress(data)     (taint from: kcdata_buffer)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2374</span>  </div><div class="cl"><span class="ln">2375</span>          if isinstance(kcdata_buffer, KCCompressedBufferObject):</div><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div><div class="cl hit"><span class="ln">2377</span>              decompressed = kcdata_buffer.Decompress(data)</div><div class="cl"><span class="ln">2378</span>              iterator = kcdata_item_iterator(decompressed)</div><div class="cl"><span class="ln">2379</span>              kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2380</span>  </div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2378</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">iterator  =  kcdata_item_iterator(decompressed)     (taint from: decompressed)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2375</span>          if isinstance(kcdata_buffer, KCCompressedBufferObject):</div><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div><div class="cl"><span class="ln">2377</span>              decompressed = kcdata_buffer.Decompress(data)</div><div class="cl hit"><span class="ln">2378</span>              iterator = kcdata_item_iterator(decompressed)</div><div class="cl"><span class="ln">2379</span>              kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2380</span>  </div><div class="cl"><span class="ln">2381</span>          if not isinstance(kcdata_buffer, KCBufferObject):</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2379</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">kcdata_buffer  =  KCObject.FromKCItem(next(iterator))     (taint from: iterator)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div><div class="cl"><span class="ln">2377</span>              decompressed = kcdata_buffer.Decompress(data)</div><div class="cl"><span class="ln">2378</span>              iterator = kcdata_item_iterator(decompressed)</div><div class="cl hit"><span class="ln">2379</span>              kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2380</span>  </div><div class="cl"><span class="ln">2381</span>          if not isinstance(kcdata_buffer, KCBufferObject):</div><div class="cl"><span class="ln">2382</span>              # ktrace stackshot chunk</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2384</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">kcdata_buffer  =  KCObject.FromKCItem(next(iterator))     (taint from: iterator)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2381</span>          if not isinstance(kcdata_buffer, KCBufferObject):</div><div class="cl"><span class="ln">2382</span>              # ktrace stackshot chunk</div><div class="cl"><span class="ln">2383</span>              iterator = kcdata_item_iterator(data[16:])</div><div class="cl hit"><span class="ln">2384</span>              kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2385</span>  </div><div class="cl"><span class="ln">2386</span>          if not isinstance(kcdata_buffer, KCBufferObject):</div><div class="cl"><span class="ln">2387</span>              try:</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2384</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">KCObject.FromKCItem(next(iterator))     (tainted arg: iterator)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2381</span>          if not isinstance(kcdata_buffer, KCBufferObject):</div><div class="cl"><span class="ln">2382</span>              # ktrace stackshot chunk</div><div class="cl"><span class="ln">2383</span>              iterator = kcdata_item_iterator(data[16:])</div><div class="cl hit"><span class="ln">2384</span>              kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2385</span>  </div><div class="cl"><span class="ln">2386</span>          if not isinstance(kcdata_buffer, KCBufferObject):</div><div class="cl"><span class="ln">2387</span>              try:</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c14"
+  data-sev="full"
+  data-source="decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()"
+  data-steps="8"
+  data-guards="0"
+  data-srcfile="kcdata.py"
+  data-sinkfile="kcdata.py">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#14</span>
+      <span class="same-file">kcdata.py</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">8&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2398:32</span>
+      <span class="qf-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+    <div class="qf-arrow">
+      ── 6 step(s) ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2393:33</span>
+      <span class="qf-desc">KCObject.FromKCItem(next(iterator))     (tainted arg: iterator)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">8 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2398</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2395</span>              import gzip</div><div class="cl"><span class="ln">2396</span>              from io import BytesIO</div><div class="cl"><span class="ln">2397</span>              try:</div><div class="cl hit"><span class="ln">2398</span>                  decompressed = gzip.GzipFile(fileobj=BytesIO(data[:])).read()</div><div class="cl"><span class="ln">2399</span>              except Exception:</div><div class="cl"><span class="ln">2400</span>                  pass</div><div class="cl"><span class="ln">2401</span>              else:</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2373</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">kcdata_buffer  =  KCObject.FromKCItem(next(iterator))     (taint from: iterator)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2370</span>  def iterate_kcdatas(kcdata_file):</div><div class="cl"><span class="ln">2371</span>      with data_from_stream(kcdata_file) as data:</div><div class="cl"><span class="ln">2372</span>          iterator = kcdata_item_iterator(data)</div><div class="cl hit"><span class="ln">2373</span>          kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2374</span>  </div><div class="cl"><span class="ln">2375</span>          if isinstance(kcdata_buffer, KCCompressedBufferObject):</div><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2377</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">decompressed  =  kcdata_buffer.Decompress(data)     (taint from: kcdata_buffer)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2374</span>  </div><div class="cl"><span class="ln">2375</span>          if isinstance(kcdata_buffer, KCCompressedBufferObject):</div><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div><div class="cl hit"><span class="ln">2377</span>              decompressed = kcdata_buffer.Decompress(data)</div><div class="cl"><span class="ln">2378</span>              iterator = kcdata_item_iterator(decompressed)</div><div class="cl"><span class="ln">2379</span>              kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2380</span>  </div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2378</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">iterator  =  kcdata_item_iterator(decompressed)     (taint from: decompressed)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2375</span>          if isinstance(kcdata_buffer, KCCompressedBufferObject):</div><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div><div class="cl"><span class="ln">2377</span>              decompressed = kcdata_buffer.Decompress(data)</div><div class="cl hit"><span class="ln">2378</span>              iterator = kcdata_item_iterator(decompressed)</div><div class="cl"><span class="ln">2379</span>              kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2380</span>  </div><div class="cl"><span class="ln">2381</span>          if not isinstance(kcdata_buffer, KCBufferObject):</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2379</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">kcdata_buffer  =  KCObject.FromKCItem(next(iterator))     (taint from: iterator)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2376</span>              kcdata_buffer.ReadItems(iterator)</div><div class="cl"><span class="ln">2377</span>              decompressed = kcdata_buffer.Decompress(data)</div><div class="cl"><span class="ln">2378</span>              iterator = kcdata_item_iterator(decompressed)</div><div class="cl hit"><span class="ln">2379</span>              kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2380</span>  </div><div class="cl"><span class="ln">2381</span>          if not isinstance(kcdata_buffer, KCBufferObject):</div><div class="cl"><span class="ln">2382</span>              # ktrace stackshot chunk</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2384</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">kcdata_buffer  =  KCObject.FromKCItem(next(iterator))     (taint from: iterator)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2381</span>          if not isinstance(kcdata_buffer, KCBufferObject):</div><div class="cl"><span class="ln">2382</span>              # ktrace stackshot chunk</div><div class="cl"><span class="ln">2383</span>              iterator = kcdata_item_iterator(data[16:])</div><div class="cl hit"><span class="ln">2384</span>              kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2385</span>  </div><div class="cl"><span class="ln">2386</span>          if not isinstance(kcdata_buffer, KCBufferObject):</div><div class="cl"><span class="ln">2387</span>              try:</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-step">
+  <div class="pn-header">
+    <span class="pn-icon">●</span>
+    <span class="pn-kind">ASSIGN</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2393</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">kcdata_buffer  =  KCObject.FromKCItem(next(iterator))     (taint from: iterator)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2390</span>                  pass</div><div class="cl"><span class="ln">2391</span>              else:</div><div class="cl"><span class="ln">2392</span>                  iterator = kcdata_item_iterator(decoded)</div><div class="cl hit"><span class="ln">2393</span>                  kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2394</span>          if not isinstance(kcdata_buffer, KCBufferObject):</div><div class="cl"><span class="ln">2395</span>              import gzip</div><div class="cl"><span class="ln">2396</span>              from io import BytesIO</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2393</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">KCObject.FromKCItem(next(iterator))     (tainted arg: iterator)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2390</span>                  pass</div><div class="cl"><span class="ln">2391</span>              else:</div><div class="cl"><span class="ln">2392</span>                  iterator = kcdata_item_iterator(decoded)</div><div class="cl hit"><span class="ln">2393</span>                  kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2394</span>          if not isinstance(kcdata_buffer, KCBufferObject):</div><div class="cl"><span class="ln">2395</span>              import gzip</div><div class="cl"><span class="ln">2396</span>              from io import BytesIO</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c15"
+  data-sev="full"
+  data-source="decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()"
+  data-steps="2"
+  data-guards="0"
+  data-srcfile="kcdata.py"
+  data-sinkfile="kcdata.py">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#15</span>
+      <span class="same-file">kcdata.py</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2398:32</span>
+      <span class="qf-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2402:28</span>
+      <span class="qf-desc">kcdata_item_iterator(decompressed)  (tainted arg: decompressed)  via [gzip.GzipFile(fileobj=BytesIO(data[:])).read(…) at line 2398]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2398</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2395</span>              import gzip</div><div class="cl"><span class="ln">2396</span>              from io import BytesIO</div><div class="cl"><span class="ln">2397</span>              try:</div><div class="cl hit"><span class="ln">2398</span>                  decompressed = gzip.GzipFile(fileobj=BytesIO(data[:])).read()</div><div class="cl"><span class="ln">2399</span>              except Exception:</div><div class="cl"><span class="ln">2400</span>                  pass</div><div class="cl"><span class="ln">2401</span>              else:</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2402</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">kcdata_item_iterator(decompressed)  (tainted arg: decompressed)  via [gzip.GzipFile(fileobj=BytesIO(data[:])).read(…) at line 2398]</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2399</span>              except Exception:</div><div class="cl"><span class="ln">2400</span>                  pass</div><div class="cl"><span class="ln">2401</span>              else:</div><div class="cl hit"><span class="ln">2402</span>                  iterator = kcdata_item_iterator(decompressed)</div><div class="cl"><span class="ln">2403</span>                  kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2404</span>  </div><div class="cl"><span class="ln">2405</span>          if not isinstance(kcdata_buffer, KCBufferObject):</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c16"
+  data-sev="full"
+  data-source="decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()"
+  data-steps="2"
+  data-guards="0"
+  data-srcfile="kcdata.py"
+  data-sinkfile="kcdata.py">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#16</span>
+      <span class="same-file">kcdata.py</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2398:32</span>
+      <span class="qf-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2403:33</span>
+      <span class="qf-desc">KCObject.FromKCItem(next(iterator))  (tainted arg: next, iterator)  via [gzip.GzipFile(fileobj=BytesIO(data[:])).read(…) at line 2398]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2398</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2395</span>              import gzip</div><div class="cl"><span class="ln">2396</span>              from io import BytesIO</div><div class="cl"><span class="ln">2397</span>              try:</div><div class="cl hit"><span class="ln">2398</span>                  decompressed = gzip.GzipFile(fileobj=BytesIO(data[:])).read()</div><div class="cl"><span class="ln">2399</span>              except Exception:</div><div class="cl"><span class="ln">2400</span>                  pass</div><div class="cl"><span class="ln">2401</span>              else:</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2403</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">KCObject.FromKCItem(next(iterator))  (tainted arg: next, iterator)  via [gzip.GzipFile(fileobj=BytesIO(data[:])).read(…) at line 2398]</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2400</span>                  pass</div><div class="cl"><span class="ln">2401</span>              else:</div><div class="cl"><span class="ln">2402</span>                  iterator = kcdata_item_iterator(decompressed)</div><div class="cl hit"><span class="ln">2403</span>                  kcdata_buffer = KCObject.FromKCItem(next(iterator))</div><div class="cl"><span class="ln">2404</span>  </div><div class="cl"><span class="ln">2405</span>          if not isinstance(kcdata_buffer, KCBufferObject):</div><div class="cl"><span class="ln">2406</span>              raise Exception(&quot;unknown file type&quot;)</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c17"
+  data-sev="full"
+  data-source="decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()"
+  data-steps="2"
+  data-guards="0"
+  data-srcfile="kcdata.py"
+  data-sinkfile="kcdata.py">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#17</span>
+      <span class="same-file">kcdata.py</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2398:32</span>
+      <span class="qf-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2409:9</span>
+      <span class="qf-desc">kcdata_buffer.ReadItems(iterator)  (tainted arg: iterator)  via [gzip.GzipFile(fileobj=BytesIO(data[:])).read(…) at line 2398]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2398</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2395</span>              import gzip</div><div class="cl"><span class="ln">2396</span>              from io import BytesIO</div><div class="cl"><span class="ln">2397</span>              try:</div><div class="cl hit"><span class="ln">2398</span>                  decompressed = gzip.GzipFile(fileobj=BytesIO(data[:])).read()</div><div class="cl"><span class="ln">2399</span>              except Exception:</div><div class="cl"><span class="ln">2400</span>                  pass</div><div class="cl"><span class="ln">2401</span>              else:</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2409</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">kcdata_buffer.ReadItems(iterator)  (tainted arg: iterator)  via [gzip.GzipFile(fileobj=BytesIO(data[:])).read(…) at line 2398]</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2406</span>              raise Exception(&quot;unknown file type&quot;)</div><div class="cl"><span class="ln">2407</span>  </div><div class="cl"><span class="ln">2408</span>  </div><div class="cl hit"><span class="ln">2409</span>          kcdata_buffer.ReadItems(iterator)</div><div class="cl"><span class="ln">2410</span>          yield kcdata_buffer</div><div class="cl"><span class="ln">2411</span>  </div><div class="cl"><span class="ln">2412</span>          for magic in iterator:</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c18"
+  data-sev="full"
+  data-source="decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()"
+  data-steps="2"
+  data-guards="1"
+  data-srcfile="kcdata.py"
+  data-sinkfile="kcdata.py">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#18</span>
+      <span class="same-file">kcdata.py</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">1&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2398:32</span>
+      <span class="qf-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/kcdata.py:2418:13</span>
+      <span class="qf-desc">kcdata_buffer.ReadItems(iterator)  (tainted arg: iterator)  via [gzip.GzipFile(fileobj=BytesIO(data[:])).read(…) at line 2398]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2398</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">decompressed  ← gzip.GzipFile(fileobj=BytesIO(data[:])).read()</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">2395</span>              import gzip</div><div class="cl"><span class="ln">2396</span>              from io import BytesIO</div><div class="cl"><span class="ln">2397</span>              try:</div><div class="cl hit"><span class="ln">2398</span>                  decompressed = gzip.GzipFile(fileobj=BytesIO(data[:])).read()</div><div class="cl"><span class="ln">2399</span>              except Exception:</div><div class="cl"><span class="ln">2400</span>                  pass</div><div class="cl"><span class="ln">2401</span>              else:</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">kcdata.py</span>
+    <span class="pn-loc">:2418</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">kcdata_buffer.ReadItems(iterator)  (tainted arg: iterator)  via [gzip.GzipFile(fileobj=BytesIO(data[:])).read(…) at line 2398]</summary>
+    <div class="node-guards"><div class="guard-item">if kcdata_buffer.i_type == 0 [⚠ tainted]</div></div>
+    <pre class="code"><div class="cl"><span class="ln">2415</span>                  continue</div><div class="cl"><span class="ln">2416</span>              if not isinstance(kcdata_buffer, KCBufferObject):</div><div class="cl"><span class="ln">2417</span>                  raise Exception(&quot;unknown file type&quot;)</div><div class="cl hit"><span class="ln">2418</span>              kcdata_buffer.ReadItems(iterator)</div><div class="cl"><span class="ln">2419</span>              yield kcdata_buffer</div><div class="cl"><span class="ln">2420</span>  </div><div class="cl"><span class="ln">2421</span>  #</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c19"
+  data-sev="full"
+  data-source="cmd_data  ← fh.read(data_size)"
+  data-steps="2"
+  data-guards="18"
+  data-srcfile="macho.py"
+  data-sinkfile="macho.py">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#19</span>
+      <span class="same-file">macho.py</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">18&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">cmd_data  ← fh.read(data_size)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/macho.py:149:32</span>
+      <span class="qf-desc">cmd_data  ← fh.read(data_size)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/macho.py:150:17</span>
+      <span class="qf-desc">cmd.append((cmd_load, cmd_cmd, cmd_data))  (tainted arg: cmd_load, cmd_cmd, cmd_data)  via [fh.read(data_size) at line 149]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">macho.py</span>
+    <span class="pn-loc">:149</span>
+    <span class="guards-pill" title="9 guard(s)">9</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">cmd_data  ← fh.read(data_size)</summary>
+    <div class="node-guards"><div class="guard-item">if klass is None</div><div class="guard-item">if cmd_load.cmd == LC_ID_DYLIB</div><div class="guard-item">if self.id_cmd is not None</div><div class="guard-item">if cmd_load.cmd in (LC_SEGMENT, LC_SEGMENT_64)</div><div class="guard-item">if cmd_load.cmd == LC_SEGMENT</div><div class="guard-item">if cmd_load.cmdsize != expected_size</div><div class="guard-item">if cmd_cmd.nsects == 0</div><div class="guard-item">if cmd_cmd.filesize != 0</div><div class="guard-item">if seg.offset &gt; 0 and seg.size &gt; 0 and not_zerofill</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 146</span>                  else:</div><div class="cl"><span class="ln"> 147</span>                      # data is a raw str</div><div class="cl"><span class="ln"> 148</span>                      data_size = cmd_load.cmdsize - sizeof(klass) - sizeof(load_command)</div><div class="cl hit"><span class="ln"> 149</span>                      cmd_data = fh.read(data_size)</div><div class="cl"><span class="ln"> 150</span>                  cmd.append((cmd_load, cmd_cmd, cmd_data))</div><div class="cl"><span class="ln"> 151</span>                  read_bytes += cmd_load.cmdsize</div><div class="cl"><span class="ln"> 152</span>  </div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">macho.py</span>
+    <span class="pn-loc">:150</span>
+    <span class="guards-pill" title="9 guard(s)">9</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">cmd.append((cmd_load, cmd_cmd, cmd_data))  (tainted arg: cmd_load, cmd_cmd, cmd_data)  via [fh.read(data_size) at line 149]</summary>
+    <div class="node-guards"><div class="guard-item">if klass is None</div><div class="guard-item">if cmd_load.cmd == LC_ID_DYLIB</div><div class="guard-item">if self.id_cmd is not None</div><div class="guard-item">if cmd_load.cmd in (LC_SEGMENT, LC_SEGMENT_64)</div><div class="guard-item">if cmd_load.cmd == LC_SEGMENT</div><div class="guard-item">if cmd_load.cmdsize != expected_size</div><div class="guard-item">if cmd_cmd.nsects == 0</div><div class="guard-item">if cmd_cmd.filesize != 0</div><div class="guard-item">if seg.offset &gt; 0 and seg.size &gt; 0 and not_zerofill</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 147</span>                      # data is a raw str</div><div class="cl"><span class="ln"> 148</span>                      data_size = cmd_load.cmdsize - sizeof(klass) - sizeof(load_command)</div><div class="cl"><span class="ln"> 149</span>                      cmd_data = fh.read(data_size)</div><div class="cl hit"><span class="ln"> 150</span>                  cmd.append((cmd_load, cmd_cmd, cmd_data))</div><div class="cl"><span class="ln"> 151</span>                  read_bytes += cmd_load.cmdsize</div><div class="cl"><span class="ln"> 152</span>  </div><div class="cl"><span class="ln"> 153</span>              # make sure the header made sense</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c20"
+  data-sev="full"
+  data-source="response_str  ← response.read()"
+  data-steps="2"
+  data-guards="0"
+  data-srcfile="speedtracer.py"
+  data-sinkfile="speedtracer.py">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#20</span>
+      <span class="same-file">speedtracer.py</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">response_str  ← response.read()</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/plugins/speedtracer.py:31:24</span>
+      <span class="qf-desc">response_str  ← response.read()</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/plugins/speedtracer.py:32:13</span>
+      <span class="qf-desc">json.loads(response_str)  (tainted arg: response_str)  via [response.read(…) at line 31]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">speedtracer.py</span>
+    <span class="pn-loc">:31</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">response_str  ← response.read()</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">  28</span>      request.add_header(&quot;X-ST-GroupName&quot;, &quot;core-os&quot;)</div><div class="cl"><span class="ln">  29</span>      try:</div><div class="cl"><span class="ln">  30</span>          response = urllib2.urlopen(request)</div><div class="cl hit"><span class="ln">  31</span>          response_str = response.read()</div><div class="cl"><span class="ln">  32</span>          j = json.loads(response_str)</div><div class="cl"><span class="ln">  33</span>          outstr += &quot;\nspeedtracer output:\n\n&quot;</div><div class="cl"><span class="ln">  34</span>          stacks = j.get(&quot;symbolicated_log&quot;)</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">speedtracer.py</span>
+    <span class="pn-loc">:32</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">json.loads(response_str)  (tainted arg: response_str)  via [response.read(…) at line 31]</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">  29</span>      try:</div><div class="cl"><span class="ln">  30</span>          response = urllib2.urlopen(request)</div><div class="cl"><span class="ln">  31</span>          response_str = response.read()</div><div class="cl hit"><span class="ln">  32</span>          j = json.loads(response_str)</div><div class="cl"><span class="ln">  33</span>          outstr += &quot;\nspeedtracer output:\n\n&quot;</div><div class="cl"><span class="ln">  34</span>          stacks = j.get(&quot;symbolicated_log&quot;)</div><div class="cl"><span class="ln">  35</span>          if stacks:</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c21"
+  data-sev="full"
+  data-source="addr  ← self.socket.accept()"
+  data-steps="2"
+  data-guards="2"
+  data-srcfile="interface.py"
+  data-sinkfile="interface.py">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#21</span>
+      <span class="same-file">interface.py</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">2&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">addr  ← self.socket.accept()</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/usertaskdebugging/interface.py:29:37</span>
+      <span class="qf-desc">addr  ← self.socket.accept()</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/usertaskdebugging/interface.py:30:13</span>
+      <span class="qf-desc">logging.info(&quot;Connected to client from %s&quot; % str(addr))  (tainted arg: str, addr)  via [self.socket.accept(…) at line 29]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">interface.py</span>
+    <span class="pn-loc">:29</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">addr  ← self.socket.accept()</summary>
+    <div class="node-guards"><div class="guard-item">if num_retries &gt; 0</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  26</span>                  num_retries -= 1</div><div class="cl"><span class="ln">  27</span>                  logging.warning(&quot;timeout: select returned empty list. retrying..&quot;)</div><div class="cl"><span class="ln">  28</span>                  continue</div><div class="cl hit"><span class="ln">  29</span>              self.connection, addr = self.socket.accept()</div><div class="cl"><span class="ln">  30</span>              logging.info(&quot;Connected to client from %s&quot; % str(addr))</div><div class="cl"><span class="ln">  31</span>              return True</div><div class="cl"><span class="ln">  32</span>          logging.error(&quot;Failed to connect. Exiting after multiple attempts.&quot;)</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">interface.py</span>
+    <span class="pn-loc">:30</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">logging.info(&quot;Connected to client from %s&quot; % str(addr))  (tainted arg: str, addr)  via [self.socket.accept(…) at line 29]</summary>
+    <div class="node-guards"><div class="guard-item">if num_retries &gt; 0</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  27</span>                  logging.warning(&quot;timeout: select returned empty list. retrying..&quot;)</div><div class="cl"><span class="ln">  28</span>                  continue</div><div class="cl"><span class="ln">  29</span>              self.connection, addr = self.socket.accept()</div><div class="cl hit"><span class="ln">  30</span>              logging.info(&quot;Connected to client from %s&quot; % str(addr))</div><div class="cl"><span class="ln">  31</span>              return True</div><div class="cl"><span class="ln">  32</span>          logging.error(&quot;Failed to connect. Exiting after multiple attempts.&quot;)</div><div class="cl"><span class="ln">  33</span>          return False</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c22"
+  data-sev="full"
+  data-source="lines  ← src.readlines()"
+  data-steps="2"
+  data-guards="0"
+  data-srcfile="xnu.py"
+  data-sinkfile="xnu.py">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#22</span>
+      <span class="same-file">xnu.py</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">lines  ← src.readlines()</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/xnu.py:160:25</span>
+      <span class="qf-desc">lines  ← src.readlines()</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/xnu.py:163:27</span>
+      <span class="qf-desc">min(frame.lineno + 2, len(lines))  (tainted arg: frame, lineno, len, lines)  via [src.readlines(…) at line 160]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">xnu.py</span>
+    <span class="pn-loc">:160</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">lines  ← src.readlines()</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln"> 157</span>              out_str += &quot;    &lt; Sources not available &gt;\n&quot;</div><div class="cl"><span class="ln"> 158</span>          else:</div><div class="cl"><span class="ln"> 159</span>              with src:</div><div class="cl hit"><span class="ln"> 160</span>                  lines = src.readlines()</div><div class="cl"><span class="ln"> 161</span>  </div><div class="cl"><span class="ln"> 162</span>                  startline = frame.lineno - 3 if frame.lineno &gt; 2 else 0</div><div class="cl"><span class="ln"> 163</span>                  endline = min(frame.lineno + 2, len(lines))</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">xnu.py</span>
+    <span class="pn-loc">:163</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">min(frame.lineno + 2, len(lines))  (tainted arg: frame, lineno, len, lines)  via [src.readlines(…) at line 160]</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln"> 160</span>                  lines = src.readlines()</div><div class="cl"><span class="ln"> 161</span>  </div><div class="cl"><span class="ln"> 162</span>                  startline = frame.lineno - 3 if frame.lineno &gt; 2 else 0</div><div class="cl hit"><span class="ln"> 163</span>                  endline = min(frame.lineno + 2, len(lines))</div><div class="cl"><span class="ln"> 164</span>                  for lineno in range(startline, endline):</div><div class="cl"><span class="ln"> 165</span>  </div><div class="cl"><span class="ln"> 166</span>                      if lineno + 1 == frame.lineno:</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c23"
+  data-sev="full"
+  data-source="parse_data  ← f.read()"
+  data-steps="2"
+  data-guards="2"
+  data-srcfile="xnutriage.py"
+  data-sinkfile="xnutriage.py">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#23</span>
+      <span class="same-file">xnutriage.py</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">2&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">parse_data  ← f.read()</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/xnutriage.py:116:17</span>
+      <span class="qf-desc">parse_data  ← f.read()</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/xnutriage.py:118:18</span>
+      <span class="qf-desc">re.findall(srch_string, parse_data)  (tainted arg: srch_string, parse_data)  via [f.read(…) at line 116]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">xnutriage.py</span>
+    <span class="pn-loc">:116</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">parse_data  ← f.read()</summary>
+    <div class="node-guards"><div class="guard-item">if cmd_args is None or len(cmd_args) == 0</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 113</span>          raise ArgumentError()</div><div class="cl"><span class="ln"> 114</span>      </div><div class="cl"><span class="ln"> 115</span>      f = open(cmd_args[0], 'r')</div><div class="cl hit"><span class="ln"> 116</span>      parse_data= f.read()</div><div class="cl"><span class="ln"> 117</span>      srch_string = &quot;lr:\s+0x[a-fA-F0-9]+\s&quot;</div><div class="cl"><span class="ln"> 118</span>      lr_pc_srch = re.findall(srch_string, parse_data)</div><div class="cl"><span class="ln"> 119</span>      if lr_pc_srch:</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">xnutriage.py</span>
+    <span class="pn-loc">:118</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">re.findall(srch_string, parse_data)  (tainted arg: srch_string, parse_data)  via [f.read(…) at line 116]</summary>
+    <div class="node-guards"><div class="guard-item">if cmd_args is None or len(cmd_args) == 0</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 115</span>      f = open(cmd_args[0], 'r')</div><div class="cl"><span class="ln"> 116</span>      parse_data= f.read()</div><div class="cl"><span class="ln"> 117</span>      srch_string = &quot;lr:\s+0x[a-fA-F0-9]+\s&quot;</div><div class="cl hit"><span class="ln"> 118</span>      lr_pc_srch = re.findall(srch_string, parse_data)</div><div class="cl"><span class="ln"> 119</span>      if lr_pc_srch:</div><div class="cl"><span class="ln"> 120</span>          print(paniclog_data, lr_pc_srch)</div><div class="cl"><span class="ln"> 121</span>          for match in lr_pc_srch:</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c24"
+  data-sev="full"
+  data-source="parse_data  ← f.read()"
+  data-steps="2"
+  data-guards="2"
+  data-srcfile="xnutriage.py"
+  data-sinkfile="xnutriage.py">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#24</span>
+      <span class="same-file">xnutriage.py</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">2&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">parse_data  ← f.read()</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/xnutriage.py:116:17</span>
+      <span class="qf-desc">parse_data  ← f.read()</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/apple-oss-distributions/xnu/tools/lldbmacros/xnutriage.py:120:9</span>
+      <span class="qf-desc">print(paniclog_data, lr_pc_srch)  (tainted arg: paniclog_data, lr_pc_srch)  via [f.read(…) at line 116]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">xnutriage.py</span>
+    <span class="pn-loc">:116</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">parse_data  ← f.read()</summary>
+    <div class="node-guards"><div class="guard-item">if cmd_args is None or len(cmd_args) == 0</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 113</span>          raise ArgumentError()</div><div class="cl"><span class="ln"> 114</span>      </div><div class="cl"><span class="ln"> 115</span>      f = open(cmd_args[0], 'r')</div><div class="cl hit"><span class="ln"> 116</span>      parse_data= f.read()</div><div class="cl"><span class="ln"> 117</span>      srch_string = &quot;lr:\s+0x[a-fA-F0-9]+\s&quot;</div><div class="cl"><span class="ln"> 118</span>      lr_pc_srch = re.findall(srch_string, parse_data)</div><div class="cl"><span class="ln"> 119</span>      if lr_pc_srch:</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">xnutriage.py</span>
+    <span class="pn-loc">:120</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">print(paniclog_data, lr_pc_srch)  (tainted arg: paniclog_data, lr_pc_srch)  via [f.read(…) at line 116]</summary>
+    <div class="node-guards"><div class="guard-item">if cmd_args is None or len(cmd_args) == 0</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 117</span>      srch_string = &quot;lr:\s+0x[a-fA-F0-9]+\s&quot;</div><div class="cl"><span class="ln"> 118</span>      lr_pc_srch = re.findall(srch_string, parse_data)</div><div class="cl"><span class="ln"> 119</span>      if lr_pc_srch:</div><div class="cl hit"><span class="ln"> 120</span>          print(paniclog_data, lr_pc_srch)</div><div class="cl"><span class="ln"> 121</span>          for match in lr_pc_srch:</div><div class="cl"><span class="ln"> 122</span>              sp=match.strip(&quot;lr: &quot;)</div><div class="cl"><span class="ln"> 123</span>              print(sp)</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+
+</div>
+
+<footer>taint — source-level data-flow tracer &nbsp;·&nbsp; 25 finding(s) for target <code>&lt;all sinks&gt;</code></footer>
+
+<script>
+const cards = Array.from(document.querySelectorAll('.card'));
+let sortKey = 'idx';
+let sortAsc = true;
+
+function applyFilters() {
+  const sev    = document.getElementById('fSev').value;
+  const src    = document.getElementById('fSrc').value;
+  const guards = parseInt(document.getElementById('fGuards').value, 10);
+  const txt    = (document.getElementById('fText').value || '').toLowerCase();
+  const group  = document.getElementById('fGroup').value;
+
+  // Remove existing group headers
+  document.querySelectorAll('.group-header').forEach(h => h.remove());
+
+  let visible = 0;
+  cards.forEach(c => {
+    const textMatch = !txt ||
+      c.dataset.source.toLowerCase().includes(txt) ||
+      c.dataset.srcfile.toLowerCase().includes(txt) ||
+      c.dataset.sinkfile.toLowerCase().includes(txt) ||
+      c.textContent.toLowerCase().includes(txt);
+    const hide =
+      (sev    && c.dataset.sev    !== sev)  ||
+      (src    && c.dataset.source !== src)  ||
+      (parseInt(c.dataset.guards,10) < guards) ||
+      !textMatch;
+    c.classList.toggle('hidden', hide);
+    if (!hide) visible++;
+  });
+  document.getElementById('fCount').textContent = visible + ' finding(s)';
+
+  // Apply grouping if requested
+  if (group) applyGrouping(group);
+}
+
+function applyGrouping(key) {
+  const container = document.getElementById('cardContainer');
+  const visible = cards.filter(c => !c.classList.contains('hidden'));
+  if (!visible.length) return;
+
+  // Group by key
+  const groups = {};
+  visible.forEach(c => {
+    const gk = key === 'source' ? c.dataset.source :
+               key === 'sinkfile' ? c.dataset.sinkfile :
+               key === 'sev' ? c.dataset.sev : '';
+    if (!groups[gk]) groups[gk] = [];
+    groups[gk].push(c);
+  });
+
+  // Re-render with group headers
+  Object.keys(groups).sort().forEach(gk => {
+    const hdr = document.createElement('div');
+    hdr.className = 'group-header';
+    hdr.innerHTML = '<span class="gh-key">' + escapeHtml(gk) + '</span>' +
+      '<span class="gh-count">' + groups[gk].length + '</span>';
+    container.appendChild(hdr);
+    groups[gk].forEach(c => container.appendChild(c));
+  });
+}
+
+const sevOrder = { full: 0, partial: 1, none: 2 };
+function sortBy(key) {
+  if (sortKey === key) { sortAsc = !sortAsc; }
+  else { sortKey = key; sortAsc = key === 'idx'; }
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('s' + key.charAt(0).toUpperCase() + key.slice(1)).classList.add('active');
+  const container = document.getElementById('cardContainer');
+  const sorted = [...cards].sort((a, b) => {
+    let av, bv;
+    if (key === 'idx')         { av = parseInt(a.id.slice(1));        bv = parseInt(b.id.slice(1)); }
+    else if (key === 'steps')  { av = parseInt(a.dataset.steps);       bv = parseInt(b.dataset.steps); }
+    else if (key === 'guards') { av = parseInt(a.dataset.guards);      bv = parseInt(b.dataset.guards); }
+    else if (key === 'sev')    { av = sevOrder[a.dataset.sev]||9;      bv = sevOrder[b.dataset.sev]||9; }
+    return sortAsc ? av - bv : bv - av;
+  });
+  sorted.forEach(c => container.appendChild(c));
+  applyFilters(); // re-apply to handle grouping
+}
+
+function clearFilters() {
+  document.getElementById('fSev').value    = '';
+  document.getElementById('fSrc').value    = '';
+  document.getElementById('fGuards').value = 0;
+  document.getElementById('fText').value   = '';
+  document.getElementById('fGroup').value  = '';
+  document.getElementById('guardVal').textContent = '0';
+  document.querySelectorAll('.group-header').forEach(h => h.remove());
+  cards.forEach(c => c.classList.remove('hidden'));
+  document.getElementById('fCount').textContent = cards.length + ' finding(s)';
+  sortKey = 'idx'; sortAsc = true;
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('sIdx').classList.add('active');
+  const container = document.getElementById('cardContainer');
+  [...cards].sort((a,b) => parseInt(a.id.slice(1)) - parseInt(b.id.slice(1)))
+    .forEach(c => container.appendChild(c));
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Keyboard shortcut: / to focus search
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'SELECT') {
+    e.preventDefault();
+    document.getElementById('fText').focus();
+  }
+});
+</script>
+</body>
+</html>

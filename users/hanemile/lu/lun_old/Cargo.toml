@@ -1,0 +1,15 @@
+[package]
+name = "lun"
+version = "0.1.0"
+edition = "2024"
+include = [ "**/*.rs", "Cargo.toml" ]
+rust-version = "1.85"
+
+[dependencies]
+
+# [profile.release]
+# opt-level = 2 # fast and samll wasm
+
+# Optimize all dependencies even in debug builds:
+# [profile.dev.packages."*"]
+# opt-level = 2

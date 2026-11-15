@@ -1,0 +1,77 @@
+--- a/markcl.lisp
++++ b/markcl.lisp
+@@ -7,16 +7,29 @@
+ (in-package #:markcl)
+ 
+ (defun parse-markdown-string (stream)
+-  "Parses a string from the stream with basic Markdown syntax."
+-  (let ((result (list 'progn)))
++  "Parses a string from the stream with basic Markdown syntax and embedded Lisp."
++  (let ((result (list 'list)))
+     (loop for char = (read-char stream nil nil)
+           while (and char (char/= char #\"))
+           do (case char
+                (#\# (push (parse-heading stream) result))
+                (#\- (push (parse-list stream) result))
+                (#\* (push (parse-bold stream) result))
+                (#\[ (push (parse-link stream) result))
+-               (otherwise (unread-char char stream)
+-                          (push (read-line stream) result))))
++               (#\( (unread-char char stream)
++                    (push (read stream t nil t) result))
++               (otherwise
++                (push (parse-text stream char) result))))
+     (nreverse result)))
++
++(defun parse-text (stream initial-char)
++  "Parses plain text until a special character or the end of the string."
++  (with-output-to-string (s)
++    (write-char initial-char s)
++    (loop for char = (read-char stream nil nil)
++          while (and char (not (find char "#-*[\"")))
++          do (write-char char s)
++          finally (when char (unread-char char stream)))))
+ 
+ (defun parse-heading (stream)
+   "Parses a Markdown heading into a Lisp list."
+@@ -25,7 +38,7 @@
+           while (and char (char= char #\#))
+           do (incf level) (read-char stream))
+     (if (char= (peek-char nil stream nil nil) #\space)
+-        (read-char stream))
+-    `(:heading ,level ,(read-line stream))))
++        (progn (read-char stream) `(:heading ,level ,(read-line stream))))
++        (error "Invalid heading format"))))
+ 
+ (defun parse-list (stream)
+   "Parses a Markdown list into a Lisp list of lists."
+@@ -52,11 +65,13 @@
+ 
+ (defun markcl-macro (stream sub-char numarg)
+   "The reader macro function for #M\"...\"."
+-  (declare (ignore sub-char numarg))
+-  (if (char= (read-char stream) #\")
+-      (handler-case (parse-markdown-string stream)
+-        (error () (let ((str (with-output-to-string (s)
+-                               (loop for char = (read-char stream nil nil)
+-                                     while (and char (char/= char #\"))
+-                                     do (write-char char s))))))
+-                    str)))
+-      (error "Expected a string after #M")))
++  (declare (ignore sub-char numarg));
++  (if (char= (peek-char nil stream) #\")
++      (progn
++        (read-char stream) ; consume the opening quote
++        (handler-case `(concatenate 'string ,@(parse-markdown-string stream))
++          (end-of-file () (error "Unterminated #M\" string"))
++          (error (c)
++            (warn "Markdown parsing failed: ~a. Falling back to string." c)
++            (let ((str (with-output-to-string (s)
++                         (loop for char = (read-char stream nil nil)
++                               while (and char (char/= char #\"))
++                               do (write-char char s))))))
++              str))))
++      (error "Expected a string after #M")))
+ 
+ (defun enable-markcl ()
+   "Enables the #M reader macro."

@@ -1,0 +1,7 @@
+main.db
+sessions.db
+server.log
+backups/
+result/
+.DS_Store
+

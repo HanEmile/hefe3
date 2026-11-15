@@ -1,0 +1,144 @@
+--- a/lun2.lisp
++++ b/lun2.lisp
+@@ -60,14 +60,16 @@
+ 
+ (defun heading (level text)
+   "Formats a given heading level and text as html"
++  ;; Record in TOC BEFORE incrementing counter
++  (when *current-toc*
++    (let ((current-num (get-current-number level)))
++      (push (list :level level 
++                  :number current-num 
++                  :text text 
++                  :id (make-heading-id text))
++            *current-toc*)))
++  ;; Now get and increment the heading number
+   (let ((id (make-heading-id text))
+         (number (get-heading-number level)))
+-    (when *current-toc*
+-     (push (list
+-            :level level
+-            :number (get-current-number level)
+-            :text text
+-            :id (make-heading-id text))
+-         *current-toc*))
+     (format nil "<span id=\"~A\"></span>~%<h~A><a href=\"#~A\">~A ~A</a></h~A>~%" 
+             id level id number text level)))
+@@ -333,8 +335,9 @@
+    :title-contains - substring that must appear in title
+    :sort-by - :date, :title, or nil"
+   (let ((results nil))
+     (maphash (lambda (file-path metadata)
++               (when (pathnamep file-path)
+                (let ((matches t))
+                  ;; Check tags (all must match)
+                  (when tags
+@@ -356,7 +359,7 @@
+                        (setf matches nil))))
+                  
+                  (when matches
+-                   (push (list :file file-path :metadata metadata) results))))
++                   (push (list :file file-path :metadata metadata) results)))))
+              *lun-metadata-cache*)
+     
+     ;; Sort results
+@@ -420,36 +423,63 @@
+         (format s "~%  </li>~%")))
+     (format s "</ul>~%")))
+ 
++(defun extract-links-from-file (file-path)
++  "Extract all render-file-link calls from a file by parsing it."
++  (let ((links nil)
++        (*current-lun-file* file-path))
++    (enable-lun-syntax)
++    (unwind-protect
++         (with-open-file (stream file-path :direction :input)
++           (handler-case
++               (let ((forms (read-lun-content stream)))
++                 (labels ((extract-from-form (form)
++                            (cond
++                              ((not (consp form)) nil)
++                              ((eq (car form) 'render-file-link)
++                               ;; Found a link - the second element should be the file path
++                               ;; It might be a variable or literal pathname
++                               (let ((target-form (second form)))
++                                 (handler-case
++                                     (let ((target (eval target-form)))
++                                       (when (pathnamep target)
++                                         (push target links)))
++                                   (error () nil))))
++                              (t
++                               ;; Recursively search the form
++                               (dolist (subform form)
++                                 (when (consp subform)
++                                   (extract-from-form subform)))))))
++                   (dolist (form forms)
++                     (extract-from-form form))))
++             (error ())))
++      (disable-lun-syntax))
++    links))
++
+ (defun table-of-contents ()
+   "Generate the table of contents for the current file"
+   (let ((toc (gethash (cons *current-lun-file* :toc) *lun-metadata-cache*)))
+     (if toc
+         (with-output-to-string (s)
+           (format s "<nav class=\"toc\">~%<h3>Table Of Contents</h3>~%<ul>~%")
+-          (let ((prev-level 0))
++          (let ((prev-level 1))
+             (dolist (entry toc)
+               (let ((level (getf entry :level))
+                     (number (getf entry :number))
+                     (text (getf entry :text))
+                     (id (getf entry :id)))
++                ;; Handle nested lists
+                 (cond
+                   ((> level prev-level)
+-                   (loop repeat (- level prev-level) do (format s "<ul>~%")))
++                   (format s "<ul>~%"))
+                   ((< level prev-level)
+-                   (loop repeat (- prev-level level) do (format s "</ul>~%"))))
+-                  
+-                (format s "<li><a href=\"#~A\">~A ~A</li>~%" id number text)
++                   (format s "</ul></li>~%")))
++                (format s "<li><a href=\"#~A\">~A ~A</a></li>~%" id number text)
+                 (setf prev-level level)))
+-            (loop repeat prev-level do (format s "</ul>~%")))
+           (format s "</ul>~%</nav>~%"))
+-        "no toc")))
++        "")))
+             
+ (defun find-backlinks (file-path)
+   "Find all files that link to the given file"
+   (let ((backlinks nil))
+     (maphash (lambda (key metadata)
+                (declare (ignore metadata))
+                (when (pathnamep key)
+-                 (let ((*current-lun-file* key))
+-                   (enable-lun-syntax)
+-                   (unwind-protect
+-                        (with-open-file (stream key :direction :input)
+-                          (handler-case
+-                              (loop
+-                                (let ((form (read stream nil :eof)))
+-                                  (when (eql form :eof) (return))
+-                                  (when (and (listp form)
+-                                             (eq (car form) 'render-file-link)
+-                                             (equal (eval (second form)) file-path))
+-                                    (pushnew key backlinks))))
+-                            (error ())))
+-                        (disable-lun-syntax)))))
++                 (let ((links (extract-links-from-file key)))
++                   (when (member file-path links :test #'equal)
++                     (push key backlinks)))))
+              *lun-metadata-cache*)
+     backlinks))
+@@ -493,7 +523,7 @@
+                    (relative-url (relative-link *current-lun-file* link-file)))
+               (format s "<li><a href=\"~A\">~A</a></li>~%" relative-url title)))
+           (format s "</ul>~%</nav>~%"))
+-        "No backlinks")))
++        "")))
+ 
+ (defun set-template (template-function)
+   "Set the site template function, accepts (content metadata) and returns wrapped HTML string"

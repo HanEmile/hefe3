@@ -1,0 +1,16 @@
+(in-package :vokobe3)
+
+(IN-PACKAGE :VOKOBE3) 
+(DEFUN VOKOBE3::LIST-TAGS-INLINE ()
+  (LET ((VOKOBE3::ALL NIL))
+    (MAPHASH
+     (LAMBDA (VOKOBE3::K VOKOBE3::V)
+       (DECLARE (IGNORE VOKOBE3::K))
+       (SETF VOKOBE3::ALL
+               (UNION VOKOBE3::ALL VOKOBE3::V :TEST #'STRING-EQUAL)))
+     VOKOBE3::*TAGS*)
+    (IF VOKOBE3::ALL
+        (FORMAT NIL "~{~A~^, ~}" (SORT VOKOBE3::ALL #'STRING<))
+        "none"))) 
+(DEFUN VOKOBE3::LINK (VOKOBE3::NAME)
+  (FORMAT NIL "<a href='~A.html'>~A</a>" VOKOBE3::NAME VOKOBE3::NAME)) 

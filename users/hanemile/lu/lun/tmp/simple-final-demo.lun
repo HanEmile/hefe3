@@ -1,0 +1,31 @@
+;; simple-final-demo.lun - Simple working demonstration
+
+(require "markdown-macros.lun")
+
+(print "✨ Simple Markdown-as-Lun Demo")
+(print "")
+
+;; Create content using markdown-style functions
+(define my-content
+  (str-concat
+    (heading 1 "Welcome")
+    (par "This is markdown-style content in Lun!")
+    (heading 2 "Features")
+    (item "Easy to write")
+    (item "Valid Lun code")
+    (item "Generates HTML")
+    (par (str-concat 
+      "Visit "
+      (link "emile.space" "https://emile.space")
+      " for more!"))))
+
+;; Generate page
+(define page-html (simple-page "Demo" my-content))
+
+;; Write to file
+(write-file "simple-final-demo.html" page-html)
+
+(print "✓ Generated simple-final-demo.html")
+(print "")
+(print "Content preview:")
+(print my-content)

@@ -1,0 +1,9 @@
+{{define "diff"}}
+{{template "layout" .}}
+{{end}}
+
+{{define "content"}}
+<h1>Diff for {{.Title}}</h1>
+<p><a href="/{{.Title}}?history">Back to History</a></p>
+<pre>{{.Diff}}</pre>
+{{end}}

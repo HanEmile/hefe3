@@ -1,0 +1,33 @@
+;; wiki-debug.lun - Debug version
+
+(print "Testing gen-index...")
+
+(define make-style (lambda ()
+  "body{font-family:system-ui}"))
+
+(define make-nav (lambda ()
+  "<nav><a href='index.html'>Home</a></nav>"))
+
+(define make-page (lambda (title body)
+  (str-concat
+    "<!DOCTYPE html><html><head><title>" title 
+    "</title><style>" (make-style) "</style></head><body>"
+    (make-nav) "<div class='content'>" body 
+    "</div></body></html>")))
+
+(define gen-index (lambda ()
+  (print "Inside gen-index")
+  (define body "<h1>Welcome</h1>")
+  (print "Body created")
+  (define page (make-page "Home" body))
+  (print "Page created:")
+  (print page)
+  (define result (write-file "wiki/output/index.html" page))
+  (print "Write result:")
+  (print result)
+  result))
+
+(print "Calling gen-index...")
+(define result (gen-index))
+(print "Result:")
+(print result)

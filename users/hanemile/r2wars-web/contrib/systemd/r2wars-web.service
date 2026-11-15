@@ -1,0 +1,39 @@
+[Unit]
+Description=r2wars-web
+After=network.target
+
+[Service]
+Type=simple
+# CGO must stay disabled: r2pipe-go otherwise tries to link a native
+# libr_core, which this project doesn't use (it shells out to r2/rasm2).
+Environment=CGO_ENABLED=0
+EnvironmentFile=/etc/r2wars-web/env
+WorkingDirectory=/var/lib/r2wars-web
+ExecStart=/usr/local/bin/r2wars-web \
+	-host 127.0.0.1 \
+	-port 8080 \
+	-databasepath /var/lib/r2wars-web/main.db \
+	-sessiondbpath /var/lib/r2wars-web/sessions.db \
+	-logfilepath /var/lib/r2wars-web/server.log \
+	-templates /usr/local/share/r2wars-web/templates \
+	-backupdir /var/lib/r2wars-web/backups
+
+# Process-level auto-recovery: if the process ever does die (OOM, an
+# unrecovered panic in a goroutine outside the HTTP handler path, etc.),
+# systemd brings it back up rather than leaving the site down.
+Restart=on-failure
+RestartSec=2s
+
+# Give in-flight requests (including a running battle) time to finish inside
+# the graceful shutdown the app itself does on SIGTERM.
+TimeoutStopSec=35s
+
+# Basic sandboxing; relax ProtectSystem/ReadWritePaths as needed if
+# WorkingDirectory lives somewhere else.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/r2wars-web
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

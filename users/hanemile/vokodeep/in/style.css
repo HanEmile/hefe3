@@ -1,0 +1,120 @@
+* { word-wrap:break-word !important; font-family: monospace; margin: 0; padding: 0; }
+
+/* light/dark theme specific foo */
+@media (prefers-color-scheme: light) {
+    html { background: #fafafa; color: #040404; }
+    a:hover { color: #fafafa; background: #040404 }
+    a:not([href*="webring.xxiivv.com"]):hover, nav a:active { color: #fafafa; background: #040404 }
+    a { color: #040404; background: #fafafa; text-decoration: none;}
+    nav a:hover, a:active { color: #fafafa; background: #040404 }
+    nav { background: /* #ffa500 */ #eeeeee }
+    nav a { display:block; background: /* #ffa500 */ #eeeeee }
+    h1 { margin: 3ex 0 1ex 0; width: 100%; background-color: /* #ffa500 */ #eeeeee }
+    h2 { margin: 2ex 0 1ex 0; width: 100%; background-color: /* #ffa500 */ #eeeeee }
+    h3 { margin: 1ex 0 1ex 0; width: 100%; font-size: 1em; background-color: /* #ffa500 */ #eeeeee }
+    h4 { margin: 1ex 0 1ex 0; width: 100%; font-size: 1em; /*background-color: #fafafa*/}
+    h5 { margin: 1ex 0 1ex 0; width: 100%; font-size: 1em; /*background-color: #fafafa*/}
+    .code { border-left: 1px solid #040404; margin-left: 2ex; padding-left: 1ex; }
+}
+@media (prefers-color-scheme: dark) {
+    html { background: #040404; color: #dddddd; }
+    a:hover { color: #040404; background: #dddddd }
+    body nav a:not([href*="webring.xxiivv.com"]):hover, nav a:active { color: #dddddd; background: #040404 }
+    a { color: #dddddd; background: #040404; text-decoration: none; }
+    nav a:hover, a:active { color: #040404; background: #dddddd }
+    nav { background: /* #ffa500 */ #dddddd }
+    nav a { display:block; background: /* #ffa500 */ #dddddd }
+    h1 { margin: 3ex 0 1ex 0; width: 100%; background-color: /* #ffa500 */ #dddddd }
+    h2 { margin: 2ex 0 1ex 0; width: 100%; background-color: /* #ffa500 */ #dddddd }
+    h3 { margin: 1ex 0 1ex 0; width: 100%; font-size: 1em; background-color: /* #ffa500 */ #dddddd }
+    h4 { margin: 1ex 0 1ex 0; width: 100%; font-size: 1em; /*background-color: #dddddd*/}
+    h5 { margin: 1ex 0 1ex 0; width: 100%; font-size: 1em; /*background-color: #dddddd*/}
+    .code { border-left: 1px solid #dddddd; margin-left: 2ex;  padding-left: 1ex; }
+    .webring { -webkit-filter: invert(100%); filter: invert(100%); }
+}
+
+/* settings for mobile devices */
+@media only screen and (max-width: 768px) {
+  body { margin: 1ex; width: calc(100% - 2ex) !important; }
+  img { max-width: 100% !important; max-height: 500px; }
+}
+img { max-width: 100ex; max-height: 500px; }
+
+body { margin-left: auto; margin-right: auto; margin-top: 1ex; margin-bottom: 1ex; width: 100ex; }
+
+/* .webring { align: right; } */
+a .webring { float: right; width: 30px; max-height: 25px; }
+
+/* display local links using [] and external links using {} */
+body pre a:not([href*="webring.xxiivv.com"]):not([class*="local"]):before { content: "["; }
+body pre a:not([href*="webring.xxiivv.com"]):not([class*="local"]):after { content: "]"; }
+a[href*="//"]:not([href*="emile.space"]):not([class*="icon"]):before { content: '{'; }
+a[href*="//"]:not([href*="emile.space"]):not([class*="icon"]):after { content: '}'; }
+
+ul { list-style-type: none; }
+
+/* navigation bar magic */
+nav { margin: 1ex 0; } 
+nav * { color: #040404; }
+nav ul { list-style: none; position: relative; display: inline-block; }
+nav ul li { display:inline-block; }
+nav ul ul { display: none; position: absolute; border: 1px solid #040404; background-color: #ff0; }
+nav ul ul li { width: 100%; padding-right: 1ex; float:none; display:list-item; position: relative; }
+nav + ul li { display: inline-block;}
+
+/* only display the hover dropdown on non-mobile devices */
+@media only screen and (min-width: 768px) {
+  nav ul li:hover a + ul { display: inherit; white-space: nowrap; }
+}
+
+/* Settings for wide screen devices (showing the floating items left and right)*/
+@media only screen and (min-width: 1360px) {
+  .toc {
+    top: 1ex; float: right; margin: 1ex 105ex -280ex 1ex;
+    width: 40ex; height: 50vh;
+    position: sticky;
+    
+    /* ability to scroll, not showing the scrollbar as it's super ugly and almost never visible */
+    overflow-y: scroll; height: calc(100vh - 2ex);
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  }
+  .toc::-webkit-scrollbar { /* WebKit */ width: 0; height: 0; }
+
+  .backlinks {
+    height: auto;
+    top: 1ex; float: right; margin: 1ex -45ex 10ex 1ex; width: 40ex; position: sticky;
+  }
+}
+
+.toc { padding-bottom: 1ex; }
+.backlinks { padding-bottom: 1ex; }
+
+/* nav bar spacing char */
+nav ul li > a::after { content: " /"; }
+nav ul li > a:only-child::after { content: ""; }
+nav ul li:last-of-type a::after { content: ""; }
+
+h1 a, h2 a, h3 a { padding-right: 1ex; }
+
+/* add hypens, but not within code, as that's horrible when copying */
+pre { white-space: pre-wrap; hyphens: auto; }
+pre.code { white-space: pre-wrap; hyphens: none; }
+
+/* display the list of folders in the current one as a vertical list, if the
+ * .vert class is present */
+nav + ul.vert li { display: block; }
+
+.w-100 { width: 100%; }
+
+.lvl-1 { display: inline-block; text-indent: 5ex hanging; }
+.lvl-2 { display: inline-block; text-indent: 7ex hanging; }
+.lvl-3 { display: inline-block; text-indent: 9ex hanging; }
+.lvl-4 { display: inline-block; text-indent: 11ex hanging; }
+.lvl-5 { display: inline-block; text-indent: 13ex hanging; }
+
+h1 { display: inline-block; text-indent: 3.3ex hanging; }
+h2 { display: inline-block; text-indent: 5.5ex hanging; }
+h3 { display: inline-block; text-indent: 7.7ex hanging; }
+h4 { display: inline-block; text-indent: 9.9ex hanging; }
+h5 { display: inline-block; text-indent: 12.1ex hanging; }

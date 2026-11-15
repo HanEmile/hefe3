@@ -1,0 +1,47 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/amalthea-app",
+    "crates/amalthea-native",
+    "crates/amalthea-web",
+    "crates/amalthea-backend",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[workspace.dependencies]
+eframe = "0.31"
+egui = "0.31"
+egui_extras = { version = "0.31", features = ["image"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "tiff"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+reqwest = { version = "0.12", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+thiserror = "2"
+url = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+wgpu = "24"
+rustfft = "6"
+rayon = "1"
+
+[profile.release]
+opt-level = 2
+lto = true
+
+# Per-package opt-level overrides: workspace-local crates compile much
+# faster at opt=1 and runtime impact is negligible (the heavy lifting
+# happens inside cached deps — rustfft, image, egui, wgpu — which stay
+# at the workspace default opt=2).
+[profile.release.package.amalthea-app]
+opt-level = 1
+[profile.release.package.amalthea-native]
+opt-level = 1
+[profile.release.package.amalthea-backend]
+opt-level = 1

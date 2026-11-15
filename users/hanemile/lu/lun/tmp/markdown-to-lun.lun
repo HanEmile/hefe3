@@ -1,0 +1,83 @@
+;; markdown-to-lun.lun - Convert raw markdown to Lun/HTML (FIXED)
+;; Uses read-lines for proper line-by-line parsing
+
+(require "markdown-macros.lun")
+
+(print "Loading Markdown-to-Lun converter (v2)...")
+
+;; ============================================================================
+;; Markdown Parsing
+;; ============================================================================
+
+;; Count leading # characters
+(define count-hashes (lambda (line)
+  (count-hashes-helper line 0)))
+
+(define count-hashes-helper (lambda (line count)
+  (if (= line "")
+      count
+      (if (= (nth 0 (str-split line "")) "#")
+          (count-hashes-helper (str-replace line "#" "" ) (+ count 1))
+          count))))
+
+;; Remove leading hashes and space
+(define remove-hashes (lambda (line level)
+  (if (< level 1)
+      line
+      (remove-hashes (str-trim (str-replace line "#" "")) (- level 1)))))
+
+;; Parse heading line
+(define parse-md-heading (lambda (line)
+  (define level (count-hashes line))
+  (define text (str-trim (remove-hashes line level)))
+  (heading level text)))
+
+;; Parse paragraph
+(define parse-md-paragraph (lambda (line)
+  (par line)))
+
+;; Parse list item
+(define parse-md-list-item (lambda (line)
+  (define text (str-trim (str-replace line "- " "")))
+  (item text)))
+
+;; Check if line starts with string
+(define line-starts-with? (lambda (line prefix)
+  (if (= (str-trim line) "")
+      0
+      (= (nth 0 (str-split line "")) (nth 0 (str-split prefix ""))))))
+
+;; Parse single markdown line
+(define parse-md-line (lambda (line)
+  (if (= (str-trim line) "")
+      ""
+      (if (line-starts-with? line "#")
+          (parse-md-heading line)
+          (if (line-starts-with? line "-")
+              (parse-md-list-item line)
+              (parse-md-paragraph line))))))
+
+;; Parse all lines
+(define parse-md-lines (lambda (lines)
+  (if (empty? lines)
+      ""
+      (str-concat
+        (parse-md-line (first lines))
+        (parse-md-lines (rest lines))))))
+
+;; ============================================================================
+;; Main Functions
+;; ============================================================================
+
+;; Convert markdown file to HTML
+(define markdown-file-to-html (lambda (md-file title)
+  (define lines (read-lines md-file))
+  (define html-content (parse-md-lines lines))
+  (simple-page title html-content)))
+
+;; Convert markdown text to HTML (using lines)
+(define markdown-text-to-html (lambda (md-text)
+  (define lines (str-split md-text "\n"))
+  (parse-md-lines lines)))
+
+(print "✓ Markdown-to-Lun converter v2 loaded!")

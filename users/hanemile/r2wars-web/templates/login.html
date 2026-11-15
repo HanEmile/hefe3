@@ -1,0 +1,38 @@
+{{ define "login" }}
+
+{{ template "head" . }}
+<body>
+  {{ template "nav" . }}
+
+  <span id="login"></span>
+  <h1><a href="#login">Login</a></h1>
+
+  {{ if .err }}{{ .err }}{{ end }}
+  {{ if .logged_in }}
+  Already logged in! <a href="/">Return home</a>
+  {{ else }}
+  <p>No password needed - enter your email and we'll send you a link to log in.</p>
+  <form method="POST" action="/login">
+
+    <table>
+      <tr>
+        <td><label for="email">Email:</label></td>
+        <td><input class="border" type="email" id="email" name="email" autofocus></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td><input class="border" type="submit" value="Send login link"></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td>{{ .res }}</td>
+      </tr>
+    </table>
+  </form>
+  Not registered yet? <a href="/register">Register Now!</a>
+  {{ end }}
+
+
+</body>
+{{ template "footer" . }}
+{{ end }}

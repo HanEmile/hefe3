@@ -1,0 +1,9 @@
+(scan-directory-metadata "./")
+
+# All Events
+
+(query-and-list :tags (event) :sort-by :date)
+
+# Asia Events
+
+(query-and-list :tags (event asia) :sort-by :date :show-tags t)

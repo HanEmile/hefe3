@@ -1,0 +1,111 @@
+;; html-dsl.lun - HTML generation DSL for Lun
+;; Allows writing HTML as S-expressions: (html (head ...) (body ...))
+
+;; ============================================================================
+;; Core HTML Tag Functions
+;; ============================================================================
+
+;; Helper to convert attributes list to HTML string
+(define attrs-to-string (lambda (attrs)
+  (if (empty? attrs)
+      ""
+      (str-concat " " (first attrs) "='" (nth 1 attrs) "'" 
+                  (attrs-to-string (rest (rest attrs)))))))
+
+;; Generic tag function
+(define tag (lambda (name attrs content)
+  (if (empty? attrs)
+      (str-concat "<" name ">" content "</" name ">")
+      (str-concat "<" name (attrs-to-string attrs) ">" content "</" name ">"))))
+
+;; Self-closing tag
+(define void-tag (lambda (name attrs)
+  (if (empty? attrs)
+      (str-concat "<" name "/>")
+      (str-concat "<" name (attrs-to-string attrs) "/>"))))
+
+;; ============================================================================
+;; HTML Structure Tags
+;; ============================================================================
+
+(define html (lambda content (tag "html" (list) (join "" content))))
+(define head (lambda content (tag "head" (list) (join "" content))))
+(define body (lambda content (tag "body" (list) (join "" content))))
+(define title (lambda (text) (tag "title" (list) text)))
+
+;; ============================================================================
+;; Content Tags
+;; ============================================================================
+
+(define h1 (lambda (text) (tag "h1" (list) text)))
+(define h2 (lambda (text) (tag "h2" (list) text)))
+(define h3 (lambda (text) (tag "h3" (list) text)))
+(define h4 (lambda (text) (tag "h4" (list) text)))
+(define h5 (lambda (text) (tag "h5" (list) text)))
+(define h6 (lambda (text) (tag "h6" (list) text)))
+
+(define p (lambda (text) (tag "p" (list) text)))
+(define div (lambda content (tag "div" (list) (join "" content))))
+(define span (lambda (text) (tag "span" (list) text)))
+
+(define a (lambda (href text) (tag "a" (list "href" href) text)))
+(define strong (lambda (text) (tag "strong" (list) text)))
+(define em (lambda (text) (tag "em" (list) text)))
+(define code (lambda (text) (tag "code" (list) text)))
+
+;; ============================================================================
+;; List Tags
+;; ============================================================================
+
+(define ul (lambda content (tag "ul" (list) (join "" content))))
+(define ol (lambda content (tag "ol" (list) (join "" content))))
+(define li (lambda (text) (tag "li" (list) text)))
+
+;; ============================================================================
+;; Structural Tags
+;; ============================================================================
+
+(define nav (lambda content (tag "nav" (list) (join "" content))))
+(define header (lambda content (tag "header" (list) (join "" content))))
+(define footer (lambda content (tag "footer" (list) (join "" content))))
+(define section (lambda content (tag "section" (list) (join "" content))))
+(define article (lambda content (tag "article" (list) (join "" content))))
+
+;; ============================================================================
+;; Void/Self-closing Tags
+;; ============================================================================
+
+(define br (lambda () (void-tag "br" (list))))
+(define hr (lambda () (void-tag "hr" (list))))
+(define img (lambda (src alt) (void-tag "img" (list "src" src "alt" alt))))
+
+;; ============================================================================
+;; Style Tag
+;; ============================================================================
+
+(define style (lambda (css) (tag "style" (list) css)))
+
+;; ============================================================================
+;; Meta Tags
+;; ============================================================================
+
+(define meta-charset (lambda (charset) (void-tag "meta" (list "charset" charset))))
+(define meta-viewport (lambda () 
+  (void-tag "meta" (list "name" "viewport" "content" "width=device-width, initial-scale=1.0"))))
+
+;; ============================================================================
+;; Complete Document Helper
+;; ============================================================================
+
+(define html-doc (lambda (title-text head-content body-content)
+  (str-concat
+    "<!DOCTYPE html>"
+    (html
+      (head
+        (meta-charset "UTF-8")
+        (meta-viewport)
+        (title title-text)
+        head-content)
+      (body body-content)))))
+
+(print "HTML DSL loaded!")

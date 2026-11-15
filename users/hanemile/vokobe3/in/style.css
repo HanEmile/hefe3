@@ -1,0 +1,58 @@
+* { word-wrap:break-word !important; font-family: monospace; margin: 0; padding: 0; }
+ul { list-style-type: none; }
+body { margin-left: auto; margin-right: auto; margin-top: 1ex; margin-bottom: 1ex; width: 100ex; line-height: 1.5; }
+header { margin-bottom: 3ex; border-bottom: 1px solid; padding-bottom: 1ex; }
+footer { margin-top: 5ex; padding-top: 1ex; border-top: 1px dashed; font-size: 0.9em; }
+
+/* Tables & Code */
+table { border-collapse: collapse; margin: 2ex auto; width: 100%; }
+td, th { padding: 0 1ex; text-align: center; }
+pre.code { white-space: pre-wrap; hyphens: none; margin: 2ex 0; border-left: 1px solid; padding-left: 2ex; }
+
+/* Typography & Headings */
+h1, h2, h3 { width: 100%; display: inline-block; padding: 0.5ex 0; }
+h1 { margin: 3ex 0 1ex 0; text-indent: 3.3ex hanging; }
+h2 { margin: 2ex 0 1ex 0; text-indent: 5.5ex hanging; }
+h3 { margin: 1ex 0 1ex 0; text-indent: 7.7ex hanging; font-size: 1em; }
+
+/* Links */
+a { text-decoration: none; }
+a:hover { box-sizing: border-box; box-shadow: inset 0px 0px 0px 1px; }
+
+/* Brackets for links like the provided CSS */
+main a:not(.tag):before { content: '['; }
+main a:not(.tag):after { content: ']'; }
+
+/* Floating TOC & Backlinks for screens > 1360px */
+@media only screen and (min-width: 1360px) {
+ .toc, .backlinks {
+   top: 1ex; float: right; width: 40ex; position: sticky;
+   overflow-y: scroll; scrollbar-width: none; -ms-overflow-style: none;
+ }
+ .toc { margin: 1ex 105ex -280ex 1ex; height: 45vh; }
+ .backlinks { margin: 1ex -45ex 10ex 1ex; height: 45vh; }
+ .toc::-webkit-scrollbar, .backlinks::-webkit-scrollbar { width: 0; height: 0; }
+}
+
+/* Themes */
+@media (prefers-color-scheme: light) {
+ html { background: #ffffff; color: #040404; }
+ a { color: #040404; }
+ a:hover, :target a { color: #ffffff; background: #040404; }
+ h1, h2, h3 { background-color: #eeeeee; }
+ .code, table, th, td { border-color: #040404; }
+}
+@media (prefers-color-scheme: dark) {
+ html { background: #040404; color: #dddddd; }
+ a { color: #dddddd; }
+ a:hover, :target a { color: #040404; background: #dddddd; }
+ h1, h2, h3 { background-color: #222222; }
+ .code, table, th, td { border-color: #dddddd; }
+}
+
+/* Mobile */
+@media only screen and (max-width: 768px) {
+ body { margin: 1ex; width: calc(100% - 2ex) !important; }
+ .toc, .backlinks { float: none; width: 100%; position: static; margin: 2ex 0; }
+}
+

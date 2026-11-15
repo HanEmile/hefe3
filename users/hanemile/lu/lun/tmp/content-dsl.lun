@@ -1,0 +1,79 @@
+;; content-dsl.lun - Combined HTML + Markdown DSL
+;; Allows writing content in both S-expression and markdown-like syntax
+
+(require "html-dsl.lun")
+
+;; ============================================================================
+;; Content DSL - Markdown-like functions that generate HTML
+;; ============================================================================
+
+;; Heading functions
+(define heading (lambda (level text)
+  (if (= level 1) (h1 text)
+  (if (= level 2) (h2 text)
+  (if (= level 3) (h3 text)
+  (if (= level 4) (h4 text)
+  (if (= level 5) (h5 text)
+  (if (= level 6) (h6 text)
+      (h1 text)))))))))
+
+;; Paragraph
+(define paragraph (lambda (text) (p text)))
+
+;; List items
+(define item (lambda (text) (li text)))
+
+;; Unordered list
+(define unordered-list (lambda items (ul (join "" items))))
+
+;; Ordered list  
+(define ordered-list (lambda items (ol (join "" items))))
+
+;; Link
+(define link (lambda (url text) (a url text)))
+
+;; Bold
+(define bold (lambda (text) (strong text)))
+
+;; Italic
+(define italic (lambda (text) (em text)))
+
+;; Inline code
+(define inline-code (lambda (text) (code text)))
+
+;; Section with heading and content
+(define content-section (lambda (title content)
+  (section (str-concat (h2 title) content))))
+
+;; ============================================================================
+;; Page Template DSL
+;; ============================================================================
+
+(define page (lambda (title-text css-content body-content)
+  (html-doc title-text (style css-content) body-content)))
+
+;; Simple page with default styling
+(define simple-page (lambda (title-text body-content)
+  (page title-text
+    "body{font-family:system-ui;max-width:800px;margin:40px auto;padding:20px;line-height:1.6}h1{color:#2c3e50;border-bottom:3px solid #3498db}h2{color:#34495e;margin-top:30px}a{color:#3498db;text-decoration:none}a:hover{text-decoration:underline}code{background:#f4f4f4;padding:2px 6px;border-radius:3px}"
+    body-content)))
+
+;; ============================================================================
+;; Convenience Macros
+;; ============================================================================
+
+;; Create a blog post structure
+(define blog-post (lambda (title date author content)
+  (article
+    (h1 title)
+    (p (str-concat "By " author " on " date))
+    (hr)
+    content)))
+
+;; Create a card
+(define card (lambda (title content)
+  (div
+    (h3 title)
+    (p content))))
+
+(print "Content DSL loaded!")

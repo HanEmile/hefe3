@@ -1,0 +1,21 @@
+version: "2"
+sql:
+  - engine: "sqlite"
+    queries: "sql/queries"
+    schema: "sql/schema/sqlite.sql"
+    gen:
+      go:
+        package: "sqlitedb"
+        out: "internal/storage/sqlite/queries"
+        emit_json_tags: true
+        emit_empty_slices: true
+  # PostgreSQL support will be added later
+  # - engine: "postgresql"
+  #   queries: "sql/queries"
+  #   schema: "sql/schema/postgres.sql"
+  #   gen:
+  #     go:
+  #       package: "pgdb"
+  #       out: "internal/storage/postgres/queries"
+  #       emit_json_tags: true
+  #       emit_empty_slices: true

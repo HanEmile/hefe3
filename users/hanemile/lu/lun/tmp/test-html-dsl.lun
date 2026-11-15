@@ -1,0 +1,32 @@
+;; test-html-dsl.lun - Test the HTML DSL
+
+(require "html-dsl.lun")
+
+(print "Testing basic tags...")
+
+(define test1 (h1 "Hello World"))
+(print test1)
+
+(define test2 (p "This is a paragraph"))
+(print test2)
+
+(define test3 (div (h1 "Title") (p "Content")))
+(print test3)
+
+(define test4 (ul (li "Item 1") (li "Item 2") (li "Item 3")))
+(print test4)
+
+(print "Testing complete document...")
+
+(define doc (html-doc 
+  "Test Page"
+  (style "body{font-family:sans-serif;max-width:800px;margin:40px auto}")
+  (str-concat
+    (h1 "Welcome")
+    (p "This is a test page")
+    (ul (li "First") (li "Second") (li "Third")))))
+
+(print doc)
+
+(write-file "test-dsl-output.html" doc)
+(print "Written to test-dsl-output.html")

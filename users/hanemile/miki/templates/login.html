@@ -1,0 +1,31 @@
+{{define "login"}}
+{{template "layout" .}}
+{{end}}
+
+{{define "content"}}
+<h1>Login</h1>
+{{if .Error}}
+<p class="error">{{.Error}}</p>
+{{end}}
+<form id="loginForm" action="/login" method="POST">
+    <label>Username: <input type="text" name="username" value="{{.Username}}" required></label><br><br>
+
+    {{if .ShowSSH}}
+    <div>
+        <p><strong>SSH Challenge:</strong></p>
+        <p>Run this command on the server:</p>
+        <textarea readonly style="width: 100%; height: 60px;">{{.SSHCommand}}</textarea>
+        <p>Then enter the 6-digit code below:</p>
+        <input type="hidden" name="action" value="verify_ssh">
+        <input type="hidden" name="token" value="{{.Token}}">
+        <label>Code: <input type="text" name="code" pattern="\d{6}" required placeholder="123456"></label>
+        <button type="submit">Verify & Login</button>
+    </div>
+    {{else}}
+    <div id="ssh-start">
+        <p>Enter your username to begin SSH-based authentication.</p>
+        <button type="submit" name="action" value="init_ssh">Start SSH Login</button>
+    </div>
+    {{end}}
+</form>
+{{end}}

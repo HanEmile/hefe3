@@ -1,0 +1,79 @@
+{{define "view_comment"}}
+{{template "layout" .}}
+{{end}}
+
+{{define "content"}}
+<div class="actions">
+    <ul>
+        <li><a href="/{{.PageTitle}}">Back to Page</a></li>
+        <li><a href="/comment?action=history&page={{.PageTitle}}&parent={{(index .Comments 0).ID}}">History</a></li>
+    </ul>
+</div>
+
+<h1>Comment Details</h1>
+
+<div class="comment-detail" style="border: 1px solid #ccc; padding: 20px; border-radius: 5px;">
+    {{with index .Comments 0}}
+    <div style="margin-bottom: 20px;">
+        <strong>Author:</strong> <a href="/{{.Author}}">{{.Author}}</a><br>
+        <strong>Date:</strong> {{.Date.Format "2006-01-02 15:04:05"}}<br>
+        <strong>Commit Hash:</strong> {{.Hash}}<br>
+        <strong>Status:</strong> {{if .IsDeleted}}<span style="color: red;">Deleted</span>{{else}}Active{{end}}<br>
+        <strong>Page:</strong> <a href="/{{.PageTitle}}">{{.PageTitle}}</a><br>
+        {{if ne .ParentID .PageTitle}}
+        <strong>Parent Comment:</strong> <a
+            href="/comment?action=view&page={{.PageTitle}}&parent={{.ParentID}}">{{.ParentID}}</a><br>
+        {{end}}
+    </div>
+
+    <hr>
+
+    <div class="comment-content" style="margin-top: 20px;">
+        {{if .IsDeleted}}
+        <em>[This comment has been deleted]</em>
+        {{else}}
+        {{.Content}}
+        {{end}}
+    </div>
+
+    <div style="margin-top: 20px;">
+        <h3>Git Metadata</h3>
+        <pre>Ref: {{.Hash}}
+Author: {{.Author}}
+Date: {{.Date}}
+        </pre>
+        {{if not .IsDeleted}}
+        <p>
+            <a href="/comment?action=edit&page={{.PageTitle}}&parent={{.ID}}" class="button">Edit Comment</a>
+        </p>
+        {{end}}
+
+        {{if $.Commits}}
+        <h3>History</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Attributes</th>
+                    <th>Message</th>
+                    <th>Author</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range $.Commits}}
+                <tr>
+                    <td><a
+                            href="/comment?action=diff&page={{$.PageTitle}}&parent={{(index $.Comments 0).ID}}&diff={{.Hash}}">{{printf
+                            "%.7s" .Hash}}</a></td>
+                    <td>{{.Message}}</td>
+                    <td>{{.Author}}</td>
+                    <td>{{.Date.Format "2006-01-02 15:04:05"}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{end}}
+    </div>
+    {{end}}
+</div>
+{{end}}

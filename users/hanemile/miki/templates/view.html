@@ -1,0 +1,134 @@
+{{define "view"}}
+{{template "layout" .}}
+{{end}}
+
+
+{{define "content"}}
+<div class="actions">
+    <ul>
+        <li><a href="/{{.Title}}?edit">Edit</a></li>
+        <li><a href="/{{.Title}}?history">History</a></li>
+        <li><a href="/{{.Title}}?refresh_cache">Refresh Cache</a></li>
+        {{if .IsAdmin}}
+        <li><a href="/{{.Title}}?delete">Delete</a></li>
+        {{end}}
+    </ul>
+</div>
+
+<h1>{{.Title}}</h1>
+
+{{if .TOC}}
+<div class="toc">
+    <strong>Table of Contents</strong>
+    <ul>
+        {{range .TOC}}
+        <li style="margin-left: {{.Level}}0px;">
+            <a href="#{{.ID}}">{{ .Number }} {{.Text}}</a>
+        </li>
+        {{end}}
+    </ul>
+</div>
+{{end}}
+
+{{if .Backlinks}}
+<div class="backlinks">
+    <strong>Backlinks</strong>
+    <ul>
+        {{range .Backlinks}}
+        <li style="margin-left: 10px;">
+            <a href="/{{.}}">{{.}}</a>
+        </li>
+        {{end}}
+    </ul>
+</div>
+{{end}}
+
+<div class="page-content">
+    {{.Body}}
+</div>
+
+{{if .Comments}}
+<div class="comments-sidebar">
+    <strong>Comments</strong>
+    <ul>
+        {{range .Comments}}
+        {{template "commentNodeSidebar" .}}
+        {{end}}
+    </ul>
+    <p><a href="/comment?page={{.Title}}&parent={{.Title}}">Add Comment</a></p>
+</div>
+{{end}}
+
+<div class="main-comments">
+    <h2>Comments</h2>
+    <p><a href="/comment?page={{.Title}}&parent={{.Title}}">Add Comment</a></p>
+    <ul>
+        {{range .Comments}}
+        {{template "commentNodeMain" dict "Comment" . "IsAdmin" $.IsAdmin}}
+        {{end}}
+    </ul>
+</div>
+{{end}}
+
+{{define "commentNodeSidebar"}}
+<li style="margin-left: 10px;">
+    <a href="#{{.Hash}}">{{.Author}}</a>
+    {{if .Children}}
+    <ul>
+        {{range .Children}}
+        {{template "commentNodeSidebar" .}}
+        {{end}}
+    </ul>
+    {{end}}
+</li>
+{{end}}
+
+{{define "commentNodeMain"}}
+<li style="margin-bottom: 10px;">
+    <span id="{{.Comment.Hash}}" style="scroll-margin-top: 60px; display: block;"></span>
+    <!-- Anchor with offset for headers if needed -->
+    <details {{if .Comment.IsDeleted}}{{else}}open{{end}}
+        style="background: {{if .Comment.IsDeleted}}rgba(255,0,0,0.05){{else}}rgba(255,255,255,0.05){{end}}; padding: 5px; border-radius: 0px; border: 1px solid rgba(0,0,0,0.1);">
+        <summary style="cursor: pointer; font-weight: bold;">
+            {{if .Comment.IsDeleted}}
+            <span style="font-style: italic;">[deleted]</span>
+            {{else}}
+            <a href="/{{.Comment.Author}}">{{.Comment.Author}}</a>
+            {{end}}
+            <span style="font-weight: normal; opacity: 0.7;">
+                ({{if .Comment.Date.IsZero}}unknown{{else}}{{.Comment.Date.Format "2006-01-02 15:04"}}{{end}})
+            </span>
+
+            <span style="font-weight: normal; margin-left: 20px; opacity: 0.9;">
+                {{if not .Comment.IsDeleted}}
+                <a href="/comment?page={{.Comment.PageTitle}}&parent={{.Comment.ID}}">Reply</a> &middot;
+                <a href="/comment?action=view&page={{.Comment.PageTitle}}&parent={{.Comment.ID}}">Details</a> &middot;
+                {{end}}
+                <a href="/comment?action=history&page={{.Comment.PageTitle}}&parent={{.Comment.ID}}">History</a>
+                {{if and .IsAdmin (not .Comment.IsDeleted)}}
+                &middot; <a href="/comment?action=delete&page={{.Comment.PageTitle}}&parent={{.Comment.ID}}"
+                    style="color: red;">Delete</a>
+                {{end}}
+            </span>
+        </summary>
+
+        <div style="margin-top: 10px; margin-left: 10px;">
+            <div style="margin-bottom: 5px;">
+                {{if .Comment.IsDeleted}}
+                <em style="opacity: 0.6;">[This comment has been deleted]</em>
+                {{else}}
+                {{.Comment.Content}}
+                {{end}}
+            </div>
+
+            {{if .Comment.Children}}
+            <ul style="margin-left: 10px; border-left: 2px solid rgba(0,0,0,0.1); padding-left: 10px;">
+                {{range .Comment.Children}}
+                {{template "commentNodeMain" dict "Comment" . "IsAdmin" $.IsAdmin}}
+                {{end}}
+            </ul>
+            {{end}}
+        </div>
+    </details>
+</li>
+{{end}}

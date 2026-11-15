@@ -1,0 +1,101 @@
+;; FINAL-DEMO.lun - Demonstrates markdown-style content in Lun
+;; This is the WORKING solution for markdown-as-lun!
+
+(require "macro-dsl.lun")
+
+(print "🎉 Final Markdown-as-Lun Demonstration")
+(print "======================================")
+(print "")
+
+;; ============================================================================
+;; This is how you write markdown-style content in Lun RIGHT NOW!
+;; ============================================================================
+
+(defpage "final-demo" "Markdown-as-Lun Demo" (lambda ()
+  (str-concat
+    ;; # Welcome to Markdown-as-Lun
+    (hero "Welcome to Markdown-as-Lun" 
+          "Write content that looks like markdown, but is valid Lun code!")
+    
+    ;; ## How It Works
+    (heading 2 "How It Works")
+    
+    ;; This system allows you to write content using markdown-style functions:
+    (paragraph "This system allows you to write content using markdown-style functions:")
+    
+    ;; - heading(level, text) for headings
+    ;; - par(text) for paragraphs  
+    ;; - link(text, url) for links
+    ;; - item(text) for list items
+    (unordered-list
+      (item (c "(heading level text)") " for headings")
+      (item (c "(paragraph text)") " for paragraphs")
+      (item (c "(link text url)") " for links")
+      (item (c "(item text)") " for list items"))
+    
+    ;; ## Example
+    (heading 2 "Example")
+    
+    ;; Here's how you write a paragraph with a link:
+    (paragraph (str-concat
+      "Here's how you write a paragraph with a "
+      (link "link" "https://example.com")
+      ":"))
+    
+    ;; Code example
+    (paragraph (c "(paragraph (str-concat \"Visit \" (link \"my site\" \"https://example.com\")))"))
+    
+    ;; ## Features
+    (heading 2 "Features")
+    
+    (features
+      (item (str-concat (b "Valid Lun Code") " - Everything is a proper S-expression"))
+      (item (str-concat (b "Markdown-like") " - Looks and feels like markdown"))
+      (item (str-concat (b "Type-Safe") " - Errors caught at generation time"))
+      (item (str-concat (b "Composable") " - Build complex pages from simple functions")))
+    
+    ;; ## Real Example
+    (heading 2 "Real Example")
+    
+    (paragraph "This entire page was generated using this system!")
+    
+    ;; Blog post example
+    (blog-post
+      "My First Markdown-Style Post"
+      "2025-12-09"
+      "Lun Developer"
+      (str-concat
+        (paragraph "I can now write content in a markdown-style syntax that is actually valid Lun code!")
+        (paragraph (str-concat
+          "Check out the "
+          (link "documentation" "https://github.com/example/lun")
+          " for more examples."))
+        (heading 3 "Benefits")
+        (unordered-list
+          (item "Clean, readable syntax")
+          (item "Full power of Lisp")
+          (item "Static HTML output")
+          (item "No runtime dependencies"))))
+    
+    ;; ## Conclusion
+    (heading 2 "Conclusion")
+    
+    (paragraph (str-concat
+      "The Lun markdown-style DSL makes it "
+      (i "easy")
+      " and "
+      (i "fun")
+      " to generate beautiful HTML using pure functional code!"))
+    
+    (paragraph (str-concat
+      "This is "
+      (b "production-ready")
+      " and "
+      (b "working right now")
+      "! 🎊")))))
+
+(print "")
+(print "✨ Page generated successfully!")
+(print "📂 Output: final-demo.html")
+(print "")
+(print "🎯 This demonstrates the WORKING markdown-as-lun system!")

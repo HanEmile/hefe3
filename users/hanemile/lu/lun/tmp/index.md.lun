@@ -1,0 +1,44 @@
+;; index.md.lun - Markdown-style content that is valid Lun
+;; This demonstrates writing markdown as S-expressions
+
+(require "markdown-macros.lun")
+
+;; ============================================================================
+;; Page Content (Markdown-style S-expressions)
+;; ============================================================================
+
+(define index-content
+  (str-concat
+    ;; # Index
+    (heading 1 "Index")
+    
+    ;; This is the index page
+    (par "This is the index page")
+    
+    ;; This is the main page: [emile.space](https://emile.space)
+    (par (str-concat 
+      "This is the main page: "
+      (link "emile.space" "https://emile.space")))
+    
+    ;; ## Features
+    (heading 2 "Features")
+    
+    ;; - Easy to write
+    (item "Easy to write")
+    
+    ;; - Valid Lun code
+    (item "Valid Lun code")
+    
+    ;; - Compiles to HTML
+    (item "Compiles to HTML")))
+
+;; Generate the page
+(define page-html (simple-page "Index" index-content))
+
+;; Write to file
+(write-file "index-from-markdown.html" page-html)
+
+(print "✓ Generated index-from-markdown.html")
+(print "")
+(print "Content:")
+(print index-content)

@@ -1,0 +1,1877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Taint — &lt;all sinks&gt;</title>
+<style>
+:root{
+  --bg:#0d1117;--s:#161b22;--b:#30363d;--b2:#21262d;
+  --t:#c9d1d9;--m:#8b949e;--a:#58a6ff;
+  --red:#f85149;--orange:#e09b52;--yel:#e3b341;--grn:#3fb950;--purple:#bc8cff;
+  --hit:#1a2d1a;--hitborder:#3fb950;
+  --mono:"JetBrains Mono","Cascadia Code","Fira Code",ui-monospace,monospace;
+  --fs:12px;--lh:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-size:var(--fs);line-height:var(--lh)}
+body{background:var(--bg);color:var(--t);font-family:system-ui,sans-serif;
+  padding:0;min-height:100vh}
+
+/* ════ HEADER ════════════════════════════════════════════════════════════════*/
+.topbar{
+  background:linear-gradient(135deg,#0d1117 0%,#161b22 100%);
+  border-bottom:1px solid var(--b);
+  padding:10px 16px;position:sticky;top:0;z-index:100;
+}
+.topbar-inner{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.logo{font-size:14px;font-weight:800;letter-spacing:-.02em;
+  background:linear-gradient(90deg,var(--red),var(--orange),var(--yel));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  white-space:nowrap}
+.target-chip{background:var(--b2);border:1px solid var(--b);
+  border-radius:4px;padding:2px 8px;font-size:10px;color:var(--m);
+  font-family:var(--mono);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:300px}
+.stat-chips{display:flex;gap:6px;margin-left:auto}
+.stat-chip{padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;
+  letter-spacing:.04em}
+.stat-chip.full{background:rgba(248,81,73,.18);color:var(--red);
+  border:1px solid rgba(248,81,73,.35)}
+.stat-chip.partial{background:rgba(227,179,65,.15);color:var(--yel);
+  border:1px solid rgba(227,179,65,.3)}
+.stat-chip.none{background:var(--b2);color:var(--m);border:1px solid var(--b)}
+
+/* ════ FILTER BAR ════════════════════════════════════════════════════════════*/
+.filterbar{
+  background:var(--s);border-bottom:1px solid var(--b);
+  padding:6px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  font-size:11px;
+}
+.filterbar label{color:var(--m);white-space:nowrap}
+.filterbar select,
+.filterbar input[type=range]{
+  background:var(--b2);border:1px solid var(--b);color:var(--t);
+  border-radius:3px;padding:2px 6px;font-size:11px;height:22px;
+}
+.filterbar select:focus{outline:1px solid var(--a);border-color:var(--a)}
+.filter-sep{width:1px;background:var(--b);height:18px;flex-shrink:0}
+.sort-btn{background:var(--b2);border:1px solid var(--b);color:var(--t);
+  border-radius:3px;padding:2px 8px;font-size:10px;cursor:pointer;height:22px;
+  display:flex;align-items:center;gap:4px}
+.sort-btn:hover{border-color:var(--a);color:var(--a)}
+.sort-btn.active{border-color:var(--a);color:var(--a);background:rgba(88,166,255,.08)}
+.filter-count{color:var(--m);font-size:10px;margin-left:auto;white-space:nowrap}
+.clear-btn{background:transparent;border:1px solid var(--b);color:var(--m);
+  border-radius:3px;padding:2px 8px;font-size:10px;cursor:pointer;height:22px}
+.clear-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* ════ MAIN CONTENT ══════════════════════════════════════════════════════════*/
+.content{padding:10px 16px;max-width:1400px}
+
+/* ════ FINDING CARD ══════════════════════════════════════════════════════════*/
+.card{
+  border:1px solid var(--b);border-radius:6px;
+  margin-bottom:8px;overflow:hidden;
+  transition:box-shadow .15s;
+}
+.card:hover{box-shadow:0 0 0 1px var(--b2)}
+.card.full   {border-left:3px solid var(--red)}
+.card.partial{border-left:3px solid var(--yel)}
+.card.hidden {display:none!important}
+
+/* ── card header bar ── */
+.card-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--s);padding:5px 10px;border-bottom:1px solid var(--b);
+  gap:8px;flex-wrap:wrap;
+}
+.card-hdr-left{display:flex;align-items:center;gap:8px}
+.sev-pill{
+  font-size:9px;font-weight:800;padding:2px 6px;border-radius:3px;
+  text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;
+}
+.sev-pill.full   {background:var(--red);color:#fff}
+.sev-pill.partial{background:var(--yel);color:#000}
+.finding-num{font-size:11px;color:var(--m);font-weight:600}
+.cross-file{
+  font-size:9px;background:rgba(188,140,255,.12);border:1px solid rgba(188,140,255,.25);
+  color:var(--purple);border-radius:3px;padding:1px 6px;font-family:var(--mono);
+}
+.same-file{
+  font-size:9px;color:var(--m);font-family:var(--mono);
+  background:var(--b2);border:1px solid var(--b);border-radius:3px;padding:1px 6px;
+}
+.card-hdr-pills{display:flex;align-items:center;gap:5px}
+.meta-pill{
+  font-size:9px;padding:1px 7px;border-radius:10px;white-space:nowrap;cursor:default;
+}
+.steps-pill{background:rgba(88,166,255,.1);color:var(--a);border:1px solid rgba(88,166,255,.2)}
+.guards-pill-hdr{background:rgba(227,179,65,.1);color:var(--yel);border:1px solid rgba(227,179,65,.2)}
+.src-pill{background:rgba(63,185,80,.1);color:var(--grn);border:1px solid rgba(63,185,80,.2);
+  font-family:var(--mono)}
+
+/* ── quick flow ── */
+.quick-flow{
+  display:grid;grid-template-columns:1fr auto 1fr;
+  align-items:center;gap:0;
+  background:var(--bg);border-bottom:1px solid var(--b);
+  min-height:0;
+}
+.qf-from,.qf-to{
+  padding:5px 10px;overflow:hidden;min-width:0;
+}
+.qf-label{
+  display:inline-block;font-size:8px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.1em;
+  padding:1px 4px;border-radius:2px;margin-right:5px;
+  vertical-align:middle;
+}
+.qf-label.src{background:rgba(248,81,73,.2);color:var(--red)}
+.qf-label.snk{background:rgba(88,166,255,.15);color:var(--a)}
+.qf-loc{
+  font-family:var(--mono);color:var(--a);font-size:10px;
+  display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.qf-desc{
+  font-family:var(--mono);font-size:9px;color:var(--m);
+  display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  margin-top:1px;
+}
+.qf-arrow{
+  padding:0 12px;color:var(--m);font-size:10px;white-space:nowrap;
+  text-align:center;font-family:var(--mono);
+  border-left:1px solid var(--b);border-right:1px solid var(--b);
+  background:var(--s);min-height:100%;display:flex;align-items:center;
+}
+
+/* ── pipeline toggle ── */
+details.pipeline-wrap>summary.pipeline-toggle{
+  cursor:pointer;list-style:none;
+  padding:4px 10px;background:var(--b2);
+  color:var(--m);font-size:10px;user-select:none;
+  display:flex;align-items:center;gap:6px;
+  border-bottom:1px solid transparent;
+}
+details.pipeline-wrap>summary.pipeline-toggle::-webkit-details-marker{display:none}
+.tog-arrow{font-size:8px;transition:transform .15s;display:inline-block}
+details.pipeline-wrap[open]>summary.pipeline-toggle .tog-arrow{transform:rotate(90deg)}
+details.pipeline-wrap[open]>summary.pipeline-toggle{border-bottom-color:var(--b)}
+.tog-sub{color:var(--m);font-size:9px;opacity:.7}
+
+/* ── pipeline ── */
+.pipeline{
+  padding:10px;display:flex;flex-direction:column;
+  align-items:flex-start;gap:0;background:var(--bg);
+}
+.pipe-node{
+  width:100%;border:1px solid var(--b);border-radius:4px;
+  overflow:hidden;
+}
+.pipe-node.pn-source{border-left:3px solid var(--red)}
+.pipe-node.pn-sink  {border-left:3px solid var(--a)}
+.pipe-node.pn-step  {border-left:3px solid var(--b)}
+
+.pn-header{
+  display:flex;align-items:center;gap:6px;
+  padding:3px 8px;background:rgba(255,255,255,.03);
+  border-bottom:1px solid var(--b);
+}
+.pn-icon{font-size:8px}
+.pn-source .pn-icon{color:var(--red)}
+.pn-sink   .pn-icon{color:var(--a)}
+.pn-step   .pn-icon{color:var(--m)}
+.pn-kind{
+  font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.07em;white-space:nowrap;
+}
+.pn-source .pn-kind{color:var(--red)}
+.pn-sink   .pn-kind{color:var(--a)}
+.pn-step   .pn-kind{color:var(--m)}
+.pn-file{font-family:var(--mono);font-size:10px;color:var(--t);flex:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pn-loc{font-family:var(--mono);font-size:9px;color:var(--m)}
+.guards-pill{
+  font-size:8px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.25);
+  color:var(--yel);border-radius:8px;padding:0 5px;cursor:help;
+}
+
+/* ── node details ── */
+details.pn-details>summary.pn-desc{
+  cursor:pointer;list-style:none;
+  padding:3px 8px;font-family:var(--mono);font-size:10px;
+  color:var(--t);user-select:none;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  display:flex;align-items:center;gap:4px;
+}
+details.pn-details>summary.pn-desc::-webkit-details-marker{display:none}
+details.pn-details>summary.pn-desc::before{
+  content:"▶";font-size:7px;transition:transform .1s;flex-shrink:0;color:var(--m);
+}
+details.pn-details[open]>summary.pn-desc::before{transform:rotate(90deg)}
+
+/* guards inside node */
+.node-guards{padding:4px 8px 0;}
+.guard-item{
+  font-family:var(--mono);font-size:9px;color:var(--yel);
+  padding:1px 0;padding-left:12px;position:relative;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.guard-item::before{content:"if";position:absolute;left:0;color:var(--m)}
+
+/* code in nodes */
+pre.code{
+  margin:4px 0 0;padding:4px 8px;
+  background:var(--bg);font-family:var(--mono);
+  font-size:11px;line-height:16px;
+  overflow-x:auto;border-top:1px solid var(--b);
+  tab-size:4;
+}
+.ln{display:inline-block;width:32px;color:var(--m);
+  user-select:none;text-align:right;margin-right:8px}
+.cl{display:block;height:16px;line-height:16px;
+  white-space:pre;overflow:hidden;text-overflow:ellipsis}
+.cl.hit{background:var(--hit);border-left:2px solid var(--hitborder);
+  margin-left:-2px;padding-left:2px;color:#acf2a0;height:16px;line-height:16px}
+
+/* ── pipe arrow connector ── */
+.pipe-arrow{
+  align-self:flex-start;margin-left:16px;
+  font-size:12px;color:var(--b);padding:1px 0;
+  line-height:14px;user-select:none;
+}
+
+.group-header{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 10px 3px;margin-top:8px;
+  border-bottom:1px solid var(--b);
+  font-size:10px;font-weight:700;color:var(--a);
+  letter-spacing:.04em;text-transform:uppercase;
+}
+.gh-count{background:rgba(88,166,255,.12);border:1px solid rgba(88,166,255,.2);
+  color:var(--a);border-radius:8px;padding:0 6px;font-size:9px}
+
+footer{padding:10px 16px 20px;color:var(--m);font-size:10px;
+  border-top:1px solid var(--b);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="logo">⚡ TAINT</span>
+    <span class="target-chip">target: &lt;all sinks&gt;</span>
+    <div class="stat-chips">
+      <span class="stat-chip full">19 FULL</span>
+      <span class="stat-chip partial">0 PARTIAL</span>
+      <span class="stat-chip none">19 total</span>
+    </div>
+  </div>
+</div>
+
+<div class="filterbar">
+  <input type="search" id="fText" placeholder="Search…" oninput="applyFilters()"
+    style="background:var(--b2);border:1px solid var(--b);color:var(--t);
+      border-radius:3px;padding:2px 8px;font-size:11px;height:22px;width:160px">
+
+  <div class="filter-sep"></div>
+  <label>Sev</label>
+  <select id="fSev" onchange="applyFilters()">
+    <option value="">all</option>
+    <option value="full">FULL</option>
+    <option value="partial">PARTIAL</option>
+  </select>
+
+  <div class="filter-sep"></div>
+  <label>Source fn</label>
+  <select id="fSrc" onchange="applyFilters()">
+    <option value="">any</option>
+    <option value="(result)  ← body(7)">(result)  ← body(7)</option><option value="(result)  ← getenv(&quot;AUDIO_FLIP_LEFT&quot;)">(result)  ← getenv(&quot;AUDIO_FLIP_LEFT&quot;)</option><option value="(result)  ← getenv(&quot;FRAMEBUFFER&quot;)">(result)  ← getenv(&quot;FRAMEBUFFER&quot;)</option><option value="(result)  ← getenv(&quot;HOME&quot;)">(result)  ← getenv(&quot;HOME&quot;)</option><option value="buffer  ← read(fd, buffer, SIZE)  [fills: buffer]">buffer  ← read(fd, buffer, SIZE)  [fills: buffer]</option><option value="coding  ← sscanf(buffer, &quot;%*s %*s %31s&quot;, coding)  [fills: coding]">coding  ← sscanf(buffer, &quot;%*s %*s %31s&quot;, coding)  [fills: coding]</option><option value="cols  ← sscanf(buf, &quot;%dx%d+%dx%d/%31[^=]=%127s&quot;, &amp;cols, &amp;rows, &amp;anchor_x, &amp;anchor_y, shape_str, shape_filename)  [fills: cols]">cols  ← sscanf(buf, &quot;%dx%d+%dx%d/%31[^=]=%127s&quot;, &amp;cols, &amp;rows, &amp;anchor_x, &amp;anchor_y, shape_str, shape_filename)  [fills: cols]</option><option value="format  ← sscanf(buffer, &quot;%*s %*s %31s&quot;, format)  [fills: format]">format  ← sscanf(buffer, &quot;%*s %*s %31s&quot;, format)  [fills: format]</option><option value="line  ← read_line(&amp;line, s-&gt;pb)  [fills: line]">line  ← read_line(&amp;line, s-&gt;pb)  [fills: line]</option><option value="raten  ← sscanf(tokstart, &quot;%d:%d&quot;, &amp;raten, &amp;rated)  [fills: raten]">raten  ← sscanf(tokstart, &quot;%d:%d&quot;, &amp;raten, &amp;rated)  [fills: raten]</option><option value="s  ← sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].delay)  [fills: s]">s  ← sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].delay)  [fills: s]</option><option value="s  ← sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].transfer_fn.curve_dB)  [fills: s]">s  ← sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].transfer_fn.curve_dB)  [fills: s]</option><option value="s  ← sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].transfer_fn.gain_dB)  [fills: s]">s  ← sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].transfer_fn.gain_dB)  [fills: s]</option><option value="s  ← sscanf(tstr3, &quot;%lf&quot;, &amp;s-&gt;bands[i].attack_rate[k])  [fills: s]">s  ← sscanf(tstr3, &quot;%lf&quot;, &amp;s-&gt;bands[i].attack_rate[k])  [fills: s]</option><option value="s  ← sscanf(tstr3, &quot;%lf&quot;, &amp;s-&gt;bands[i].decay_rate[k])  [fills: s]">s  ← sscanf(tstr3, &quot;%lf&quot;, &amp;s-&gt;bands[i].decay_rate[k])  [fills: s]</option><option value="st  ← sscanf(buffer, &quot;%*s %*s %d&quot;, &amp;st-&gt;codecpar-&gt;bits_per_coded_sample)  [fills: st]">st  ← sscanf(buffer, &quot;%*s %*s %d&quot;, &amp;st-&gt;codecpar-&gt;bits_per_coded_sample)  [fills: st]</option><option value="st  ← sscanf(buffer, &quot;%*s %*s %d&quot;, &amp;st-&gt;codecpar-&gt;sample_rate)  [fills: st]">st  ← sscanf(buffer, &quot;%*s %*s %d&quot;, &amp;st-&gt;codecpar-&gt;sample_rate)  [fills: st]</option><option value="st  ← sscanf(buffer, &quot;%*s %*s %u&quot;, &amp;st-&gt;codecpar-&gt;ch_layout.nb_channels)  [fills: st]">st  ← sscanf(buffer, &quot;%*s %*s %u&quot;, &amp;st-&gt;codecpar-&gt;ch_layout.nb_channels)  [fills: st]</option><option value="type_str  ← sscanf(args, &quot;%127[^|]|%d|%d|%lf|%lf&quot;, type_str, &amp;smooth-&gt;param1, &amp;smooth-&gt;param2, &amp;smooth-&gt;param3, &amp;smooth-&gt;param4)  [fills: type_str]">type_str  ← sscanf(args, &quot;%127[^|]|%d|%d|%lf|%lf&quot;, type_str, &amp;smooth-&gt;param1, &amp;smooth-&gt;param2, &amp;smooth-&gt;param3, &amp;smooth-&gt;param4)  [fills: type_str]</option>
+  </select>
+
+  <div class="filter-sep"></div>
+  <label>Min guards</label>
+  <input type="range" id="fGuards" min="0" max="20" value="0"
+    oninput="document.getElementById('guardVal').textContent=this.value;applyFilters()"
+    style="width:80px">
+  <span id="guardVal" style="color:var(--yel);font-size:10px;min-width:16px">0</span>
+
+  <div class="filter-sep"></div>
+  <label>Group</label>
+  <select id="fGroup" onchange="applyFilters()">
+    <option value="">none</option>
+    <option value="source">by source fn</option>
+    <option value="sinkfile">by sink file</option>
+    <option value="sev">by severity</option>
+  </select>
+
+  <div class="filter-sep"></div>
+  <label>Sort</label>
+  <button class="sort-btn active" id="sIdx"    onclick="sortBy('idx')">   # </button>
+  <button class="sort-btn"        id="sSteps"  onclick="sortBy('steps')"> steps </button>
+  <button class="sort-btn"        id="sGuards" onclick="sortBy('guards')">guards </button>
+  <button class="sort-btn"        id="sSev"    onclick="sortBy('sev')">   sev </button>
+
+  <div class="filter-sep"></div>
+  <button class="clear-btn" onclick="clearFilters()">✕ reset</button>
+  <span class="filter-count" id="fCount">19 finding(s)</span>
+</div>
+
+<div class="content" id="cardContainer">
+<div class="card full" id="c0"
+  data-sev="full"
+  data-source="(result)  ← body(7)"
+  data-steps="1"
+  data-guards="4"
+  data-srcfile="vp3.c"
+  data-sinkfile="vp3.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#0</span>
+      <span class="same-file">vp3.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">4&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← body(7)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavcodec/vp3.c:678:10</span>
+      <span class="qf-desc">(result)  ← body(7)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavcodec/vp3.c:678:10</span>
+      <span class="qf-desc">(result)  ← body(7)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">vp3.c</span>
+    <span class="pn-loc">:678</span>
+    <span class="guards-pill" title="4 guard(s)">4</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← body(7)</summary>
+    <div class="node-guards"><div class="guard-item">if ((bits = show_bits(gb, 9)) == 0x1ff)</div><div class="guard-item">if (v &gt; s-&gt;yuv_macroblock_count)</div><div class="guard-item">if (bits &lt; 0x100)</div><div class="guard-item">if (bits &lt; thresh(0))</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 675</span>      else_if(4)</div><div class="cl"><span class="ln"> 676</span>      else_if(5)</div><div class="cl"><span class="ln"> 677</span>      else_if(6)</div><div class="cl hit"><span class="ln"> 678</span>      else body(7)</div><div class="cl"><span class="ln"> 679</span>  #undef body</div><div class="cl"><span class="ln"> 680</span>  #undef thresh</div><div class="cl"><span class="ln"> 681</span>  #undef else_if</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c1"
+  data-sev="full"
+  data-source="(result)  ← getenv(&quot;FRAMEBUFFER&quot;)"
+  data-steps="1"
+  data-guards="0"
+  data-srcfile="fbdev_common.c"
+  data-sinkfile="fbdev_common.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#1</span>
+      <span class="same-file">fbdev_common.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← getenv(&quot;FRAMEBUFFER&quot;)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavdevice/fbdev_common.c:68:23</span>
+      <span class="qf-desc">(result)  ← getenv(&quot;FRAMEBUFFER&quot;)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavdevice/fbdev_common.c:68:23</span>
+      <span class="qf-desc">(result)  ← getenv(&quot;FRAMEBUFFER&quot;)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">fbdev_common.c</span>
+    <span class="pn-loc">:68</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← getenv(&quot;FRAMEBUFFER&quot;)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">  65</span>  </div><div class="cl"><span class="ln">  66</span>  const char *ff_fbdev_default_device(void)</div><div class="cl"><span class="ln">  67</span>  {</div><div class="cl hit"><span class="ln">  68</span>      const char *dev = getenv(&quot;FRAMEBUFFER&quot;);</div><div class="cl"><span class="ln">  69</span>      if (!dev)</div><div class="cl"><span class="ln">  70</span>          dev = &quot;/dev/fb0&quot;;</div><div class="cl"><span class="ln">  71</span>      return dev;</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c2"
+  data-sev="full"
+  data-source="(result)  ← getenv(&quot;AUDIO_FLIP_LEFT&quot;)"
+  data-steps="1"
+  data-guards="0"
+  data-srcfile="oss.c"
+  data-sinkfile="oss.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#2</span>
+      <span class="same-file">oss.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← getenv(&quot;AUDIO_FLIP_LEFT&quot;)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavdevice/oss.c:46:18</span>
+      <span class="qf-desc">(result)  ← getenv(&quot;AUDIO_FLIP_LEFT&quot;)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavdevice/oss.c:46:18</span>
+      <span class="qf-desc">(result)  ← getenv(&quot;AUDIO_FLIP_LEFT&quot;)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">oss.c</span>
+    <span class="pn-loc">:46</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← getenv(&quot;AUDIO_FLIP_LEFT&quot;)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">  43</span>      OSSAudioData *s = s1-&gt;priv_data;</div><div class="cl"><span class="ln">  44</span>      int audio_fd;</div><div class="cl"><span class="ln">  45</span>      int tmp, err;</div><div class="cl hit"><span class="ln">  46</span>      char *flip = getenv(&quot;AUDIO_FLIP_LEFT&quot;);</div><div class="cl"><span class="ln">  47</span>  </div><div class="cl"><span class="ln">  48</span>      if (is_output)</div><div class="cl"><span class="ln">  49</span>          audio_fd = avpriv_open(audio_device, O_WRONLY);</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c3"
+  data-sev="full"
+  data-source="(result)  ← getenv(&quot;HOME&quot;)"
+  data-steps="1"
+  data-guards="2"
+  data-srcfile="af_ladspa.c"
+  data-sinkfile="af_ladspa.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#3</span>
+      <span class="same-file">af_ladspa.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">2&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← getenv(&quot;HOME&quot;)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavfilter/af_ladspa.c:507:33</span>
+      <span class="qf-desc">(result)  ← getenv(&quot;HOME&quot;)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavfilter/af_ladspa.c:507:33</span>
+      <span class="qf-desc">(result)  ← getenv(&quot;HOME&quot;)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">af_ladspa.c</span>
+    <span class="pn-loc">:507</span>
+    <span class="guards-pill" title="2 guard(s)">2</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← getenv(&quot;HOME&quot;)</summary>
+    <div class="node-guards"><div class="guard-item">if (!s-&gt;dl_name)</div><div class="guard-item">if (s-&gt;dl_name[0] == '/' || s-&gt;dl_name[0] == '.')</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 504</span>      } else {</div><div class="cl"><span class="ln"> 505</span>          // argument is a shared object name</div><div class="cl"><span class="ln"> 506</span>          char *paths = av_strdup(getenv(&quot;LADSPA_PATH&quot;));</div><div class="cl hit"><span class="ln"> 507</span>          const char *home_path = getenv(&quot;HOME&quot;);</div><div class="cl"><span class="ln"> 508</span>          const char *separator = &quot;:&quot;;</div><div class="cl"><span class="ln"> 509</span>  </div><div class="cl"><span class="ln"> 510</span>          if (paths) {</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c4"
+  data-sev="full"
+  data-source="s  ← sscanf(tstr3, &quot;%lf&quot;, &amp;s-&gt;bands[i].attack_rate[k])  [fills: s]"
+  data-steps="2"
+  data-guards="7"
+  data-srcfile="af_mcompand.c"
+  data-sinkfile="af_mcompand.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#4</span>
+      <span class="same-file">af_mcompand.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">7&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">s  ← sscanf(tstr3, &quot;%lf&quot;, &amp;s-&gt;bands[i].attack_rate[k])  [fills: s]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavfilter/af_mcompand.c:364:13</span>
+      <span class="qf-desc">s  ← sscanf(tstr3, &quot;%lf&quot;, &amp;s-&gt;bands[i].attack_rate[k])  [fills: s]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavfilter/af_mcompand.c:321:5</span>
+      <span class="qf-desc">count_items(s-&gt;args, &amp;nb_bands, '|')     (tainted arg: s)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">af_mcompand.c</span>
+    <span class="pn-loc">:364</span>
+    <span class="guards-pill" title="7 guard(s)">7</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">s  ← sscanf(tstr3, &quot;%lf&quot;, &amp;s-&gt;bands[i].attack_rate[k])  [fills: s]</summary>
+    <div class="node-guards"><div class="guard-item">if (!s-&gt;bands) [⚠ tainted]</div><div class="guard-item">if i &lt; nb_bands</div><div class="guard-item">if (!tstr)</div><div class="guard-item">if (!tstr2)</div><div class="guard-item">if (!nb_attacks || nb_attacks &amp; 1)</div><div class="guard-item">if (!s-&gt;bands[i].attack_rate || !s-&gt;bands[i].decay_rate || !s-&gt;bands[i].volume) [⚠ tainted]</div><div class="guard-item">if k &lt; FFMIN(nb_attacks / 2, outlink-&gt;ch_layout.nb_channels)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 361</span>              char *tstr3 = av_strtok(p3, &quot;,&quot;, &amp;saveptr3);</div><div class="cl"><span class="ln"> 362</span>  </div><div class="cl"><span class="ln"> 363</span>              p3 = NULL;</div><div class="cl hit"><span class="ln"> 364</span>              sscanf(tstr3, &quot;%lf&quot;, &amp;s-&gt;bands[i].attack_rate[k]);</div><div class="cl"><span class="ln"> 365</span>              tstr3 = av_strtok(p3, &quot;,&quot;, &amp;saveptr3);</div><div class="cl"><span class="ln"> 366</span>              sscanf(tstr3, &quot;%lf&quot;, &amp;s-&gt;bands[i].decay_rate[k]);</div><div class="cl"><span class="ln"> 367</span>  </div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">af_mcompand.c</span>
+    <span class="pn-loc">:321</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">count_items(s-&gt;args, &amp;nb_bands, '|')     (tainted arg: s)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln"> 318</span>      char *p = s-&gt;args, *saveptr = NULL;</div><div class="cl"><span class="ln"> 319</span>      int max_delay_size = 0;</div><div class="cl"><span class="ln"> 320</span>  </div><div class="cl hit"><span class="ln"> 321</span>      count_items(s-&gt;args, &amp;nb_bands, '|');</div><div class="cl"><span class="ln"> 322</span>      s-&gt;nb_bands = FFMAX(1, nb_bands);</div><div class="cl"><span class="ln"> 323</span>  </div><div class="cl"><span class="ln"> 324</span>      s-&gt;bands = av_calloc(nb_bands, sizeof(*s-&gt;bands));</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c5"
+  data-sev="full"
+  data-source="s  ← sscanf(tstr3, &quot;%lf&quot;, &amp;s-&gt;bands[i].decay_rate[k])  [fills: s]"
+  data-steps="2"
+  data-guards="7"
+  data-srcfile="af_mcompand.c"
+  data-sinkfile="af_mcompand.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#5</span>
+      <span class="same-file">af_mcompand.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">7&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">s  ← sscanf(tstr3, &quot;%lf&quot;, &amp;s-&gt;bands[i].decay_rate[k])  [fills: s]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavfilter/af_mcompand.c:366:13</span>
+      <span class="qf-desc">s  ← sscanf(tstr3, &quot;%lf&quot;, &amp;s-&gt;bands[i].decay_rate[k])  [fills: s]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavfilter/af_mcompand.c:321:5</span>
+      <span class="qf-desc">count_items(s-&gt;args, &amp;nb_bands, '|')     (tainted arg: s)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">af_mcompand.c</span>
+    <span class="pn-loc">:366</span>
+    <span class="guards-pill" title="7 guard(s)">7</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">s  ← sscanf(tstr3, &quot;%lf&quot;, &amp;s-&gt;bands[i].decay_rate[k])  [fills: s]</summary>
+    <div class="node-guards"><div class="guard-item">if (!s-&gt;bands) [⚠ tainted]</div><div class="guard-item">if i &lt; nb_bands</div><div class="guard-item">if (!tstr)</div><div class="guard-item">if (!tstr2)</div><div class="guard-item">if (!nb_attacks || nb_attacks &amp; 1)</div><div class="guard-item">if (!s-&gt;bands[i].attack_rate || !s-&gt;bands[i].decay_rate || !s-&gt;bands[i].volume) [⚠ tainted]</div><div class="guard-item">if k &lt; FFMIN(nb_attacks / 2, outlink-&gt;ch_layout.nb_channels)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 363</span>              p3 = NULL;</div><div class="cl"><span class="ln"> 364</span>              sscanf(tstr3, &quot;%lf&quot;, &amp;s-&gt;bands[i].attack_rate[k]);</div><div class="cl"><span class="ln"> 365</span>              tstr3 = av_strtok(p3, &quot;,&quot;, &amp;saveptr3);</div><div class="cl hit"><span class="ln"> 366</span>              sscanf(tstr3, &quot;%lf&quot;, &amp;s-&gt;bands[i].decay_rate[k]);</div><div class="cl"><span class="ln"> 367</span>  </div><div class="cl"><span class="ln"> 368</span>              if (s-&gt;bands[i].attack_rate[k] &gt; 1.0 / outlink-&gt;sample_rate) {</div><div class="cl"><span class="ln"> 369</span>                  s-&gt;bands[i].attack_rate[k] = 1.0 - exp(-1.0 / (outlink-&gt;sample_rate * s-&gt;bands[i].attack_rate[k]));</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">af_mcompand.c</span>
+    <span class="pn-loc">:321</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">count_items(s-&gt;args, &amp;nb_bands, '|')     (tainted arg: s)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln"> 318</span>      char *p = s-&gt;args, *saveptr = NULL;</div><div class="cl"><span class="ln"> 319</span>      int max_delay_size = 0;</div><div class="cl"><span class="ln"> 320</span>  </div><div class="cl hit"><span class="ln"> 321</span>      count_items(s-&gt;args, &amp;nb_bands, '|');</div><div class="cl"><span class="ln"> 322</span>      s-&gt;nb_bands = FFMAX(1, nb_bands);</div><div class="cl"><span class="ln"> 323</span>  </div><div class="cl"><span class="ln"> 324</span>      s-&gt;bands = av_calloc(nb_bands, sizeof(*s-&gt;bands));</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c6"
+  data-sev="full"
+  data-source="s  ← sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].transfer_fn.curve_dB)  [fills: s]"
+  data-steps="2"
+  data-guards="11"
+  data-srcfile="af_mcompand.c"
+  data-sinkfile="af_mcompand.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#6</span>
+      <span class="same-file">af_mcompand.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">11&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">s  ← sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].transfer_fn.curve_dB)  [fills: s]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavfilter/af_mcompand.c:391:9</span>
+      <span class="qf-desc">s  ← sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].transfer_fn.curve_dB)  [fills: s]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavfilter/af_mcompand.c:321:5</span>
+      <span class="qf-desc">count_items(s-&gt;args, &amp;nb_bands, '|')     (tainted arg: s)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">af_mcompand.c</span>
+    <span class="pn-loc">:391</span>
+    <span class="guards-pill" title="11 guard(s)">11</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">s  ← sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].transfer_fn.curve_dB)  [fills: s]</summary>
+    <div class="node-guards"><div class="guard-item">if (!s-&gt;bands) [⚠ tainted]</div><div class="guard-item">if i &lt; nb_bands</div><div class="guard-item">if (!tstr)</div><div class="guard-item">if (!tstr2)</div><div class="guard-item">if (!nb_attacks || nb_attacks &amp; 1)</div><div class="guard-item">if (!s-&gt;bands[i].attack_rate || !s-&gt;bands[i].decay_rate || !s-&gt;bands[i].volume) [⚠ tainted]</div><div class="guard-item">if k &lt; FFMIN(nb_attacks / 2, outlink-&gt;ch_layout.nb_channels)</div><div class="guard-item">if (s-&gt;bands[i].attack_rate[k] &gt; 1.0 / outlink-&gt;sample_rate) [⚠ tainted]</div><div class="guard-item">if (s-&gt;bands[i].decay_rate[k] &gt; 1.0 / outlink-&gt;sample_rate) [⚠ tainted]</div><div class="guard-item">if ch &lt; outlink-&gt;ch_layout.nb_channels</div><div class="guard-item">if (!tstr2)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 388</span>              av_log(ctx, AV_LOG_ERROR, &quot;transfer function curve in dB must be set\n&quot;);</div><div class="cl"><span class="ln"> 389</span>              return AVERROR(EINVAL);</div><div class="cl"><span class="ln"> 390</span>          }</div><div class="cl hit"><span class="ln"> 391</span>          sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].transfer_fn.curve_dB);</div><div class="cl"><span class="ln"> 392</span>  </div><div class="cl"><span class="ln"> 393</span>          radius = s-&gt;bands[i].transfer_fn.curve_dB * M_LN10 / 20.0;</div><div class="cl"><span class="ln"> 394</span>  </div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">af_mcompand.c</span>
+    <span class="pn-loc">:321</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">count_items(s-&gt;args, &amp;nb_bands, '|')     (tainted arg: s)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln"> 318</span>      char *p = s-&gt;args, *saveptr = NULL;</div><div class="cl"><span class="ln"> 319</span>      int max_delay_size = 0;</div><div class="cl"><span class="ln"> 320</span>  </div><div class="cl hit"><span class="ln"> 321</span>      count_items(s-&gt;args, &amp;nb_bands, '|');</div><div class="cl"><span class="ln"> 322</span>      s-&gt;nb_bands = FFMAX(1, nb_bands);</div><div class="cl"><span class="ln"> 323</span>  </div><div class="cl"><span class="ln"> 324</span>      s-&gt;bands = av_calloc(nb_bands, sizeof(*s-&gt;bands));</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c7"
+  data-sev="full"
+  data-source="s  ← sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].delay)  [fills: s]"
+  data-steps="2"
+  data-guards="19"
+  data-srcfile="af_mcompand.c"
+  data-sinkfile="af_mcompand.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#7</span>
+      <span class="same-file">af_mcompand.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">19&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">s  ← sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].delay)  [fills: s]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavfilter/af_mcompand.c:434:13</span>
+      <span class="qf-desc">s  ← sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].delay)  [fills: s]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavfilter/af_mcompand.c:321:5</span>
+      <span class="qf-desc">count_items(s-&gt;args, &amp;nb_bands, '|')     (tainted arg: s)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">af_mcompand.c</span>
+    <span class="pn-loc">:434</span>
+    <span class="guards-pill" title="19 guard(s)">19</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">s  ← sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].delay)  [fills: s]</summary>
+    <div class="node-guards"><div class="guard-item">if (!s-&gt;bands) [⚠ tainted]</div><div class="guard-item">if i &lt; nb_bands</div><div class="guard-item">if (!tstr)</div><div class="guard-item">if (!tstr2)</div><div class="guard-item">if (!nb_attacks || nb_attacks &amp; 1)</div><div class="guard-item">if (!s-&gt;bands[i].attack_rate || !s-&gt;bands[i].decay_rate || !s-&gt;bands[i].volume) [⚠ tainted]</div><div class="guard-item">if k &lt; FFMIN(nb_attacks / 2, outlink-&gt;ch_layout.nb_channels)</div><div class="guard-item">if (s-&gt;bands[i].attack_rate[k] &gt; 1.0 / outlink-&gt;sample_rate) [⚠ tainted]</div><div class="guard-item">if (s-&gt;bands[i].decay_rate[k] &gt; 1.0 / outlink-&gt;sample_rate) [⚠ tainted]</div><div class="guard-item">if ch &lt; outlink-&gt;ch_layout.nb_channels</div><div class="guard-item">if (!tstr2)</div><div class="guard-item">if (!tstr2)</div><div class="guard-item">if (!s-&gt;bands[i].transfer_fn.segments) [⚠ tainted]</div><div class="guard-item">if (ret &lt; 0)</div><div class="guard-item">if (!tstr2)</div><div class="guard-item">if (s-&gt;bands[i].topfreq &lt; 0 || s-&gt;bands[i].topfreq &gt;= outlink-&gt;sample_rate / 2.0) [⚠ tainted]</div><div class="guard-item">if (s-&gt;bands[i].topfreq != 0) [⚠ tainted]</div><div class="guard-item">if (ret &lt; 0)</div><div class="guard-item">if (tstr2)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 431</span>  </div><div class="cl"><span class="ln"> 432</span>          tstr2 = av_strtok(p2, &quot; &quot;, &amp;saveptr2);</div><div class="cl"><span class="ln"> 433</span>          if (tstr2) {</div><div class="cl hit"><span class="ln"> 434</span>              sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].delay);</div><div class="cl"><span class="ln"> 435</span>              max_delay_size = FFMAX(max_delay_size, s-&gt;bands[i].delay * outlink-&gt;sample_rate);</div><div class="cl"><span class="ln"> 436</span>  </div><div class="cl"><span class="ln"> 437</span>              tstr2 = av_strtok(p2, &quot; &quot;, &amp;saveptr2);</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">af_mcompand.c</span>
+    <span class="pn-loc">:321</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">count_items(s-&gt;args, &amp;nb_bands, '|')     (tainted arg: s)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln"> 318</span>      char *p = s-&gt;args, *saveptr = NULL;</div><div class="cl"><span class="ln"> 319</span>      int max_delay_size = 0;</div><div class="cl"><span class="ln"> 320</span>  </div><div class="cl hit"><span class="ln"> 321</span>      count_items(s-&gt;args, &amp;nb_bands, '|');</div><div class="cl"><span class="ln"> 322</span>      s-&gt;nb_bands = FFMAX(1, nb_bands);</div><div class="cl"><span class="ln"> 323</span>  </div><div class="cl"><span class="ln"> 324</span>      s-&gt;bands = av_calloc(nb_bands, sizeof(*s-&gt;bands));</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c8"
+  data-sev="full"
+  data-source="s  ← sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].transfer_fn.gain_dB)  [fills: s]"
+  data-steps="2"
+  data-guards="22"
+  data-srcfile="af_mcompand.c"
+  data-sinkfile="af_mcompand.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#8</span>
+      <span class="same-file">af_mcompand.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">22&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">s  ← sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].transfer_fn.gain_dB)  [fills: s]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavfilter/af_mcompand.c:450:21</span>
+      <span class="qf-desc">s  ← sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].transfer_fn.gain_dB)  [fills: s]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavfilter/af_mcompand.c:321:5</span>
+      <span class="qf-desc">count_items(s-&gt;args, &amp;nb_bands, '|')     (tainted arg: s)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">af_mcompand.c</span>
+    <span class="pn-loc">:450</span>
+    <span class="guards-pill" title="22 guard(s)">22</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">s  ← sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].transfer_fn.gain_dB)  [fills: s]</summary>
+    <div class="node-guards"><div class="guard-item">if (!s-&gt;bands) [⚠ tainted]</div><div class="guard-item">if i &lt; nb_bands</div><div class="guard-item">if (!tstr)</div><div class="guard-item">if (!tstr2)</div><div class="guard-item">if (!nb_attacks || nb_attacks &amp; 1)</div><div class="guard-item">if (!s-&gt;bands[i].attack_rate || !s-&gt;bands[i].decay_rate || !s-&gt;bands[i].volume) [⚠ tainted]</div><div class="guard-item">if k &lt; FFMIN(nb_attacks / 2, outlink-&gt;ch_layout.nb_channels)</div><div class="guard-item">if (s-&gt;bands[i].attack_rate[k] &gt; 1.0 / outlink-&gt;sample_rate) [⚠ tainted]</div><div class="guard-item">if (s-&gt;bands[i].decay_rate[k] &gt; 1.0 / outlink-&gt;sample_rate) [⚠ tainted]</div><div class="guard-item">if ch &lt; outlink-&gt;ch_layout.nb_channels</div><div class="guard-item">if (!tstr2)</div><div class="guard-item">if (!tstr2)</div><div class="guard-item">if (!s-&gt;bands[i].transfer_fn.segments) [⚠ tainted]</div><div class="guard-item">if (ret &lt; 0)</div><div class="guard-item">if (!tstr2)</div><div class="guard-item">if (s-&gt;bands[i].topfreq &lt; 0 || s-&gt;bands[i].topfreq &gt;= outlink-&gt;sample_rate / 2.0) [⚠ tainted]</div><div class="guard-item">if (s-&gt;bands[i].topfreq != 0) [⚠ tainted]</div><div class="guard-item">if (ret &lt; 0)</div><div class="guard-item">if (tstr2)</div><div class="guard-item">if (tstr2)</div><div class="guard-item">if k &lt; outlink-&gt;ch_layout.nb_channels</div><div class="guard-item">if (tstr2)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 447</span>  </div><div class="cl"><span class="ln"> 448</span>                  tstr2 = av_strtok(p2, &quot; &quot;, &amp;saveptr2);</div><div class="cl"><span class="ln"> 449</span>                  if (tstr2) {</div><div class="cl hit"><span class="ln"> 450</span>                      sscanf(tstr2, &quot;%lf&quot;, &amp;s-&gt;bands[i].transfer_fn.gain_dB);</div><div class="cl"><span class="ln"> 451</span>                  }</div><div class="cl"><span class="ln"> 452</span>              }</div><div class="cl"><span class="ln"> 453</span>          }</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">af_mcompand.c</span>
+    <span class="pn-loc">:321</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">count_items(s-&gt;args, &amp;nb_bands, '|')     (tainted arg: s)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln"> 318</span>      char *p = s-&gt;args, *saveptr = NULL;</div><div class="cl"><span class="ln"> 319</span>      int max_delay_size = 0;</div><div class="cl"><span class="ln"> 320</span>  </div><div class="cl hit"><span class="ln"> 321</span>      count_items(s-&gt;args, &amp;nb_bands, '|');</div><div class="cl"><span class="ln"> 322</span>      s-&gt;nb_bands = FFMAX(1, nb_bands);</div><div class="cl"><span class="ln"> 323</span>  </div><div class="cl"><span class="ln"> 324</span>      s-&gt;bands = av_calloc(nb_bands, sizeof(*s-&gt;bands));</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c9"
+  data-sev="full"
+  data-source="type_str  ← sscanf(args, &quot;%127[^|]|%d|%d|%lf|%lf&quot;, type_str, &amp;smooth-&gt;param1, &amp;smooth-&gt;param2, &amp;smooth-&gt;param3, &amp;smooth-&gt;param4)  [fills: type_str]"
+  data-steps="2"
+  data-guards="7"
+  data-srcfile="vf_libopencv.c"
+  data-sinkfile="vf_libopencv.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#9</span>
+      <span class="same-file">vf_libopencv.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">7&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">type_str  ← sscanf(args, &quot;%127[^|]|%d|%d|%lf|%lf&quot;, type_str, &amp;smooth-&gt;param1, &amp;smooth-&gt;param2, &amp;smooth-&gt;param3, &amp;smooth-&gt;param4)  [fills: type_str]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavfilter/vf_libopencv.c:91:9</span>
+      <span class="qf-desc">type_str  ← sscanf(args, &quot;%127[^|]|%d|%d|%lf|%lf&quot;, type_str, &amp;smooth-&gt;param1, &amp;smooth-&gt;param2, &amp;smooth-&gt;param3, &amp;smooth-&gt;param4)  [fills: type_str]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavfilter/vf_libopencv.c:99:9</span>
+      <span class="qf-desc">av_log(ctx, AV_LOG_ERROR, &quot;Smoothing type '%s' unknown.\n&quot;, type_str)     (tainted arg: type_str)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">vf_libopencv.c</span>
+    <span class="pn-loc">:91</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">type_str  ← sscanf(args, &quot;%127[^|]|%d|%d|%lf|%lf&quot;, type_str, &amp;smooth-&gt;param1, &amp;smooth-&gt;param2, &amp;smooth-&gt;param3, &amp;smooth-&gt;param4)  [fills: type_str]</summary>
+    <div class="node-guards"><div class="guard-item">if (args)</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  88</span>      smooth-&gt;param4 = 0.0;</div><div class="cl"><span class="ln">  89</span>  </div><div class="cl"><span class="ln">  90</span>      if (args)</div><div class="cl hit"><span class="ln">  91</span>          sscanf(args, &quot;%127[^|]|%d|%d|%lf|%lf&quot;, type_str, &amp;smooth-&gt;param1, &amp;smooth-&gt;param2, &amp;smooth-&gt;param3, &amp;smooth-&gt;param4);</div><div class="cl"><span class="ln">  92</span>  </div><div class="cl"><span class="ln">  93</span>      if      (!strcmp(type_str, &quot;blur&quot;         )) smooth-&gt;type = CV_BLUR;</div><div class="cl"><span class="ln">  94</span>      else if (!strcmp(type_str, &quot;blur_no_scale&quot;)) smooth-&gt;type = CV_BLUR_NO_SCALE;</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">vf_libopencv.c</span>
+    <span class="pn-loc">:99</span>
+    <span class="guards-pill" title="6 guard(s)">6</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">av_log(ctx, AV_LOG_ERROR, &quot;Smoothing type '%s' unknown.\n&quot;, type_str)     (tainted arg: type_str)</summary>
+    <div class="node-guards"><div class="guard-item">if (args)</div><div class="guard-item">if (!strcmp(type_str, &quot;blur&quot;         )) [⚠ tainted]</div><div class="guard-item">if (!strcmp(type_str, &quot;blur_no_scale&quot;)) [⚠ tainted]</div><div class="guard-item">if (!strcmp(type_str, &quot;median&quot;       )) [⚠ tainted]</div><div class="guard-item">if (!strcmp(type_str, &quot;gaussian&quot;     )) [⚠ tainted]</div><div class="guard-item">if (!strcmp(type_str, &quot;bilateral&quot;    )) [⚠ tainted]</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  96</span>      else if (!strcmp(type_str, &quot;gaussian&quot;     )) smooth-&gt;type = CV_GAUSSIAN;</div><div class="cl"><span class="ln">  97</span>      else if (!strcmp(type_str, &quot;bilateral&quot;    )) smooth-&gt;type = CV_BILATERAL;</div><div class="cl"><span class="ln">  98</span>      else {</div><div class="cl hit"><span class="ln">  99</span>          av_log(ctx, AV_LOG_ERROR, &quot;Smoothing type '%s' unknown.\n&quot;, type_str);</div><div class="cl"><span class="ln"> 100</span>          return AVERROR(EINVAL);</div><div class="cl"><span class="ln"> 101</span>      }</div><div class="cl"><span class="ln"> 102</span>  </div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c10"
+  data-sev="full"
+  data-source="cols  ← sscanf(buf, &quot;%dx%d+%dx%d/%31[^=]=%127s&quot;, &amp;cols, &amp;rows, &amp;anchor_x, &amp;anchor_y, shape_str, shape_filename)  [fills: cols]"
+  data-steps="2"
+  data-guards="6"
+  data-srcfile="vf_libopencv.c"
+  data-sinkfile="vf_libopencv.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#10</span>
+      <span class="same-file">vf_libopencv.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">6&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">cols  ← sscanf(buf, &quot;%dx%d+%dx%d/%31[^=]=%127s&quot;, &amp;cols, &amp;rows, &amp;anchor_x, &amp;anchor_y, shape_str, shape_filename)  [fills: cols]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavfilter/vf_libopencv.c:208:5</span>
+      <span class="qf-desc">cols  ← sscanf(buf, &quot;%dx%d+%dx%d/%31[^=]=%127s&quot;, &amp;cols, &amp;rows, &amp;anchor_x, &amp;anchor_y, shape_str, shape_filename)  [fills: cols]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavfilter/vf_libopencv.c:225:9</span>
+      <span class="qf-desc">av_log(log_ctx, AV_LOG_ERROR, &quot;Invalid non-positive values for shape size %dx%d\n&quot;, cols, rows)     (tainted arg: cols)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">vf_libopencv.c</span>
+    <span class="pn-loc">:208</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">cols  ← sscanf(buf, &quot;%dx%d+%dx%d/%31[^=]=%127s&quot;, &amp;cols, &amp;rows, &amp;anchor_x, &amp;anchor_y, shape_str, shape_filename)  [fills: cols]</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln"> 205</span>      int cols = 0, rows = 0, anchor_x = 0, anchor_y = 0, shape = CV_SHAPE_RECT;</div><div class="cl"><span class="ln"> 206</span>      int *values = NULL, ret = 0;</div><div class="cl"><span class="ln"> 207</span>  </div><div class="cl hit"><span class="ln"> 208</span>      sscanf(buf, &quot;%dx%d+%dx%d/%31[^=]=%127s&quot;, &amp;cols, &amp;rows, &amp;anchor_x, &amp;anchor_y, shape_str, shape_filename);</div><div class="cl"><span class="ln"> 209</span>  </div><div class="cl"><span class="ln"> 210</span>      if      (!strcmp(shape_str, &quot;rect&quot;   )) shape = CV_SHAPE_RECT;</div><div class="cl"><span class="ln"> 211</span>      else if (!strcmp(shape_str, &quot;cross&quot;  )) shape = CV_SHAPE_CROSS;</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">vf_libopencv.c</span>
+    <span class="pn-loc">:225</span>
+    <span class="guards-pill" title="6 guard(s)">6</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">av_log(log_ctx, AV_LOG_ERROR, &quot;Invalid non-positive values for shape size %dx%d\n&quot;, cols, rows)     (tainted arg: cols)</summary>
+    <div class="node-guards"><div class="guard-item">if (!strcmp(shape_str, &quot;rect&quot;   ))</div><div class="guard-item">if (!strcmp(shape_str, &quot;cross&quot;  ))</div><div class="guard-item">if (!strcmp(shape_str, &quot;ellipse&quot;))</div><div class="guard-item">if (!strcmp(shape_str, &quot;custom&quot; ))</div><div class="guard-item">if ((ret = read_shape_from_file(&amp;cols, &amp;rows, &amp;values, shape_filename, log_ctx)) &lt; 0) [⚠ tainted]</div><div class="guard-item">if (rows &lt;= 0 || cols &lt;= 0) [⚠ tainted]</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 222</span>      }</div><div class="cl"><span class="ln"> 223</span>  </div><div class="cl"><span class="ln"> 224</span>      if (rows &lt;= 0 || cols &lt;= 0) {</div><div class="cl hit"><span class="ln"> 225</span>          av_log(log_ctx, AV_LOG_ERROR,</div><div class="cl"><span class="ln"> 226</span>                 &quot;Invalid non-positive values for shape size %dx%d\n&quot;, cols, rows);</div><div class="cl"><span class="ln"> 227</span>          ret = AVERROR(EINVAL);</div><div class="cl"><span class="ln"> 228</span>          goto out;</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c11"
+  data-sev="full"
+  data-source="line  ← read_line(&amp;line, s-&gt;pb)  [fills: line]"
+  data-steps="2"
+  data-guards="3"
+  data-srcfile="lrcdec.c"
+  data-sinkfile="lrcdec.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#11</span>
+      <span class="same-file">lrcdec.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">3&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">line  ← read_line(&amp;line, s-&gt;pb)  [fills: line]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavformat/lrcdec.c:176:38</span>
+      <span class="qf-desc">line  ← read_line(&amp;line, s-&gt;pb)  [fills: line]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavformat/lrcdec.c:173:5</span>
+      <span class="qf-desc">av_bprint_init(&amp;line, 0, AV_BPRINT_SIZE_UNLIMITED)     (tainted arg: line)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">lrcdec.c</span>
+    <span class="pn-loc">:176</span>
+    <span class="guards-pill" title="2 guard(s)">2</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">line  ← read_line(&amp;line, s-&gt;pb)  [fills: line]</summary>
+    <div class="node-guards"><div class="guard-item">if (!st)</div><div class="guard-item">if (!avio_feof(s-&gt;pb))</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 173</span>      av_bprint_init(&amp;line, 0, AV_BPRINT_SIZE_UNLIMITED);</div><div class="cl"><span class="ln"> 174</span>  </div><div class="cl"><span class="ln"> 175</span>      while(!avio_feof(s-&gt;pb)) {</div><div class="cl hit"><span class="ln"> 176</span>          int64_t header_offset, pos = read_line(&amp;line, s-&gt;pb);</div><div class="cl"><span class="ln"> 177</span>  </div><div class="cl"><span class="ln"> 178</span>          if (!av_bprint_is_complete(&amp;line))</div><div class="cl"><span class="ln"> 179</span>              goto err_nomem_out;</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">lrcdec.c</span>
+    <span class="pn-loc">:173</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">av_bprint_init(&amp;line, 0, AV_BPRINT_SIZE_UNLIMITED)     (tainted arg: line)</summary>
+    <div class="node-guards"><div class="guard-item">if (!st)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 170</span>      lrc-&gt;ts_offset = 0;</div><div class="cl"><span class="ln"> 171</span>      st-&gt;codecpar-&gt;codec_type = AVMEDIA_TYPE_SUBTITLE;</div><div class="cl"><span class="ln"> 172</span>      st-&gt;codecpar-&gt;codec_id   = AV_CODEC_ID_TEXT;</div><div class="cl hit"><span class="ln"> 173</span>      av_bprint_init(&amp;line, 0, AV_BPRINT_SIZE_UNLIMITED);</div><div class="cl"><span class="ln"> 174</span>  </div><div class="cl"><span class="ln"> 175</span>      while(!avio_feof(s-&gt;pb)) {</div><div class="cl"><span class="ln"> 176</span>          int64_t header_offset, pos = read_line(&amp;line, s-&gt;pb);</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c12"
+  data-sev="full"
+  data-source="st  ← sscanf(buffer, &quot;%*s %*s %u&quot;, &amp;st-&gt;codecpar-&gt;ch_layout.nb_channels)  [fills: st]"
+  data-steps="2"
+  data-guards="26"
+  data-srcfile="nistspheredec.c"
+  data-sinkfile="nistspheredec.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#12</span>
+      <span class="same-file">nistspheredec.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">26&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">st  ← sscanf(buffer, &quot;%*s %*s %u&quot;, &amp;st-&gt;codecpar-&gt;ch_layout.nb_channels)  [fills: st]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavformat/nistspheredec.c:94:13</span>
+      <span class="qf-desc">st  ← sscanf(buffer, &quot;%*s %*s %u&quot;, &amp;st-&gt;codecpar-&gt;ch_layout.nb_channels)  [fills: st]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavformat/nistspheredec.c:82:13</span>
+      <span class="qf-desc">avpriv_set_pts_info(st, 64, 1, st-&gt;codecpar-&gt;sample_rate)     (tainted arg: st)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">nistspheredec.c</span>
+    <span class="pn-loc">:94</span>
+    <span class="guards-pill" title="14 guard(s)">14</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">st  ← sscanf(buffer, &quot;%*s %*s %u&quot;, &amp;st-&gt;codecpar-&gt;ch_layout.nb_channels)  [fills: st]</summary>
+    <div class="node-guards"><div class="guard-item">if (!st) [⚠ tainted]</div><div class="guard-item">if (header_size &lt;= 0)</div><div class="guard-item">if (!avio_feof(s-&gt;pb))</div><div class="guard-item">if (avio_tell(s-&gt;pb) &gt;= header_size)</div><div class="guard-item">if (!memcmp(buffer, &quot;end_head&quot;, 8))</div><div class="guard-item">if (!st-&gt;codecpar-&gt;bits_per_coded_sample) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;pcm&quot;)) [⚠ tainted]</div><div class="guard-item">if (st-&gt;codecpar-&gt;codec_id == AV_CODEC_ID_NONE) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;alaw&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;ulaw&quot;) ||
+                       !av_strcasecmp(coding, &quot;mu-law&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strncasecmp(coding, &quot;pcm,embedded-shorten&quot;, 20)) [⚠ tainted]</div><div class="guard-item">if (ff_alloc_extradata(st-&gt;codecpar, 1)) [⚠ tainted]</div><div class="guard-item">if (avio_tell(s-&gt;pb) &gt; header_size)</div><div class="guard-item">if (!memcmp(buffer, &quot;channel_count&quot;, 13))</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  91</span>  </div><div class="cl"><span class="ln">  92</span>              return 0;</div><div class="cl"><span class="ln">  93</span>          } else if (!memcmp(buffer, &quot;channel_count&quot;, 13)) {</div><div class="cl hit"><span class="ln">  94</span>              sscanf(buffer, &quot;%*s %*s %u&quot;, &amp;st-&gt;codecpar-&gt;ch_layout.nb_channels);</div><div class="cl"><span class="ln">  95</span>              if (st-&gt;codecpar-&gt;ch_layout.nb_channels &lt;= 0 || st-&gt;codecpar-&gt;ch_layout.nb_channels &gt; INT16_MAX)</div><div class="cl"><span class="ln">  96</span>                  return AVERROR_INVALIDDATA;</div><div class="cl"><span class="ln">  97</span>          } else if (!memcmp(buffer, &quot;sample_byte_format&quot;, 18)) {</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">nistspheredec.c</span>
+    <span class="pn-loc">:82</span>
+    <span class="guards-pill" title="12 guard(s)">12</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">avpriv_set_pts_info(st, 64, 1, st-&gt;codecpar-&gt;sample_rate)     (tainted arg: st)</summary>
+    <div class="node-guards"><div class="guard-item">if (!st) [⚠ tainted]</div><div class="guard-item">if (header_size &lt;= 0)</div><div class="guard-item">if (!avio_feof(s-&gt;pb))</div><div class="guard-item">if (avio_tell(s-&gt;pb) &gt;= header_size)</div><div class="guard-item">if (!memcmp(buffer, &quot;end_head&quot;, 8))</div><div class="guard-item">if (!st-&gt;codecpar-&gt;bits_per_coded_sample) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;pcm&quot;)) [⚠ tainted]</div><div class="guard-item">if (st-&gt;codecpar-&gt;codec_id == AV_CODEC_ID_NONE) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;alaw&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;ulaw&quot;) ||
+                       !av_strcasecmp(coding, &quot;mu-law&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strncasecmp(coding, &quot;pcm,embedded-shorten&quot;, 20)) [⚠ tainted]</div><div class="guard-item">if (ff_alloc_extradata(st-&gt;codecpar, 1)) [⚠ tainted]</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  79</span>                  avpriv_request_sample(s, &quot;coding %s&quot;, coding);</div><div class="cl"><span class="ln">  80</span>              }</div><div class="cl"><span class="ln">  81</span>  </div><div class="cl hit"><span class="ln">  82</span>              avpriv_set_pts_info(st, 64, 1, st-&gt;codecpar-&gt;sample_rate);</div><div class="cl"><span class="ln">  83</span>  </div><div class="cl"><span class="ln">  84</span>              st-&gt;codecpar-&gt;block_align = st-&gt;codecpar-&gt;bits_per_coded_sample *</div><div class="cl"><span class="ln">  85</span>                                          st-&gt;codecpar-&gt;ch_layout.nb_channels / 8;</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c13"
+  data-sev="full"
+  data-source="format  ← sscanf(buffer, &quot;%*s %*s %31s&quot;, format)  [fills: format]"
+  data-steps="2"
+  data-guards="36"
+  data-srcfile="nistspheredec.c"
+  data-sinkfile="nistspheredec.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#13</span>
+      <span class="same-file">nistspheredec.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">36&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">format  ← sscanf(buffer, &quot;%*s %*s %31s&quot;, format)  [fills: format]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavformat/nistspheredec.c:98:13</span>
+      <span class="qf-desc">format  ← sscanf(buffer, &quot;%*s %*s %31s&quot;, format)  [fills: format]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavformat/nistspheredec.c:107:17</span>
+      <span class="qf-desc">avpriv_request_sample(s, &quot;sample byte format %s&quot;, format)     (tainted arg: format)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">nistspheredec.c</span>
+    <span class="pn-loc">:98</span>
+    <span class="guards-pill" title="16 guard(s)">16</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">format  ← sscanf(buffer, &quot;%*s %*s %31s&quot;, format)  [fills: format]</summary>
+    <div class="node-guards"><div class="guard-item">if (!st) [⚠ tainted]</div><div class="guard-item">if (header_size &lt;= 0)</div><div class="guard-item">if (!avio_feof(s-&gt;pb))</div><div class="guard-item">if (avio_tell(s-&gt;pb) &gt;= header_size)</div><div class="guard-item">if (!memcmp(buffer, &quot;end_head&quot;, 8))</div><div class="guard-item">if (!st-&gt;codecpar-&gt;bits_per_coded_sample) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;pcm&quot;)) [⚠ tainted]</div><div class="guard-item">if (st-&gt;codecpar-&gt;codec_id == AV_CODEC_ID_NONE) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;alaw&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;ulaw&quot;) ||
+                       !av_strcasecmp(coding, &quot;mu-law&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strncasecmp(coding, &quot;pcm,embedded-shorten&quot;, 20)) [⚠ tainted]</div><div class="guard-item">if (ff_alloc_extradata(st-&gt;codecpar, 1)) [⚠ tainted]</div><div class="guard-item">if (avio_tell(s-&gt;pb) &gt; header_size)</div><div class="guard-item">if (!memcmp(buffer, &quot;channel_count&quot;, 13))</div><div class="guard-item">if (st-&gt;codecpar-&gt;ch_layout.nb_channels &lt;= 0 || st-&gt;codecpar-&gt;ch_layout.nb_channels &gt; INT16_MAX) [⚠ tainted]</div><div class="guard-item">if (!memcmp(buffer, &quot;sample_byte_format&quot;, 18))</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  95</span>              if (st-&gt;codecpar-&gt;ch_layout.nb_channels &lt;= 0 || st-&gt;codecpar-&gt;ch_layout.nb_channels &gt; INT16_MAX)</div><div class="cl"><span class="ln">  96</span>                  return AVERROR_INVALIDDATA;</div><div class="cl"><span class="ln">  97</span>          } else if (!memcmp(buffer, &quot;sample_byte_format&quot;, 18)) {</div><div class="cl hit"><span class="ln">  98</span>              sscanf(buffer, &quot;%*s %*s %31s&quot;, format);</div><div class="cl"><span class="ln">  99</span>  </div><div class="cl"><span class="ln"> 100</span>              if (!av_strcasecmp(format, &quot;01&quot;)) {</div><div class="cl"><span class="ln"> 101</span>                  be = 0;</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">nistspheredec.c</span>
+    <span class="pn-loc">:107</span>
+    <span class="guards-pill" title="20 guard(s)">20</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">avpriv_request_sample(s, &quot;sample byte format %s&quot;, format)     (tainted arg: format)</summary>
+    <div class="node-guards"><div class="guard-item">if (!st) [⚠ tainted]</div><div class="guard-item">if (header_size &lt;= 0)</div><div class="guard-item">if (!avio_feof(s-&gt;pb))</div><div class="guard-item">if (avio_tell(s-&gt;pb) &gt;= header_size)</div><div class="guard-item">if (!memcmp(buffer, &quot;end_head&quot;, 8))</div><div class="guard-item">if (!st-&gt;codecpar-&gt;bits_per_coded_sample) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;pcm&quot;)) [⚠ tainted]</div><div class="guard-item">if (st-&gt;codecpar-&gt;codec_id == AV_CODEC_ID_NONE) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;alaw&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;ulaw&quot;) ||
+                       !av_strcasecmp(coding, &quot;mu-law&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strncasecmp(coding, &quot;pcm,embedded-shorten&quot;, 20)) [⚠ tainted]</div><div class="guard-item">if (ff_alloc_extradata(st-&gt;codecpar, 1)) [⚠ tainted]</div><div class="guard-item">if (avio_tell(s-&gt;pb) &gt; header_size)</div><div class="guard-item">if (!memcmp(buffer, &quot;channel_count&quot;, 13))</div><div class="guard-item">if (st-&gt;codecpar-&gt;ch_layout.nb_channels &lt;= 0 || st-&gt;codecpar-&gt;ch_layout.nb_channels &gt; INT16_MAX) [⚠ tainted]</div><div class="guard-item">if (!memcmp(buffer, &quot;sample_byte_format&quot;, 18))</div><div class="guard-item">if (!av_strcasecmp(format, &quot;01&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(format, &quot;10&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(format, &quot;mu-law&quot;)) [⚠ tainted]</div><div class="guard-item">if (av_strcasecmp(format, &quot;1&quot;)) [⚠ tainted]</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 104</span>              } else if (!av_strcasecmp(format, &quot;mu-law&quot;)) {</div><div class="cl"><span class="ln"> 105</span>                  st-&gt;codecpar-&gt;codec_id = AV_CODEC_ID_PCM_MULAW;</div><div class="cl"><span class="ln"> 106</span>              } else if (av_strcasecmp(format, &quot;1&quot;)) {</div><div class="cl hit"><span class="ln"> 107</span>                  avpriv_request_sample(s, &quot;sample byte format %s&quot;, format);</div><div class="cl"><span class="ln"> 108</span>                  return AVERROR_PATCHWELCOME;</div><div class="cl"><span class="ln"> 109</span>              }</div><div class="cl"><span class="ln"> 110</span>          } else if (!memcmp(buffer, &quot;sample_coding&quot;, 13)) {</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c14"
+  data-sev="full"
+  data-source="coding  ← sscanf(buffer, &quot;%*s %*s %31s&quot;, coding)  [fills: coding]"
+  data-steps="2"
+  data-guards="33"
+  data-srcfile="nistspheredec.c"
+  data-sinkfile="nistspheredec.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#14</span>
+      <span class="same-file">nistspheredec.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">33&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">coding  ← sscanf(buffer, &quot;%*s %*s %31s&quot;, coding)  [fills: coding]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavformat/nistspheredec.c:111:13</span>
+      <span class="qf-desc">coding  ← sscanf(buffer, &quot;%*s %*s %31s&quot;, coding)  [fills: coding]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavformat/nistspheredec.c:79:17</span>
+      <span class="qf-desc">avpriv_request_sample(s, &quot;coding %s&quot;, coding)     (tainted arg: coding)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">nistspheredec.c</span>
+    <span class="pn-loc">:111</span>
+    <span class="guards-pill" title="21 guard(s)">21</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">coding  ← sscanf(buffer, &quot;%*s %*s %31s&quot;, coding)  [fills: coding]</summary>
+    <div class="node-guards"><div class="guard-item">if (!st) [⚠ tainted]</div><div class="guard-item">if (header_size &lt;= 0)</div><div class="guard-item">if (!avio_feof(s-&gt;pb))</div><div class="guard-item">if (avio_tell(s-&gt;pb) &gt;= header_size)</div><div class="guard-item">if (!memcmp(buffer, &quot;end_head&quot;, 8))</div><div class="guard-item">if (!st-&gt;codecpar-&gt;bits_per_coded_sample) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;pcm&quot;)) [⚠ tainted]</div><div class="guard-item">if (st-&gt;codecpar-&gt;codec_id == AV_CODEC_ID_NONE) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;alaw&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;ulaw&quot;) ||
+                       !av_strcasecmp(coding, &quot;mu-law&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strncasecmp(coding, &quot;pcm,embedded-shorten&quot;, 20)) [⚠ tainted]</div><div class="guard-item">if (ff_alloc_extradata(st-&gt;codecpar, 1)) [⚠ tainted]</div><div class="guard-item">if (avio_tell(s-&gt;pb) &gt; header_size)</div><div class="guard-item">if (!memcmp(buffer, &quot;channel_count&quot;, 13))</div><div class="guard-item">if (st-&gt;codecpar-&gt;ch_layout.nb_channels &lt;= 0 || st-&gt;codecpar-&gt;ch_layout.nb_channels &gt; INT16_MAX) [⚠ tainted]</div><div class="guard-item">if (!memcmp(buffer, &quot;sample_byte_format&quot;, 18))</div><div class="guard-item">if (!av_strcasecmp(format, &quot;01&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(format, &quot;10&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(format, &quot;mu-law&quot;)) [⚠ tainted]</div><div class="guard-item">if (av_strcasecmp(format, &quot;1&quot;)) [⚠ tainted]</div><div class="guard-item">if (!memcmp(buffer, &quot;sample_coding&quot;, 13))</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 108</span>                  return AVERROR_PATCHWELCOME;</div><div class="cl"><span class="ln"> 109</span>              }</div><div class="cl"><span class="ln"> 110</span>          } else if (!memcmp(buffer, &quot;sample_coding&quot;, 13)) {</div><div class="cl hit"><span class="ln"> 111</span>              sscanf(buffer, &quot;%*s %*s %31s&quot;, coding);</div><div class="cl"><span class="ln"> 112</span>          } else if (!memcmp(buffer, &quot;sample_count&quot;, 12)) {</div><div class="cl"><span class="ln"> 113</span>              sscanf(buffer, &quot;%*s %*s %&quot;SCNd64, &amp;st-&gt;duration);</div><div class="cl"><span class="ln"> 114</span>          } else if (!memcmp(buffer, &quot;sample_n_bytes&quot;, 14)) {</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">nistspheredec.c</span>
+    <span class="pn-loc">:79</span>
+    <span class="guards-pill" title="12 guard(s)">12</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">avpriv_request_sample(s, &quot;coding %s&quot;, coding)     (tainted arg: coding)</summary>
+    <div class="node-guards"><div class="guard-item">if (!st) [⚠ tainted]</div><div class="guard-item">if (header_size &lt;= 0)</div><div class="guard-item">if (!avio_feof(s-&gt;pb))</div><div class="guard-item">if (avio_tell(s-&gt;pb) &gt;= header_size)</div><div class="guard-item">if (!memcmp(buffer, &quot;end_head&quot;, 8))</div><div class="guard-item">if (!st-&gt;codecpar-&gt;bits_per_coded_sample) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;pcm&quot;)) [⚠ tainted]</div><div class="guard-item">if (st-&gt;codecpar-&gt;codec_id == AV_CODEC_ID_NONE) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;alaw&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;ulaw&quot;) ||
+                       !av_strcasecmp(coding, &quot;mu-law&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strncasecmp(coding, &quot;pcm,embedded-shorten&quot;, 20)) [⚠ tainted]</div><div class="guard-item">if (ff_alloc_extradata(st-&gt;codecpar, 1)) [⚠ tainted]</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  76</span>                  if (ff_alloc_extradata(st-&gt;codecpar, 1))</div><div class="cl"><span class="ln">  77</span>                      st-&gt;codecpar-&gt;extradata[0] = 1;</div><div class="cl"><span class="ln">  78</span>              } else {</div><div class="cl hit"><span class="ln">  79</span>                  avpriv_request_sample(s, &quot;coding %s&quot;, coding);</div><div class="cl"><span class="ln">  80</span>              }</div><div class="cl"><span class="ln">  81</span>  </div><div class="cl"><span class="ln">  82</span>              avpriv_set_pts_info(st, 64, 1, st-&gt;codecpar-&gt;sample_rate);</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c15"
+  data-sev="full"
+  data-source="st  ← sscanf(buffer, &quot;%*s %*s %d&quot;, &amp;st-&gt;codecpar-&gt;sample_rate)  [fills: st]"
+  data-steps="2"
+  data-guards="37"
+  data-srcfile="nistspheredec.c"
+  data-sinkfile="nistspheredec.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#15</span>
+      <span class="same-file">nistspheredec.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">37&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">st  ← sscanf(buffer, &quot;%*s %*s %d&quot;, &amp;st-&gt;codecpar-&gt;sample_rate)  [fills: st]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavformat/nistspheredec.c:119:13</span>
+      <span class="qf-desc">st  ← sscanf(buffer, &quot;%*s %*s %d&quot;, &amp;st-&gt;codecpar-&gt;sample_rate)  [fills: st]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavformat/nistspheredec.c:82:13</span>
+      <span class="qf-desc">avpriv_set_pts_info(st, 64, 1, st-&gt;codecpar-&gt;sample_rate)     (tainted arg: st)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">nistspheredec.c</span>
+    <span class="pn-loc">:119</span>
+    <span class="guards-pill" title="25 guard(s)">25</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">st  ← sscanf(buffer, &quot;%*s %*s %d&quot;, &amp;st-&gt;codecpar-&gt;sample_rate)  [fills: st]</summary>
+    <div class="node-guards"><div class="guard-item">if (!st) [⚠ tainted]</div><div class="guard-item">if (header_size &lt;= 0)</div><div class="guard-item">if (!avio_feof(s-&gt;pb))</div><div class="guard-item">if (avio_tell(s-&gt;pb) &gt;= header_size)</div><div class="guard-item">if (!memcmp(buffer, &quot;end_head&quot;, 8))</div><div class="guard-item">if (!st-&gt;codecpar-&gt;bits_per_coded_sample) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;pcm&quot;)) [⚠ tainted]</div><div class="guard-item">if (st-&gt;codecpar-&gt;codec_id == AV_CODEC_ID_NONE) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;alaw&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;ulaw&quot;) ||
+                       !av_strcasecmp(coding, &quot;mu-law&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strncasecmp(coding, &quot;pcm,embedded-shorten&quot;, 20)) [⚠ tainted]</div><div class="guard-item">if (ff_alloc_extradata(st-&gt;codecpar, 1)) [⚠ tainted]</div><div class="guard-item">if (avio_tell(s-&gt;pb) &gt; header_size)</div><div class="guard-item">if (!memcmp(buffer, &quot;channel_count&quot;, 13))</div><div class="guard-item">if (st-&gt;codecpar-&gt;ch_layout.nb_channels &lt;= 0 || st-&gt;codecpar-&gt;ch_layout.nb_channels &gt; INT16_MAX) [⚠ tainted]</div><div class="guard-item">if (!memcmp(buffer, &quot;sample_byte_format&quot;, 18))</div><div class="guard-item">if (!av_strcasecmp(format, &quot;01&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(format, &quot;10&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(format, &quot;mu-law&quot;)) [⚠ tainted]</div><div class="guard-item">if (av_strcasecmp(format, &quot;1&quot;)) [⚠ tainted]</div><div class="guard-item">if (!memcmp(buffer, &quot;sample_coding&quot;, 13))</div><div class="guard-item">if (!memcmp(buffer, &quot;sample_count&quot;, 12))</div><div class="guard-item">if (!memcmp(buffer, &quot;sample_n_bytes&quot;, 14))</div><div class="guard-item">if (bps &gt; INT16_MAX/8U) [⚠ tainted]</div><div class="guard-item">if (!memcmp(buffer, &quot;sample_rate&quot;, 11))</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 116</span>              if (bps &gt; INT16_MAX/8U)</div><div class="cl"><span class="ln"> 117</span>                  return AVERROR_INVALIDDATA;</div><div class="cl"><span class="ln"> 118</span>          } else if (!memcmp(buffer, &quot;sample_rate&quot;, 11)) {</div><div class="cl hit"><span class="ln"> 119</span>              sscanf(buffer, &quot;%*s %*s %d&quot;, &amp;st-&gt;codecpar-&gt;sample_rate);</div><div class="cl"><span class="ln"> 120</span>          } else if (!memcmp(buffer, &quot;sample_sig_bits&quot;, 15)) {</div><div class="cl"><span class="ln"> 121</span>              sscanf(buffer, &quot;%*s %*s %d&quot;, &amp;st-&gt;codecpar-&gt;bits_per_coded_sample);</div><div class="cl"><span class="ln"> 122</span>              if (st-&gt;codecpar-&gt;bits_per_coded_sample &lt;= 0 || st-&gt;codecpar-&gt;bits_per_coded_sample &gt; INT16_MAX)</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">nistspheredec.c</span>
+    <span class="pn-loc">:82</span>
+    <span class="guards-pill" title="12 guard(s)">12</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">avpriv_set_pts_info(st, 64, 1, st-&gt;codecpar-&gt;sample_rate)     (tainted arg: st)</summary>
+    <div class="node-guards"><div class="guard-item">if (!st) [⚠ tainted]</div><div class="guard-item">if (header_size &lt;= 0)</div><div class="guard-item">if (!avio_feof(s-&gt;pb))</div><div class="guard-item">if (avio_tell(s-&gt;pb) &gt;= header_size)</div><div class="guard-item">if (!memcmp(buffer, &quot;end_head&quot;, 8))</div><div class="guard-item">if (!st-&gt;codecpar-&gt;bits_per_coded_sample) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;pcm&quot;)) [⚠ tainted]</div><div class="guard-item">if (st-&gt;codecpar-&gt;codec_id == AV_CODEC_ID_NONE) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;alaw&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;ulaw&quot;) ||
+                       !av_strcasecmp(coding, &quot;mu-law&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strncasecmp(coding, &quot;pcm,embedded-shorten&quot;, 20)) [⚠ tainted]</div><div class="guard-item">if (ff_alloc_extradata(st-&gt;codecpar, 1)) [⚠ tainted]</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  79</span>                  avpriv_request_sample(s, &quot;coding %s&quot;, coding);</div><div class="cl"><span class="ln">  80</span>              }</div><div class="cl"><span class="ln">  81</span>  </div><div class="cl hit"><span class="ln">  82</span>              avpriv_set_pts_info(st, 64, 1, st-&gt;codecpar-&gt;sample_rate);</div><div class="cl"><span class="ln">  83</span>  </div><div class="cl"><span class="ln">  84</span>              st-&gt;codecpar-&gt;block_align = st-&gt;codecpar-&gt;bits_per_coded_sample *</div><div class="cl"><span class="ln">  85</span>                                          st-&gt;codecpar-&gt;ch_layout.nb_channels / 8;</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c16"
+  data-sev="full"
+  data-source="st  ← sscanf(buffer, &quot;%*s %*s %d&quot;, &amp;st-&gt;codecpar-&gt;bits_per_coded_sample)  [fills: st]"
+  data-steps="2"
+  data-guards="38"
+  data-srcfile="nistspheredec.c"
+  data-sinkfile="nistspheredec.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#16</span>
+      <span class="same-file">nistspheredec.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">38&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">st  ← sscanf(buffer, &quot;%*s %*s %d&quot;, &amp;st-&gt;codecpar-&gt;bits_per_coded_sample)  [fills: st]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavformat/nistspheredec.c:121:13</span>
+      <span class="qf-desc">st  ← sscanf(buffer, &quot;%*s %*s %d&quot;, &amp;st-&gt;codecpar-&gt;bits_per_coded_sample)  [fills: st]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavformat/nistspheredec.c:82:13</span>
+      <span class="qf-desc">avpriv_set_pts_info(st, 64, 1, st-&gt;codecpar-&gt;sample_rate)     (tainted arg: st)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">nistspheredec.c</span>
+    <span class="pn-loc">:121</span>
+    <span class="guards-pill" title="26 guard(s)">26</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">st  ← sscanf(buffer, &quot;%*s %*s %d&quot;, &amp;st-&gt;codecpar-&gt;bits_per_coded_sample)  [fills: st]</summary>
+    <div class="node-guards"><div class="guard-item">if (!st) [⚠ tainted]</div><div class="guard-item">if (header_size &lt;= 0)</div><div class="guard-item">if (!avio_feof(s-&gt;pb))</div><div class="guard-item">if (avio_tell(s-&gt;pb) &gt;= header_size)</div><div class="guard-item">if (!memcmp(buffer, &quot;end_head&quot;, 8))</div><div class="guard-item">if (!st-&gt;codecpar-&gt;bits_per_coded_sample) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;pcm&quot;)) [⚠ tainted]</div><div class="guard-item">if (st-&gt;codecpar-&gt;codec_id == AV_CODEC_ID_NONE) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;alaw&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;ulaw&quot;) ||
+                       !av_strcasecmp(coding, &quot;mu-law&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strncasecmp(coding, &quot;pcm,embedded-shorten&quot;, 20)) [⚠ tainted]</div><div class="guard-item">if (ff_alloc_extradata(st-&gt;codecpar, 1)) [⚠ tainted]</div><div class="guard-item">if (avio_tell(s-&gt;pb) &gt; header_size)</div><div class="guard-item">if (!memcmp(buffer, &quot;channel_count&quot;, 13))</div><div class="guard-item">if (st-&gt;codecpar-&gt;ch_layout.nb_channels &lt;= 0 || st-&gt;codecpar-&gt;ch_layout.nb_channels &gt; INT16_MAX) [⚠ tainted]</div><div class="guard-item">if (!memcmp(buffer, &quot;sample_byte_format&quot;, 18))</div><div class="guard-item">if (!av_strcasecmp(format, &quot;01&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(format, &quot;10&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(format, &quot;mu-law&quot;)) [⚠ tainted]</div><div class="guard-item">if (av_strcasecmp(format, &quot;1&quot;)) [⚠ tainted]</div><div class="guard-item">if (!memcmp(buffer, &quot;sample_coding&quot;, 13))</div><div class="guard-item">if (!memcmp(buffer, &quot;sample_count&quot;, 12))</div><div class="guard-item">if (!memcmp(buffer, &quot;sample_n_bytes&quot;, 14))</div><div class="guard-item">if (bps &gt; INT16_MAX/8U) [⚠ tainted]</div><div class="guard-item">if (!memcmp(buffer, &quot;sample_rate&quot;, 11))</div><div class="guard-item">if (!memcmp(buffer, &quot;sample_sig_bits&quot;, 15))</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 118</span>          } else if (!memcmp(buffer, &quot;sample_rate&quot;, 11)) {</div><div class="cl"><span class="ln"> 119</span>              sscanf(buffer, &quot;%*s %*s %d&quot;, &amp;st-&gt;codecpar-&gt;sample_rate);</div><div class="cl"><span class="ln"> 120</span>          } else if (!memcmp(buffer, &quot;sample_sig_bits&quot;, 15)) {</div><div class="cl hit"><span class="ln"> 121</span>              sscanf(buffer, &quot;%*s %*s %d&quot;, &amp;st-&gt;codecpar-&gt;bits_per_coded_sample);</div><div class="cl"><span class="ln"> 122</span>              if (st-&gt;codecpar-&gt;bits_per_coded_sample &lt;= 0 || st-&gt;codecpar-&gt;bits_per_coded_sample &gt; INT16_MAX)</div><div class="cl"><span class="ln"> 123</span>                  return AVERROR_INVALIDDATA;</div><div class="cl"><span class="ln"> 124</span>          } else {</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">nistspheredec.c</span>
+    <span class="pn-loc">:82</span>
+    <span class="guards-pill" title="12 guard(s)">12</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">avpriv_set_pts_info(st, 64, 1, st-&gt;codecpar-&gt;sample_rate)     (tainted arg: st)</summary>
+    <div class="node-guards"><div class="guard-item">if (!st) [⚠ tainted]</div><div class="guard-item">if (header_size &lt;= 0)</div><div class="guard-item">if (!avio_feof(s-&gt;pb))</div><div class="guard-item">if (avio_tell(s-&gt;pb) &gt;= header_size)</div><div class="guard-item">if (!memcmp(buffer, &quot;end_head&quot;, 8))</div><div class="guard-item">if (!st-&gt;codecpar-&gt;bits_per_coded_sample) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;pcm&quot;)) [⚠ tainted]</div><div class="guard-item">if (st-&gt;codecpar-&gt;codec_id == AV_CODEC_ID_NONE) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;alaw&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strcasecmp(coding, &quot;ulaw&quot;) ||
+                       !av_strcasecmp(coding, &quot;mu-law&quot;)) [⚠ tainted]</div><div class="guard-item">if (!av_strncasecmp(coding, &quot;pcm,embedded-shorten&quot;, 20)) [⚠ tainted]</div><div class="guard-item">if (ff_alloc_extradata(st-&gt;codecpar, 1)) [⚠ tainted]</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  79</span>                  avpriv_request_sample(s, &quot;coding %s&quot;, coding);</div><div class="cl"><span class="ln">  80</span>              }</div><div class="cl"><span class="ln">  81</span>  </div><div class="cl hit"><span class="ln">  82</span>              avpriv_set_pts_info(st, 64, 1, st-&gt;codecpar-&gt;sample_rate);</div><div class="cl"><span class="ln">  83</span>  </div><div class="cl"><span class="ln">  84</span>              st-&gt;codecpar-&gt;block_align = st-&gt;codecpar-&gt;bits_per_coded_sample *</div><div class="cl"><span class="ln">  85</span>                                          st-&gt;codecpar-&gt;ch_layout.nb_channels / 8;</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c17"
+  data-sev="full"
+  data-source="raten  ← sscanf(tokstart, &quot;%d:%d&quot;, &amp;raten, &amp;rated)  [fills: raten]"
+  data-steps="2"
+  data-guards="39"
+  data-srcfile="yuv4mpegdec.c"
+  data-sinkfile="yuv4mpegdec.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#17</span>
+      <span class="same-file">yuv4mpegdec.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">39&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">raten  ← sscanf(tokstart, &quot;%d:%d&quot;, &amp;raten, &amp;rated)  [fills: raten]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavformat/yuv4mpegdec.c:160:13</span>
+      <span class="qf-desc">raten  ← sscanf(tokstart, &quot;%d:%d&quot;, &amp;raten, &amp;rated)  [fills: raten]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/libavformat/yuv4mpegdec.c:246:5</span>
+      <span class="qf-desc">av_reduce(&amp;raten, &amp;rated, raten, rated, (1UL &lt;&lt; 31) - 1)     (tainted arg: raten, raten)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">yuv4mpegdec.c</span>
+    <span class="pn-loc">:160</span>
+    <span class="guards-pill" title="12 guard(s)">12</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">raten  ← sscanf(tokstart, &quot;%d:%d&quot;, &amp;raten, &amp;rated)  [fills: raten]</summary>
+    <div class="node-guards"><div class="guard-item">if (header[i] == '\n')</div><div class="guard-item">if (++i == MAX_YUV4_HEADER)</div><div class="guard-item">if (strncmp(header, Y4M_MAGIC, strlen(Y4M_MAGIC)))</div><div class="guard-item">if tokstart &lt; header_end</div><div class="guard-item">if (*tokstart == 0x20)</div><div class="guard-item">if (*tokstart++)</div><div class="guard-item">if i &lt; FF_ARRAY_ELEMS(pix_fmt_array)</div><div class="guard-item">if (av_strstart(tokstart, pix_fmt_array[i].name, NULL))</div><div class="guard-item">if (pix_fmt_array[i].chroma_loc != AVCHROMA_LOC_UNSPECIFIED)</div><div class="guard-item">if (i == FF_ARRAY_ELEMS(pix_fmt_array))</div><div class="guard-item">if (tokstart &lt; header_end &amp;&amp; *tokstart != 0x20)</div><div class="guard-item">if (*tokstart++)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 157</span>              }</div><div class="cl"><span class="ln"> 158</span>              break;</div><div class="cl"><span class="ln"> 159</span>          case 'F': // Frame rate</div><div class="cl hit"><span class="ln"> 160</span>              sscanf(tokstart, &quot;%d:%d&quot;, &amp;raten, &amp;rated); // 0:0 if unknown</div><div class="cl"><span class="ln"> 161</span>              while (tokstart &lt; header_end &amp;&amp; *tokstart != 0x20)</div><div class="cl"><span class="ln"> 162</span>                  tokstart++;</div><div class="cl"><span class="ln"> 163</span>              break;</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">yuv4mpegdec.c</span>
+    <span class="pn-loc">:246</span>
+    <span class="guards-pill" title="27 guard(s)">27</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">av_reduce(&amp;raten, &amp;rated, raten, rated, (1UL &lt;&lt; 31) - 1)     (tainted arg: raten, raten)</summary>
+    <div class="node-guards"><div class="guard-item">if (header[i] == '\n')</div><div class="guard-item">if (++i == MAX_YUV4_HEADER)</div><div class="guard-item">if (strncmp(header, Y4M_MAGIC, strlen(Y4M_MAGIC)))</div><div class="guard-item">if tokstart &lt; header_end</div><div class="guard-item">if (*tokstart == 0x20)</div><div class="guard-item">if (*tokstart++)</div><div class="guard-item">if i &lt; FF_ARRAY_ELEMS(pix_fmt_array)</div><div class="guard-item">if (av_strstart(tokstart, pix_fmt_array[i].name, NULL))</div><div class="guard-item">if (pix_fmt_array[i].chroma_loc != AVCHROMA_LOC_UNSPECIFIED)</div><div class="guard-item">if (i == FF_ARRAY_ELEMS(pix_fmt_array))</div><div class="guard-item">if (tokstart &lt; header_end &amp;&amp; *tokstart != 0x20)</div><div class="guard-item">if (*tokstart++)</div><div class="guard-item">if (tokstart &lt; header_end &amp;&amp; *tokstart != 0x20)</div><div class="guard-item">if (tokstart &lt; header_end &amp;&amp; *tokstart != 0x20)</div><div class="guard-item">if (strncmp(&quot;YSCSS=&quot;, tokstart, 6) == 0)</div><div class="guard-item">if i &lt; FF_ARRAY_ELEMS(pix_fmt_array)</div><div class="guard-item">if (av_strstart(tokstart, pix_fmt_array[i].name, NULL))</div><div class="guard-item">if (strncmp(&quot;COLORRANGE=&quot;, tokstart, 11) == 0)</div><div class="guard-item">if (strncmp(&quot;FULL&quot;,tokstart, 4) == 0)</div><div class="guard-item">if (strncmp(&quot;LIMITED&quot;, tokstart, 7) == 0)</div><div class="guard-item">if (tokstart &lt; header_end &amp;&amp; *tokstart != 0x20)</div><div class="guard-item">if (width == -1 || height == -1)</div><div class="guard-item">if (pix_fmt == AV_PIX_FMT_NONE)</div><div class="guard-item">if (alt_pix_fmt == AV_PIX_FMT_NONE)</div><div class="guard-item">if (raten &lt;= 0 || rated &lt;= 0) [⚠ tainted]</div><div class="guard-item">if (aspectn == 0 &amp;&amp; aspectd == 0) [⚠ tainted]</div><div class="guard-item">if (!st)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 243</span>          return AVERROR(ENOMEM);</div><div class="cl"><span class="ln"> 244</span>      st-&gt;codecpar-&gt;width  = width;</div><div class="cl"><span class="ln"> 245</span>      st-&gt;codecpar-&gt;height = height;</div><div class="cl hit"><span class="ln"> 246</span>      av_reduce(&amp;raten, &amp;rated, raten, rated, (1UL &lt;&lt; 31) - 1);</div><div class="cl"><span class="ln"> 247</span>      avpriv_set_pts_info(st, 64, rated, raten);</div><div class="cl"><span class="ln"> 248</span>      st-&gt;avg_frame_rate                = av_inv_q(st-&gt;time_base);</div><div class="cl"><span class="ln"> 249</span>      st-&gt;codecpar-&gt;format              = pix_fmt;</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c18"
+  data-sev="full"
+  data-source="buffer  ← read(fd, buffer, SIZE)  [fills: buffer]"
+  data-steps="2"
+  data-guards="6"
+  data-srcfile="ffhash.c"
+  data-sinkfile="ffhash.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#18</span>
+      <span class="same-file">ffhash.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">6&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">buffer  ← read(fd, buffer, SIZE)  [fills: buffer]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/tools/ffhash.c:95:20</span>
+      <span class="qf-desc">buffer  ← read(fd, buffer, SIZE)  [fills: buffer]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/ffmpeg/ffmpeg/tools/ffhash.c:105:9</span>
+      <span class="qf-desc">av_hash_update(hash, buffer, size)     (tainted arg: buffer)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">ffhash.c</span>
+    <span class="pn-loc">:95</span>
+    <span class="guards-pill" title="2 guard(s)">2</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">buffer  ← read(fd, buffer, SIZE)  [fills: buffer]</summary>
+    <div class="node-guards"><div class="guard-item">if (file)</div><div class="guard-item">if (fd == -1)</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  92</span>  </div><div class="cl"><span class="ln">  93</span>      av_hash_init(hash);</div><div class="cl"><span class="ln">  94</span>      for (;;) {</div><div class="cl hit"><span class="ln">  95</span>          int size = read(fd, buffer, SIZE);</div><div class="cl"><span class="ln">  96</span>          if (size &lt; 0) {</div><div class="cl"><span class="ln">  97</span>              int err = errno;</div><div class="cl"><span class="ln">  98</span>              close(fd);</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">ffhash.c</span>
+    <span class="pn-loc">:105</span>
+    <span class="guards-pill" title="4 guard(s)">4</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">av_hash_update(hash, buffer, size)     (tainted arg: buffer)</summary>
+    <div class="node-guards"><div class="guard-item">if (file)</div><div class="guard-item">if (fd == -1)</div><div class="guard-item">if (size &lt; 0)</div><div class="guard-item">if (!size)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 102</span>              goto end;</div><div class="cl"><span class="ln"> 103</span>          } else if(!size)</div><div class="cl"><span class="ln"> 104</span>              break;</div><div class="cl hit"><span class="ln"> 105</span>          av_hash_update(hash, buffer, size);</div><div class="cl"><span class="ln"> 106</span>      }</div><div class="cl"><span class="ln"> 107</span>      close(fd);</div><div class="cl"><span class="ln"> 108</span>  </div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+
+</div>
+
+<footer>taint — source-level data-flow tracer &nbsp;·&nbsp; 19 finding(s) for target <code>&lt;all sinks&gt;</code></footer>
+
+<script>
+const cards = Array.from(document.querySelectorAll('.card'));
+let sortKey = 'idx';
+let sortAsc = true;
+
+function applyFilters() {
+  const sev    = document.getElementById('fSev').value;
+  const src    = document.getElementById('fSrc').value;
+  const guards = parseInt(document.getElementById('fGuards').value, 10);
+  const txt    = (document.getElementById('fText').value || '').toLowerCase();
+  const group  = document.getElementById('fGroup').value;
+
+  // Remove existing group headers
+  document.querySelectorAll('.group-header').forEach(h => h.remove());
+
+  let visible = 0;
+  cards.forEach(c => {
+    const textMatch = !txt ||
+      c.dataset.source.toLowerCase().includes(txt) ||
+      c.dataset.srcfile.toLowerCase().includes(txt) ||
+      c.dataset.sinkfile.toLowerCase().includes(txt) ||
+      c.textContent.toLowerCase().includes(txt);
+    const hide =
+      (sev    && c.dataset.sev    !== sev)  ||
+      (src    && c.dataset.source !== src)  ||
+      (parseInt(c.dataset.guards,10) < guards) ||
+      !textMatch;
+    c.classList.toggle('hidden', hide);
+    if (!hide) visible++;
+  });
+  document.getElementById('fCount').textContent = visible + ' finding(s)';
+
+  // Apply grouping if requested
+  if (group) applyGrouping(group);
+}
+
+function applyGrouping(key) {
+  const container = document.getElementById('cardContainer');
+  const visible = cards.filter(c => !c.classList.contains('hidden'));
+  if (!visible.length) return;
+
+  // Group by key
+  const groups = {};
+  visible.forEach(c => {
+    const gk = key === 'source' ? c.dataset.source :
+               key === 'sinkfile' ? c.dataset.sinkfile :
+               key === 'sev' ? c.dataset.sev : '';
+    if (!groups[gk]) groups[gk] = [];
+    groups[gk].push(c);
+  });
+
+  // Re-render with group headers
+  Object.keys(groups).sort().forEach(gk => {
+    const hdr = document.createElement('div');
+    hdr.className = 'group-header';
+    hdr.innerHTML = '<span class="gh-key">' + escapeHtml(gk) + '</span>' +
+      '<span class="gh-count">' + groups[gk].length + '</span>';
+    container.appendChild(hdr);
+    groups[gk].forEach(c => container.appendChild(c));
+  });
+}
+
+const sevOrder = { full: 0, partial: 1, none: 2 };
+function sortBy(key) {
+  if (sortKey === key) { sortAsc = !sortAsc; }
+  else { sortKey = key; sortAsc = key === 'idx'; }
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('s' + key.charAt(0).toUpperCase() + key.slice(1)).classList.add('active');
+  const container = document.getElementById('cardContainer');
+  const sorted = [...cards].sort((a, b) => {
+    let av, bv;
+    if (key === 'idx')         { av = parseInt(a.id.slice(1));        bv = parseInt(b.id.slice(1)); }
+    else if (key === 'steps')  { av = parseInt(a.dataset.steps);       bv = parseInt(b.dataset.steps); }
+    else if (key === 'guards') { av = parseInt(a.dataset.guards);      bv = parseInt(b.dataset.guards); }
+    else if (key === 'sev')    { av = sevOrder[a.dataset.sev]||9;      bv = sevOrder[b.dataset.sev]||9; }
+    return sortAsc ? av - bv : bv - av;
+  });
+  sorted.forEach(c => container.appendChild(c));
+  applyFilters(); // re-apply to handle grouping
+}
+
+function clearFilters() {
+  document.getElementById('fSev').value    = '';
+  document.getElementById('fSrc').value    = '';
+  document.getElementById('fGuards').value = 0;
+  document.getElementById('fText').value   = '';
+  document.getElementById('fGroup').value  = '';
+  document.getElementById('guardVal').textContent = '0';
+  document.querySelectorAll('.group-header').forEach(h => h.remove());
+  cards.forEach(c => c.classList.remove('hidden'));
+  document.getElementById('fCount').textContent = cards.length + ' finding(s)';
+  sortKey = 'idx'; sortAsc = true;
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('sIdx').classList.add('active');
+  const container = document.getElementById('cardContainer');
+  [...cards].sort((a,b) => parseInt(a.id.slice(1)) - parseInt(b.id.slice(1)))
+    .forEach(c => container.appendChild(c));
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Keyboard shortcut: / to focus search
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'SELECT') {
+    e.preventDefault();
+    document.getElementById('fText').focus();
+  }
+});
+</script>
+</body>
+</html>

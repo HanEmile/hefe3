@@ -1,0 +1,2743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Taint — &lt;all sinks&gt;</title>
+<style>
+:root{
+  --bg:#0d1117;--s:#161b22;--b:#30363d;--b2:#21262d;
+  --t:#c9d1d9;--m:#8b949e;--a:#58a6ff;
+  --red:#f85149;--orange:#e09b52;--yel:#e3b341;--grn:#3fb950;--purple:#bc8cff;
+  --hit:#1a2d1a;--hitborder:#3fb950;
+  --mono:"JetBrains Mono","Cascadia Code","Fira Code",ui-monospace,monospace;
+  --fs:12px;--lh:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-size:var(--fs);line-height:var(--lh)}
+body{background:var(--bg);color:var(--t);font-family:system-ui,sans-serif;
+  padding:0;min-height:100vh}
+
+/* ════ HEADER ════════════════════════════════════════════════════════════════*/
+.topbar{
+  background:linear-gradient(135deg,#0d1117 0%,#161b22 100%);
+  border-bottom:1px solid var(--b);
+  padding:10px 16px;position:sticky;top:0;z-index:100;
+}
+.topbar-inner{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.logo{font-size:14px;font-weight:800;letter-spacing:-.02em;
+  background:linear-gradient(90deg,var(--red),var(--orange),var(--yel));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  white-space:nowrap}
+.target-chip{background:var(--b2);border:1px solid var(--b);
+  border-radius:4px;padding:2px 8px;font-size:10px;color:var(--m);
+  font-family:var(--mono);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:300px}
+.stat-chips{display:flex;gap:6px;margin-left:auto}
+.stat-chip{padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;
+  letter-spacing:.04em}
+.stat-chip.full{background:rgba(248,81,73,.18);color:var(--red);
+  border:1px solid rgba(248,81,73,.35)}
+.stat-chip.partial{background:rgba(227,179,65,.15);color:var(--yel);
+  border:1px solid rgba(227,179,65,.3)}
+.stat-chip.none{background:var(--b2);color:var(--m);border:1px solid var(--b)}
+
+/* ════ FILTER BAR ════════════════════════════════════════════════════════════*/
+.filterbar{
+  background:var(--s);border-bottom:1px solid var(--b);
+  padding:6px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  font-size:11px;
+}
+.filterbar label{color:var(--m);white-space:nowrap}
+.filterbar select,
+.filterbar input[type=range]{
+  background:var(--b2);border:1px solid var(--b);color:var(--t);
+  border-radius:3px;padding:2px 6px;font-size:11px;height:22px;
+}
+.filterbar select:focus{outline:1px solid var(--a);border-color:var(--a)}
+.filter-sep{width:1px;background:var(--b);height:18px;flex-shrink:0}
+.sort-btn{background:var(--b2);border:1px solid var(--b);color:var(--t);
+  border-radius:3px;padding:2px 8px;font-size:10px;cursor:pointer;height:22px;
+  display:flex;align-items:center;gap:4px}
+.sort-btn:hover{border-color:var(--a);color:var(--a)}
+.sort-btn.active{border-color:var(--a);color:var(--a);background:rgba(88,166,255,.08)}
+.filter-count{color:var(--m);font-size:10px;margin-left:auto;white-space:nowrap}
+.clear-btn{background:transparent;border:1px solid var(--b);color:var(--m);
+  border-radius:3px;padding:2px 8px;font-size:10px;cursor:pointer;height:22px}
+.clear-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* ════ MAIN CONTENT ══════════════════════════════════════════════════════════*/
+.content{padding:10px 16px;max-width:1400px}
+
+/* ════ FINDING CARD ══════════════════════════════════════════════════════════*/
+.card{
+  border:1px solid var(--b);border-radius:6px;
+  margin-bottom:8px;overflow:hidden;
+  transition:box-shadow .15s;
+}
+.card:hover{box-shadow:0 0 0 1px var(--b2)}
+.card.full   {border-left:3px solid var(--red)}
+.card.partial{border-left:3px solid var(--yel)}
+.card.hidden {display:none!important}
+
+/* ── card header bar ── */
+.card-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--s);padding:5px 10px;border-bottom:1px solid var(--b);
+  gap:8px;flex-wrap:wrap;
+}
+.card-hdr-left{display:flex;align-items:center;gap:8px}
+.sev-pill{
+  font-size:9px;font-weight:800;padding:2px 6px;border-radius:3px;
+  text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;
+}
+.sev-pill.full   {background:var(--red);color:#fff}
+.sev-pill.partial{background:var(--yel);color:#000}
+.finding-num{font-size:11px;color:var(--m);font-weight:600}
+.cross-file{
+  font-size:9px;background:rgba(188,140,255,.12);border:1px solid rgba(188,140,255,.25);
+  color:var(--purple);border-radius:3px;padding:1px 6px;font-family:var(--mono);
+}
+.same-file{
+  font-size:9px;color:var(--m);font-family:var(--mono);
+  background:var(--b2);border:1px solid var(--b);border-radius:3px;padding:1px 6px;
+}
+.card-hdr-pills{display:flex;align-items:center;gap:5px}
+.meta-pill{
+  font-size:9px;padding:1px 7px;border-radius:10px;white-space:nowrap;cursor:default;
+}
+.steps-pill{background:rgba(88,166,255,.1);color:var(--a);border:1px solid rgba(88,166,255,.2)}
+.guards-pill-hdr{background:rgba(227,179,65,.1);color:var(--yel);border:1px solid rgba(227,179,65,.2)}
+.src-pill{background:rgba(63,185,80,.1);color:var(--grn);border:1px solid rgba(63,185,80,.2);
+  font-family:var(--mono)}
+
+/* ── quick flow ── */
+.quick-flow{
+  display:grid;grid-template-columns:1fr auto 1fr;
+  align-items:center;gap:0;
+  background:var(--bg);border-bottom:1px solid var(--b);
+  min-height:0;
+}
+.qf-from,.qf-to{
+  padding:5px 10px;overflow:hidden;min-width:0;
+}
+.qf-label{
+  display:inline-block;font-size:8px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.1em;
+  padding:1px 4px;border-radius:2px;margin-right:5px;
+  vertical-align:middle;
+}
+.qf-label.src{background:rgba(248,81,73,.2);color:var(--red)}
+.qf-label.snk{background:rgba(88,166,255,.15);color:var(--a)}
+.qf-loc{
+  font-family:var(--mono);color:var(--a);font-size:10px;
+  display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.qf-desc{
+  font-family:var(--mono);font-size:9px;color:var(--m);
+  display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  margin-top:1px;
+}
+.qf-arrow{
+  padding:0 12px;color:var(--m);font-size:10px;white-space:nowrap;
+  text-align:center;font-family:var(--mono);
+  border-left:1px solid var(--b);border-right:1px solid var(--b);
+  background:var(--s);min-height:100%;display:flex;align-items:center;
+}
+
+/* ── pipeline toggle ── */
+details.pipeline-wrap>summary.pipeline-toggle{
+  cursor:pointer;list-style:none;
+  padding:4px 10px;background:var(--b2);
+  color:var(--m);font-size:10px;user-select:none;
+  display:flex;align-items:center;gap:6px;
+  border-bottom:1px solid transparent;
+}
+details.pipeline-wrap>summary.pipeline-toggle::-webkit-details-marker{display:none}
+.tog-arrow{font-size:8px;transition:transform .15s;display:inline-block}
+details.pipeline-wrap[open]>summary.pipeline-toggle .tog-arrow{transform:rotate(90deg)}
+details.pipeline-wrap[open]>summary.pipeline-toggle{border-bottom-color:var(--b)}
+.tog-sub{color:var(--m);font-size:9px;opacity:.7}
+
+/* ── pipeline ── */
+.pipeline{
+  padding:10px;display:flex;flex-direction:column;
+  align-items:flex-start;gap:0;background:var(--bg);
+}
+.pipe-node{
+  width:100%;border:1px solid var(--b);border-radius:4px;
+  overflow:hidden;
+}
+.pipe-node.pn-source{border-left:3px solid var(--red)}
+.pipe-node.pn-sink  {border-left:3px solid var(--a)}
+.pipe-node.pn-step  {border-left:3px solid var(--b)}
+
+.pn-header{
+  display:flex;align-items:center;gap:6px;
+  padding:3px 8px;background:rgba(255,255,255,.03);
+  border-bottom:1px solid var(--b);
+}
+.pn-icon{font-size:8px}
+.pn-source .pn-icon{color:var(--red)}
+.pn-sink   .pn-icon{color:var(--a)}
+.pn-step   .pn-icon{color:var(--m)}
+.pn-kind{
+  font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.07em;white-space:nowrap;
+}
+.pn-source .pn-kind{color:var(--red)}
+.pn-sink   .pn-kind{color:var(--a)}
+.pn-step   .pn-kind{color:var(--m)}
+.pn-file{font-family:var(--mono);font-size:10px;color:var(--t);flex:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pn-loc{font-family:var(--mono);font-size:9px;color:var(--m)}
+.guards-pill{
+  font-size:8px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.25);
+  color:var(--yel);border-radius:8px;padding:0 5px;cursor:help;
+}
+
+/* ── node details ── */
+details.pn-details>summary.pn-desc{
+  cursor:pointer;list-style:none;
+  padding:3px 8px;font-family:var(--mono);font-size:10px;
+  color:var(--t);user-select:none;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  display:flex;align-items:center;gap:4px;
+}
+details.pn-details>summary.pn-desc::-webkit-details-marker{display:none}
+details.pn-details>summary.pn-desc::before{
+  content:"▶";font-size:7px;transition:transform .1s;flex-shrink:0;color:var(--m);
+}
+details.pn-details[open]>summary.pn-desc::before{transform:rotate(90deg)}
+
+/* guards inside node */
+.node-guards{padding:4px 8px 0;}
+.guard-item{
+  font-family:var(--mono);font-size:9px;color:var(--yel);
+  padding:1px 0;padding-left:12px;position:relative;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.guard-item::before{content:"if";position:absolute;left:0;color:var(--m)}
+
+/* code in nodes */
+pre.code{
+  margin:4px 0 0;padding:4px 8px;
+  background:var(--bg);font-family:var(--mono);
+  font-size:11px;line-height:16px;
+  overflow-x:auto;border-top:1px solid var(--b);
+  tab-size:4;
+}
+.ln{display:inline-block;width:32px;color:var(--m);
+  user-select:none;text-align:right;margin-right:8px}
+.cl{display:block;height:16px;line-height:16px;
+  white-space:pre;overflow:hidden;text-overflow:ellipsis}
+.cl.hit{background:var(--hit);border-left:2px solid var(--hitborder);
+  margin-left:-2px;padding-left:2px;color:#acf2a0;height:16px;line-height:16px}
+
+/* ── pipe arrow connector ── */
+.pipe-arrow{
+  align-self:flex-start;margin-left:16px;
+  font-size:12px;color:var(--b);padding:1px 0;
+  line-height:14px;user-select:none;
+}
+
+.group-header{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 10px 3px;margin-top:8px;
+  border-bottom:1px solid var(--b);
+  font-size:10px;font-weight:700;color:var(--a);
+  letter-spacing:.04em;text-transform:uppercase;
+}
+.gh-count{background:rgba(88,166,255,.12);border:1px solid rgba(88,166,255,.2);
+  color:var(--a);border-radius:8px;padding:0 6px;font-size:9px}
+
+footer{padding:10px 16px 20px;color:var(--m);font-size:10px;
+  border-top:1px solid var(--b);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="logo">⚡ TAINT</span>
+    <span class="target-chip">target: &lt;all sinks&gt;</span>
+    <div class="stat-chips">
+      <span class="stat-chip full">32 FULL</span>
+      <span class="stat-chip partial">0 PARTIAL</span>
+      <span class="stat-chip none">32 total</span>
+    </div>
+  </div>
+</div>
+
+<div class="filterbar">
+  <input type="search" id="fText" placeholder="Search…" oninput="applyFilters()"
+    style="background:var(--b2);border:1px solid var(--b);color:var(--t);
+      border-radius:3px;padding:2px 8px;font-size:11px;height:22px;width:160px">
+
+  <div class="filter-sep"></div>
+  <label>Sev</label>
+  <select id="fSev" onchange="applyFilters()">
+    <option value="">all</option>
+    <option value="full">FULL</option>
+    <option value="partial">PARTIAL</option>
+  </select>
+
+  <div class="filter-sep"></div>
+  <label>Source fn</label>
+  <select id="fSrc" onchange="applyFilters()">
+    <option value="">any</option>
+    <option value="(result)  ← body(ls, &amp;b, 0, ls-&gt;linenumber)">(result)  ← body(ls, &amp;b, 0, ls-&gt;linenumber)</option><option value="(result)  ← body(ls, &amp;b, needself, line)">(result)  ← body(ls, &amp;b, needself, line)</option><option value="(result)  ← body(ls, v, 0, ls-&gt;linenumber)">(result)  ← body(ls, v, 0, ls-&gt;linenumber)</option><option value="(result)  ← getenv(&quot;HOME&quot;)">(result)  ← getenv(&quot;HOME&quot;)</option><option value="(result)  ← getenv(&quot;TERM&quot;)">(result)  ← getenv(&quot;TERM&quot;)</option><option value="(result)  ← getenv(&quot;UPSTART_JOB&quot;)">(result)  ← getenv(&quot;UPSTART_JOB&quot;)</option><option value="(result)  ← getenv(LUA_INIT)">(result)  ← getenv(LUA_INIT)</option><option value="(result)  ← getenv(REDIS_CLI_AUTH_ENV)">(result)  ← getenv(REDIS_CLI_AUTH_ENV)</option><option value="(result)  ← getenv(REDIS_CLI_CLUSTER_YES_ENV)">(result)  ← getenv(REDIS_CLI_CLUSTER_YES_ENV)</option><option value="(result)  ← getenv(envname)">(result)  ← getenv(envname)</option><option value="(result)  ← mmap(NULL, 4096, PROT_READ, MAP_PRIVATE | MAP_ANON, -1, 0)">(result)  ← mmap(NULL, 4096, PROT_READ, MAP_PRIVATE | MAP_ANON, -1, 0)</option><option value="(result)  ← mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)">(result)  ← mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)</option><option value="(result)  ← mmap(addr, size, prot, flags, -1, 0)">(result)  ← mmap(addr, size, prot, flags, -1, 0)</option><option value="(result)  ← mmap(addr, size, prot, mmap_flags | MAP_FIXED, PAGES_FD_TAG, 0)">(result)  ← mmap(addr, size, prot, mmap_flags | MAP_FIXED, PAGES_FD_TAG, 0)</option><option value="buf  ← fread(buf, 1, sizeof(buf), fp)">buf  ← fread(buf, 1, sizeof(buf), fp)</option><option value="buf  ← read(fd, buf, #ifdef _WIN32">buf  ← read(fd, buf, #ifdef _WIN32</option><option value="buf  ← read(fileno(stdin), buf, 255)  [fills: buf]">buf  ← read(fileno(stdin), buf, 255)  [fills: buf]</option><option value="buf  ← read(fileno(stdin), buf, 4)  [fills: buf]">buf  ← read(fileno(stdin), buf, 4)  [fills: buf]</option><option value="buf  ← read(fileno(stdin), buf, 6)">buf  ← read(fileno(stdin), buf, 6)</option><option value="f  ← getline(f, pc)">f  ← getline(f, pc)</option><option value="obuf  ← read(STDIN_FILENO, obuf, sizeof(obuf))">obuf  ← read(STDIN_FILENO, obuf, sizeof(obuf))</option><option value="obuf  ← read(STDIN_FILENO, obuf, sizeof(obuf))  [fills: obuf]">obuf  ← read(STDIN_FILENO, obuf, sizeof(obuf))  [fills: obuf]</option><option value="p  ← getline(p, npc)  [fills: p]">p  ← getline(p, npc)  [fills: p]</option>
+  </select>
+
+  <div class="filter-sep"></div>
+  <label>Min guards</label>
+  <input type="range" id="fGuards" min="0" max="20" value="0"
+    oninput="document.getElementById('guardVal').textContent=this.value;applyFilters()"
+    style="width:80px">
+  <span id="guardVal" style="color:var(--yel);font-size:10px;min-width:16px">0</span>
+
+  <div class="filter-sep"></div>
+  <label>Group</label>
+  <select id="fGroup" onchange="applyFilters()">
+    <option value="">none</option>
+    <option value="source">by source fn</option>
+    <option value="sinkfile">by sink file</option>
+    <option value="sev">by severity</option>
+  </select>
+
+  <div class="filter-sep"></div>
+  <label>Sort</label>
+  <button class="sort-btn active" id="sIdx"    onclick="sortBy('idx')">   # </button>
+  <button class="sort-btn"        id="sSteps"  onclick="sortBy('steps')"> steps </button>
+  <button class="sort-btn"        id="sGuards" onclick="sortBy('guards')">guards </button>
+  <button class="sort-btn"        id="sSev"    onclick="sortBy('sev')">   sev </button>
+
+  <div class="filter-sep"></div>
+  <button class="clear-btn" onclick="clearFilters()">✕ reset</button>
+  <span class="filter-count" id="fCount">32 finding(s)</span>
+</div>
+
+<div class="content" id="cardContainer">
+<div class="card full" id="c0"
+  data-sev="full"
+  data-source="buf  ← read(fd, buf, #ifdef _WIN32"
+  data-steps="2"
+  data-guards="0"
+  data-srcfile="malloc_io.h"
+  data-sinkfile="malloc_io.h">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#0</span>
+      <span class="same-file">malloc_io.h</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">buf  ← read(fd, buf, #ifdef _WIN32</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/jemalloc/include/jemalloc/internal/malloc_io.h:96:19</span>
+      <span class="qf-desc">buf  ← read(fd, buf, #ifdef _WIN32</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/jemalloc/include/jemalloc/internal/malloc_io.h:94:16</span>
+      <span class="qf-desc">syscall(SYS_read, fd, buf, count)     (tainted arg: buf)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">malloc_io.h</span>
+    <span class="pn-loc">:96</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">buf  ← read(fd, buf, #ifdef _WIN32</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">  93</span>  #if defined(JEMALLOC_USE_SYSCALL) &amp;&amp; defined(SYS_read)</div><div class="cl"><span class="ln">  94</span>  	long result = syscall(SYS_read, fd, buf, count);</div><div class="cl"><span class="ln">  95</span>  #else</div><div class="cl hit"><span class="ln">  96</span>  	ssize_t result = read(fd, buf,</div><div class="cl"><span class="ln">  97</span>  #ifdef _WIN32</div><div class="cl"><span class="ln">  98</span>  	    (unsigned int)</div><div class="cl"><span class="ln">  99</span>  #endif</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">malloc_io.h</span>
+    <span class="pn-loc">:94</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">syscall(SYS_read, fd, buf, count)     (tainted arg: buf)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">  91</span>  static inline ssize_t</div><div class="cl"><span class="ln">  92</span>  malloc_read_fd(int fd, void *buf, size_t count) {</div><div class="cl"><span class="ln">  93</span>  #if defined(JEMALLOC_USE_SYSCALL) &amp;&amp; defined(SYS_read)</div><div class="cl hit"><span class="ln">  94</span>  	long result = syscall(SYS_read, fd, buf, count);</div><div class="cl"><span class="ln">  95</span>  #else</div><div class="cl"><span class="ln">  96</span>  	ssize_t result = read(fd, buf,</div><div class="cl"><span class="ln">  97</span>  #ifdef _WIN32</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c1"
+  data-sev="full"
+  data-source="(result)  ← mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)"
+  data-steps="1"
+  data-guards="0"
+  data-srcfile="pages.c"
+  data-sinkfile="pages.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#1</span>
+      <span class="same-file">pages.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/jemalloc/src/pages.c:67:16</span>
+      <span class="qf-desc">(result)  ← mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/jemalloc/src/pages.c:67:16</span>
+      <span class="qf-desc">(result)  ← mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">pages.c</span>
+    <span class="pn-loc">:67</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">  64</span>  	int works = -1;</div><div class="cl"><span class="ln">  65</span>  	size_t size = PAGE;</div><div class="cl"><span class="ln">  66</span>  </div><div class="cl hit"><span class="ln">  67</span>  	void * addr = mmap(NULL, size, PROT_READ|PROT_WRITE,</div><div class="cl"><span class="ln">  68</span>  	    MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);</div><div class="cl"><span class="ln">  69</span>  </div><div class="cl"><span class="ln">  70</span>  	if (addr == MAP_FAILED) {</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c2"
+  data-sev="full"
+  data-source="(result)  ← mmap(addr, size, prot, flags, -1, 0)"
+  data-steps="1"
+  data-guards="2"
+  data-srcfile="pages.c"
+  data-sinkfile="pages.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#2</span>
+      <span class="same-file">pages.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">2&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← mmap(addr, size, prot, flags, -1, 0)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/jemalloc/src/pages.c:274:15</span>
+      <span class="qf-desc">(result)  ← mmap(addr, size, prot, flags, -1, 0)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/jemalloc/src/pages.c:274:15</span>
+      <span class="qf-desc">(result)  ← mmap(addr, size, prot, flags, -1, 0)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">pages.c</span>
+    <span class="pn-loc">:274</span>
+    <span class="guards-pill" title="2 guard(s)">2</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← mmap(addr, size, prot, flags, -1, 0)</summary>
+    <div class="node-guards"><div class="guard-item">if (os_overcommits)</div><div class="guard-item">if (addr != NULL)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 271</span>  			flags |= MAP_ALIGNED(alignment_bits);</div><div class="cl"><span class="ln"> 272</span>  		}</div><div class="cl"><span class="ln"> 273</span>  </div><div class="cl hit"><span class="ln"> 274</span>  		void *ret = mmap(addr, size, prot, flags, -1, 0);</div><div class="cl"><span class="ln"> 275</span>  		if (ret == MAP_FAILED) {</div><div class="cl"><span class="ln"> 276</span>  			ret = NULL;</div><div class="cl"><span class="ln"> 277</span>  		}</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c3"
+  data-sev="full"
+  data-source="(result)  ← mmap(addr, size, prot, mmap_flags | MAP_FIXED, PAGES_FD_TAG, 0)"
+  data-steps="1"
+  data-guards="0"
+  data-srcfile="pages.c"
+  data-sinkfile="pages.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#3</span>
+      <span class="same-file">pages.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← mmap(addr, size, prot, mmap_flags | MAP_FIXED, PAGES_FD_TAG, 0)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/jemalloc/src/pages.c:329:18</span>
+      <span class="qf-desc">(result)  ← mmap(addr, size, prot, mmap_flags | MAP_FIXED, PAGES_FD_TAG, 0)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/jemalloc/src/pages.c:329:18</span>
+      <span class="qf-desc">(result)  ← mmap(addr, size, prot, mmap_flags | MAP_FIXED, PAGES_FD_TAG, 0)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">pages.c</span>
+    <span class="pn-loc">:329</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← mmap(addr, size, prot, mmap_flags | MAP_FIXED, PAGES_FD_TAG, 0)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln"> 326</span>  #else</div><div class="cl"><span class="ln"> 327</span>  	{</div><div class="cl"><span class="ln"> 328</span>  		int prot = commit ? PAGES_PROT_COMMIT : PAGES_PROT_DECOMMIT;</div><div class="cl hit"><span class="ln"> 329</span>  		void *result = mmap(addr, size, prot, mmap_flags | MAP_FIXED,</div><div class="cl"><span class="ln"> 330</span>  		    PAGES_FD_TAG, 0);</div><div class="cl"><span class="ln"> 331</span>  		if (result == MAP_FAILED) {</div><div class="cl"><span class="ln"> 332</span>  			return true;</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c4"
+  data-sev="full"
+  data-source="(result)  ← getenv(&quot;TERM&quot;)"
+  data-steps="1"
+  data-guards="0"
+  data-srcfile="linenoise.c"
+  data-sinkfile="linenoise.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#4</span>
+      <span class="same-file">linenoise.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← getenv(&quot;TERM&quot;)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/linenoise/linenoise.c:291:18</span>
+      <span class="qf-desc">(result)  ← getenv(&quot;TERM&quot;)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/linenoise/linenoise.c:291:18</span>
+      <span class="qf-desc">(result)  ← getenv(&quot;TERM&quot;)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">linenoise.c</span>
+    <span class="pn-loc">:291</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← getenv(&quot;TERM&quot;)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln"> 288</span>  /* Return true if the terminal name is in the list of terminals we know are</div><div class="cl"><span class="ln"> 289</span>   * not able to understand basic escape sequences. */</div><div class="cl"><span class="ln"> 290</span>  static int isUnsupportedTerm(void) {</div><div class="cl hit"><span class="ln"> 291</span>      char *term = getenv(&quot;TERM&quot;);</div><div class="cl"><span class="ln"> 292</span>      int j;</div><div class="cl"><span class="ln"> 293</span>  </div><div class="cl"><span class="ln"> 294</span>      if (term == NULL) return 0;</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c5"
+  data-sev="full"
+  data-source="(result)  ← getenv(envname)"
+  data-steps="1"
+  data-guards="0"
+  data-srcfile="loadlib.c"
+  data-sinkfile="loadlib.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#5</span>
+      <span class="same-file">loadlib.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← getenv(envname)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/loadlib.c:594:22</span>
+      <span class="qf-desc">(result)  ← getenv(envname)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/loadlib.c:594:22</span>
+      <span class="qf-desc">(result)  ← getenv(envname)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">loadlib.c</span>
+    <span class="pn-loc">:594</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← getenv(envname)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln"> 591</span>  </div><div class="cl"><span class="ln"> 592</span>  static void setpath (lua_State *L, const char *fieldname, const char *envname,</div><div class="cl"><span class="ln"> 593</span>                                     const char *def) {</div><div class="cl hit"><span class="ln"> 594</span>    const char *path = getenv(envname);</div><div class="cl"><span class="ln"> 595</span>    if (path == NULL)  /* no environment variable? */</div><div class="cl"><span class="ln"> 596</span>      lua_pushstring(L, def);  /* use default */</div><div class="cl"><span class="ln"> 597</span>    else {</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c6"
+  data-sev="full"
+  data-source="(result)  ← body(ls, v, 0, ls-&gt;linenumber)"
+  data-steps="1"
+  data-guards="1"
+  data-srcfile="lparser.c"
+  data-sinkfile="lparser.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#6</span>
+      <span class="same-file">lparser.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">1&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← body(ls, v, 0, ls-&gt;linenumber)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/lparser.c:770:7</span>
+      <span class="qf-desc">(result)  ← body(ls, v, 0, ls-&gt;linenumber)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/lparser.c:770:7</span>
+      <span class="qf-desc">(result)  ← body(ls, v, 0, ls-&gt;linenumber)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">lparser.c</span>
+    <span class="pn-loc">:770</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← body(ls, v, 0, ls-&gt;linenumber)</summary>
+    <div class="node-guards"><div class="guard-item">if (ls-&gt;t.token)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 767</span>      }</div><div class="cl"><span class="ln"> 768</span>      case TK_FUNCTION: {</div><div class="cl"><span class="ln"> 769</span>        luaX_next(ls);</div><div class="cl hit"><span class="ln"> 770</span>        body(ls, v, 0, ls-&gt;linenumber);</div><div class="cl"><span class="ln"> 771</span>        return;</div><div class="cl"><span class="ln"> 772</span>      }</div><div class="cl"><span class="ln"> 773</span>      default: {</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c7"
+  data-sev="full"
+  data-source="(result)  ← body(ls, &amp;b, 0, ls-&gt;linenumber)"
+  data-steps="1"
+  data-guards="0"
+  data-srcfile="lparser.c"
+  data-sinkfile="lparser.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#7</span>
+      <span class="same-file">lparser.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← body(ls, &amp;b, 0, ls-&gt;linenumber)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/lparser.c:1176:3</span>
+      <span class="qf-desc">(result)  ← body(ls, &amp;b, 0, ls-&gt;linenumber)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/lparser.c:1176:3</span>
+      <span class="qf-desc">(result)  ← body(ls, &amp;b, 0, ls-&gt;linenumber)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">lparser.c</span>
+    <span class="pn-loc">:1176</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← body(ls, &amp;b, 0, ls-&gt;linenumber)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">1173</span>    init_exp(&amp;v, VLOCAL, fs-&gt;freereg);</div><div class="cl"><span class="ln">1174</span>    luaK_reserveregs(fs, 1);</div><div class="cl"><span class="ln">1175</span>    adjustlocalvars(ls, 1);</div><div class="cl hit"><span class="ln">1176</span>    body(ls, &amp;b, 0, ls-&gt;linenumber);</div><div class="cl"><span class="ln">1177</span>    luaK_storevar(fs, &amp;v, &amp;b);</div><div class="cl"><span class="ln">1178</span>    /* debug information will only see the variable after this point! */</div><div class="cl"><span class="ln">1179</span>    getlocvar(fs, fs-&gt;nactvar - 1).startpc = fs-&gt;pc;</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c8"
+  data-sev="full"
+  data-source="(result)  ← body(ls, &amp;b, needself, line)"
+  data-steps="1"
+  data-guards="0"
+  data-srcfile="lparser.c"
+  data-sinkfile="lparser.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#8</span>
+      <span class="same-file">lparser.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← body(ls, &amp;b, needself, line)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/lparser.c:1222:3</span>
+      <span class="qf-desc">(result)  ← body(ls, &amp;b, needself, line)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/lparser.c:1222:3</span>
+      <span class="qf-desc">(result)  ← body(ls, &amp;b, needself, line)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">lparser.c</span>
+    <span class="pn-loc">:1222</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← body(ls, &amp;b, needself, line)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">1219</span>    expdesc v, b;</div><div class="cl"><span class="ln">1220</span>    luaX_next(ls);  /* skip FUNCTION */</div><div class="cl"><span class="ln">1221</span>    needself = funcname(ls, &amp;v);</div><div class="cl hit"><span class="ln">1222</span>    body(ls, &amp;b, needself, line);</div><div class="cl"><span class="ln">1223</span>    luaK_storevar(ls-&gt;fs, &amp;v, &amp;b);</div><div class="cl"><span class="ln">1224</span>    luaK_fixline(ls-&gt;fs, line);  /* definition `happens' in the first line */</div><div class="cl"><span class="ln">1225</span>  }</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c9"
+  data-sev="full"
+  data-source="(result)  ← getenv(LUA_INIT)"
+  data-steps="1"
+  data-guards="0"
+  data-srcfile="lua.c"
+  data-sinkfile="lua.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#9</span>
+      <span class="same-file">lua.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← getenv(LUA_INIT)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/lua.c:324:22</span>
+      <span class="qf-desc">(result)  ← getenv(LUA_INIT)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/lua.c:324:22</span>
+      <span class="qf-desc">(result)  ← getenv(LUA_INIT)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">lua.c</span>
+    <span class="pn-loc">:324</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← getenv(LUA_INIT)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln"> 321</span>  </div><div class="cl"><span class="ln"> 322</span>  </div><div class="cl"><span class="ln"> 323</span>  static int handle_luainit (lua_State *L) {</div><div class="cl hit"><span class="ln"> 324</span>    const char *init = getenv(LUA_INIT);</div><div class="cl"><span class="ln"> 325</span>    if (init == NULL) return 0;  /* status OK */</div><div class="cl"><span class="ln"> 326</span>    else if (init[0] == '@')</div><div class="cl"><span class="ln"> 327</span>      return dofile(L, init+1);</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c10"
+  data-sev="full"
+  data-source="p  ← getline(p, npc)  [fills: p]"
+  data-steps="2"
+  data-guards="4"
+  data-srcfile="lvm.c"
+  data-sinkfile="lvm.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#10</span>
+      <span class="same-file">lvm.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">4&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">p  ← getline(p, npc)  [fills: p]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/lvm.c:71:19</span>
+      <span class="qf-desc">p  ← getline(p, npc)  [fills: p]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/lvm.c:70:15</span>
+      <span class="qf-desc">pcRel(pc, p)     (tainted arg: p)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">lvm.c</span>
+    <span class="pn-loc">:71</span>
+    <span class="guards-pill" title="2 guard(s)">2</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">p  ← getline(p, npc)  [fills: p]</summary>
+    <div class="node-guards"><div class="guard-item">if ((mask &amp; LUA_MASKCOUNT) &amp;&amp; L-&gt;hookcount == 0)</div><div class="guard-item">if (mask &amp; LUA_MASKLINE)</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  68</span>    if (mask &amp; LUA_MASKLINE) {</div><div class="cl"><span class="ln">  69</span>      Proto *p = ci_func(L-&gt;ci)-&gt;l.p;</div><div class="cl"><span class="ln">  70</span>      int npc = pcRel(pc, p);</div><div class="cl hit"><span class="ln">  71</span>      int newline = getline(p, npc);</div><div class="cl"><span class="ln">  72</span>      /* call linehook when enter a new function, when jump back (loop),</div><div class="cl"><span class="ln">  73</span>         or when enter a new line */</div><div class="cl"><span class="ln">  74</span>      if (npc == 0 || pc &lt;= oldpc || newline != getline(p, pcRel(oldpc, p)))</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">lvm.c</span>
+    <span class="pn-loc">:70</span>
+    <span class="guards-pill" title="2 guard(s)">2</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">pcRel(pc, p)     (tainted arg: p)</summary>
+    <div class="node-guards"><div class="guard-item">if ((mask &amp; LUA_MASKCOUNT) &amp;&amp; L-&gt;hookcount == 0)</div><div class="guard-item">if (mask &amp; LUA_MASKLINE)</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  67</span>    }</div><div class="cl"><span class="ln">  68</span>    if (mask &amp; LUA_MASKLINE) {</div><div class="cl"><span class="ln">  69</span>      Proto *p = ci_func(L-&gt;ci)-&gt;l.p;</div><div class="cl hit"><span class="ln">  70</span>      int npc = pcRel(pc, p);</div><div class="cl"><span class="ln">  71</span>      int newline = getline(p, npc);</div><div class="cl"><span class="ln">  72</span>      /* call linehook when enter a new function, when jump back (loop),</div><div class="cl"><span class="ln">  73</span>         or when enter a new line */</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c11"
+  data-sev="full"
+  data-source="f  ← getline(f, pc)"
+  data-steps="2"
+  data-guards="9"
+  data-srcfile="print.c"
+  data-sinkfile="print.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#11</span>
+      <span class="same-file">print.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">9&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">f  ← getline(f, pc)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/print.c:87:12</span>
+      <span class="qf-desc">f  ← getline(f, pc)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/print.c:108:21</span>
+      <span class="qf-desc">PrintConstant(f, bx)  (tainted arg: f, bx)  via [getline(f) at line 87]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">print.c</span>
+    <span class="pn-loc">:87</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">f  ← getline(f, pc)</summary>
+    <div class="node-guards"><div class="guard-item">if pc&lt;n</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  84</span>    int c=GETARG_C(i);</div><div class="cl"><span class="ln">  85</span>    int bx=GETARG_Bx(i);</div><div class="cl"><span class="ln">  86</span>    int sbx=GETARG_sBx(i);</div><div class="cl hit"><span class="ln">  87</span>    int line=getline(f,pc);</div><div class="cl"><span class="ln">  88</span>    printf(&quot;\t%d\t&quot;,pc+1);</div><div class="cl"><span class="ln">  89</span>    if (line&gt;0) printf(&quot;[%d]\t&quot;,line); else printf(&quot;[-]\t&quot;);</div><div class="cl"><span class="ln">  90</span>    printf(&quot;%-9s\t&quot;,luaP_opnames[o]);</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">print.c</span>
+    <span class="pn-loc">:108</span>
+    <span class="guards-pill" title="8 guard(s)">8</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">PrintConstant(f, bx)  (tainted arg: f, bx)  via [getline(f) at line 87]</summary>
+    <div class="node-guards"><div class="guard-item">if pc&lt;n</div><div class="guard-item">if (line&gt;0)</div><div class="guard-item">if (getOpMode(o))</div><div class="guard-item">if (getBMode(o)!=OpArgN)</div><div class="guard-item">if (getCMode(o)!=OpArgN)</div><div class="guard-item">if (getBMode(o)==OpArgK)</div><div class="guard-item">if (o==OP_JMP)</div><div class="guard-item">if (o)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 105</span>    switch (o)</div><div class="cl"><span class="ln"> 106</span>    {</div><div class="cl"><span class="ln"> 107</span>     case OP_LOADK:</div><div class="cl hit"><span class="ln"> 108</span>      printf(&quot;\t; &quot;); PrintConstant(f,bx);</div><div class="cl"><span class="ln"> 109</span>      break;</div><div class="cl"><span class="ln"> 110</span>     case OP_GETUPVAL:</div><div class="cl"><span class="ln"> 111</span>     case OP_SETUPVAL:</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c12"
+  data-sev="full"
+  data-source="f  ← getline(f, pc)"
+  data-steps="2"
+  data-guards="9"
+  data-srcfile="print.c"
+  data-sinkfile="print.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#12</span>
+      <span class="same-file">print.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">9&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">f  ← getline(f, pc)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/print.c:87:12</span>
+      <span class="qf-desc">f  ← getline(f, pc)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/print.c:112:5</span>
+      <span class="qf-desc">printf(&quot;\t; %s&quot;, (f-&gt;sizeupvalues&gt;0) ? getstr(f-&gt;upvalues[b]) : &quot;-&quot;)  (tainted arg: f, getstr, b)  via [getline(f) at line 87]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">print.c</span>
+    <span class="pn-loc">:87</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">f  ← getline(f, pc)</summary>
+    <div class="node-guards"><div class="guard-item">if pc&lt;n</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  84</span>    int c=GETARG_C(i);</div><div class="cl"><span class="ln">  85</span>    int bx=GETARG_Bx(i);</div><div class="cl"><span class="ln">  86</span>    int sbx=GETARG_sBx(i);</div><div class="cl hit"><span class="ln">  87</span>    int line=getline(f,pc);</div><div class="cl"><span class="ln">  88</span>    printf(&quot;\t%d\t&quot;,pc+1);</div><div class="cl"><span class="ln">  89</span>    if (line&gt;0) printf(&quot;[%d]\t&quot;,line); else printf(&quot;[-]\t&quot;);</div><div class="cl"><span class="ln">  90</span>    printf(&quot;%-9s\t&quot;,luaP_opnames[o]);</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">print.c</span>
+    <span class="pn-loc">:112</span>
+    <span class="guards-pill" title="8 guard(s)">8</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">printf(&quot;\t; %s&quot;, (f-&gt;sizeupvalues&gt;0) ? getstr(f-&gt;upvalues[b]) : &quot;-&quot;)  (tainted arg: f, getstr, b)  via [getline(f) at line 87]</summary>
+    <div class="node-guards"><div class="guard-item">if pc&lt;n</div><div class="guard-item">if (line&gt;0)</div><div class="guard-item">if (getOpMode(o))</div><div class="guard-item">if (getBMode(o)!=OpArgN)</div><div class="guard-item">if (getCMode(o)!=OpArgN)</div><div class="guard-item">if (getBMode(o)==OpArgK)</div><div class="guard-item">if (o==OP_JMP)</div><div class="guard-item">if (o)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 109</span>      break;</div><div class="cl"><span class="ln"> 110</span>     case OP_GETUPVAL:</div><div class="cl"><span class="ln"> 111</span>     case OP_SETUPVAL:</div><div class="cl hit"><span class="ln"> 112</span>      printf(&quot;\t; %s&quot;, (f-&gt;sizeupvalues&gt;0) ? getstr(f-&gt;upvalues[b]) : &quot;-&quot;);</div><div class="cl"><span class="ln"> 113</span>      break;</div><div class="cl"><span class="ln"> 114</span>     case OP_GETGLOBAL:</div><div class="cl"><span class="ln"> 115</span>     case OP_SETGLOBAL:</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c13"
+  data-sev="full"
+  data-source="f  ← getline(f, pc)"
+  data-steps="2"
+  data-guards="9"
+  data-srcfile="print.c"
+  data-sinkfile="print.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#13</span>
+      <span class="same-file">print.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">9&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">f  ← getline(f, pc)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/print.c:87:12</span>
+      <span class="qf-desc">f  ← getline(f, pc)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/print.c:116:5</span>
+      <span class="qf-desc">printf(&quot;\t; %s&quot;, svalue(&amp;f-&gt;k[bx]))  (tainted arg: svalue, f, bx)  via [getline(f) at line 87]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">print.c</span>
+    <span class="pn-loc">:87</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">f  ← getline(f, pc)</summary>
+    <div class="node-guards"><div class="guard-item">if pc&lt;n</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  84</span>    int c=GETARG_C(i);</div><div class="cl"><span class="ln">  85</span>    int bx=GETARG_Bx(i);</div><div class="cl"><span class="ln">  86</span>    int sbx=GETARG_sBx(i);</div><div class="cl hit"><span class="ln">  87</span>    int line=getline(f,pc);</div><div class="cl"><span class="ln">  88</span>    printf(&quot;\t%d\t&quot;,pc+1);</div><div class="cl"><span class="ln">  89</span>    if (line&gt;0) printf(&quot;[%d]\t&quot;,line); else printf(&quot;[-]\t&quot;);</div><div class="cl"><span class="ln">  90</span>    printf(&quot;%-9s\t&quot;,luaP_opnames[o]);</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">print.c</span>
+    <span class="pn-loc">:116</span>
+    <span class="guards-pill" title="8 guard(s)">8</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">printf(&quot;\t; %s&quot;, svalue(&amp;f-&gt;k[bx]))  (tainted arg: svalue, f, bx)  via [getline(f) at line 87]</summary>
+    <div class="node-guards"><div class="guard-item">if pc&lt;n</div><div class="guard-item">if (line&gt;0)</div><div class="guard-item">if (getOpMode(o))</div><div class="guard-item">if (getBMode(o)!=OpArgN)</div><div class="guard-item">if (getCMode(o)!=OpArgN)</div><div class="guard-item">if (getBMode(o)==OpArgK)</div><div class="guard-item">if (o==OP_JMP)</div><div class="guard-item">if (o)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 113</span>      break;</div><div class="cl"><span class="ln"> 114</span>     case OP_GETGLOBAL:</div><div class="cl"><span class="ln"> 115</span>     case OP_SETGLOBAL:</div><div class="cl hit"><span class="ln"> 116</span>      printf(&quot;\t; %s&quot;,svalue(&amp;f-&gt;k[bx]));</div><div class="cl"><span class="ln"> 117</span>      break;</div><div class="cl"><span class="ln"> 118</span>     case OP_GETTABLE:</div><div class="cl"><span class="ln"> 119</span>     case OP_SELF:</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c14"
+  data-sev="full"
+  data-source="f  ← getline(f, pc)"
+  data-steps="2"
+  data-guards="10"
+  data-srcfile="print.c"
+  data-sinkfile="print.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#14</span>
+      <span class="same-file">print.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">10&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">f  ← getline(f, pc)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/print.c:87:12</span>
+      <span class="qf-desc">f  ← getline(f, pc)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/print.c:120:35</span>
+      <span class="qf-desc">PrintConstant(f, INDEXK(c))  (tainted arg: f, INDEXK, c)  via [getline(f) at line 87]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">print.c</span>
+    <span class="pn-loc">:87</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">f  ← getline(f, pc)</summary>
+    <div class="node-guards"><div class="guard-item">if pc&lt;n</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  84</span>    int c=GETARG_C(i);</div><div class="cl"><span class="ln">  85</span>    int bx=GETARG_Bx(i);</div><div class="cl"><span class="ln">  86</span>    int sbx=GETARG_sBx(i);</div><div class="cl hit"><span class="ln">  87</span>    int line=getline(f,pc);</div><div class="cl"><span class="ln">  88</span>    printf(&quot;\t%d\t&quot;,pc+1);</div><div class="cl"><span class="ln">  89</span>    if (line&gt;0) printf(&quot;[%d]\t&quot;,line); else printf(&quot;[-]\t&quot;);</div><div class="cl"><span class="ln">  90</span>    printf(&quot;%-9s\t&quot;,luaP_opnames[o]);</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">print.c</span>
+    <span class="pn-loc">:120</span>
+    <span class="guards-pill" title="9 guard(s)">9</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">PrintConstant(f, INDEXK(c))  (tainted arg: f, INDEXK, c)  via [getline(f) at line 87]</summary>
+    <div class="node-guards"><div class="guard-item">if pc&lt;n</div><div class="guard-item">if (line&gt;0)</div><div class="guard-item">if (getOpMode(o))</div><div class="guard-item">if (getBMode(o)!=OpArgN)</div><div class="guard-item">if (getCMode(o)!=OpArgN)</div><div class="guard-item">if (getBMode(o)==OpArgK)</div><div class="guard-item">if (o==OP_JMP)</div><div class="guard-item">if (o)</div><div class="guard-item">if (ISK(c))</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 117</span>      break;</div><div class="cl"><span class="ln"> 118</span>     case OP_GETTABLE:</div><div class="cl"><span class="ln"> 119</span>     case OP_SELF:</div><div class="cl hit"><span class="ln"> 120</span>      if (ISK(c)) { printf(&quot;\t; &quot;); PrintConstant(f,INDEXK(c)); }</div><div class="cl"><span class="ln"> 121</span>      break;</div><div class="cl"><span class="ln"> 122</span>     case OP_SETTABLE:</div><div class="cl"><span class="ln"> 123</span>     case OP_ADD:</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c15"
+  data-sev="full"
+  data-source="f  ← getline(f, pc)"
+  data-steps="2"
+  data-guards="12"
+  data-srcfile="print.c"
+  data-sinkfile="print.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#15</span>
+      <span class="same-file">print.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">12&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">f  ← getline(f, pc)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/print.c:87:12</span>
+      <span class="qf-desc">f  ← getline(f, pc)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/print.c:134:18</span>
+      <span class="qf-desc">PrintConstant(f, INDEXK(b))  (tainted arg: f, INDEXK, b)  via [getline(f) at line 87]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">print.c</span>
+    <span class="pn-loc">:87</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">f  ← getline(f, pc)</summary>
+    <div class="node-guards"><div class="guard-item">if pc&lt;n</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  84</span>    int c=GETARG_C(i);</div><div class="cl"><span class="ln">  85</span>    int bx=GETARG_Bx(i);</div><div class="cl"><span class="ln">  86</span>    int sbx=GETARG_sBx(i);</div><div class="cl hit"><span class="ln">  87</span>    int line=getline(f,pc);</div><div class="cl"><span class="ln">  88</span>    printf(&quot;\t%d\t&quot;,pc+1);</div><div class="cl"><span class="ln">  89</span>    if (line&gt;0) printf(&quot;[%d]\t&quot;,line); else printf(&quot;[-]\t&quot;);</div><div class="cl"><span class="ln">  90</span>    printf(&quot;%-9s\t&quot;,luaP_opnames[o]);</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">print.c</span>
+    <span class="pn-loc">:134</span>
+    <span class="guards-pill" title="11 guard(s)">11</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">PrintConstant(f, INDEXK(b))  (tainted arg: f, INDEXK, b)  via [getline(f) at line 87]</summary>
+    <div class="node-guards"><div class="guard-item">if pc&lt;n</div><div class="guard-item">if (line&gt;0)</div><div class="guard-item">if (getOpMode(o))</div><div class="guard-item">if (getBMode(o)!=OpArgN)</div><div class="guard-item">if (getCMode(o)!=OpArgN)</div><div class="guard-item">if (getBMode(o)==OpArgK)</div><div class="guard-item">if (o==OP_JMP)</div><div class="guard-item">if (o)</div><div class="guard-item">if (ISK(c))</div><div class="guard-item">if (ISK(b) || ISK(c))</div><div class="guard-item">if (ISK(b))</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 131</span>      if (ISK(b) || ISK(c))</div><div class="cl"><span class="ln"> 132</span>      {</div><div class="cl"><span class="ln"> 133</span>       printf(&quot;\t; &quot;);</div><div class="cl hit"><span class="ln"> 134</span>       if (ISK(b)) PrintConstant(f,INDEXK(b)); else printf(&quot;-&quot;);</div><div class="cl"><span class="ln"> 135</span>       printf(&quot; &quot;);</div><div class="cl"><span class="ln"> 136</span>       if (ISK(c)) PrintConstant(f,INDEXK(c)); else printf(&quot;-&quot;);</div><div class="cl"><span class="ln"> 137</span>      }</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c16"
+  data-sev="full"
+  data-source="f  ← getline(f, pc)"
+  data-steps="2"
+  data-guards="13"
+  data-srcfile="print.c"
+  data-sinkfile="print.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#16</span>
+      <span class="same-file">print.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">13&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">f  ← getline(f, pc)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/print.c:87:12</span>
+      <span class="qf-desc">f  ← getline(f, pc)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/print.c:136:18</span>
+      <span class="qf-desc">PrintConstant(f, INDEXK(c))  (tainted arg: f, INDEXK, c)  via [getline(f) at line 87]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">print.c</span>
+    <span class="pn-loc">:87</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">f  ← getline(f, pc)</summary>
+    <div class="node-guards"><div class="guard-item">if pc&lt;n</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  84</span>    int c=GETARG_C(i);</div><div class="cl"><span class="ln">  85</span>    int bx=GETARG_Bx(i);</div><div class="cl"><span class="ln">  86</span>    int sbx=GETARG_sBx(i);</div><div class="cl hit"><span class="ln">  87</span>    int line=getline(f,pc);</div><div class="cl"><span class="ln">  88</span>    printf(&quot;\t%d\t&quot;,pc+1);</div><div class="cl"><span class="ln">  89</span>    if (line&gt;0) printf(&quot;[%d]\t&quot;,line); else printf(&quot;[-]\t&quot;);</div><div class="cl"><span class="ln">  90</span>    printf(&quot;%-9s\t&quot;,luaP_opnames[o]);</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">print.c</span>
+    <span class="pn-loc">:136</span>
+    <span class="guards-pill" title="12 guard(s)">12</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">PrintConstant(f, INDEXK(c))  (tainted arg: f, INDEXK, c)  via [getline(f) at line 87]</summary>
+    <div class="node-guards"><div class="guard-item">if pc&lt;n</div><div class="guard-item">if (line&gt;0)</div><div class="guard-item">if (getOpMode(o))</div><div class="guard-item">if (getBMode(o)!=OpArgN)</div><div class="guard-item">if (getCMode(o)!=OpArgN)</div><div class="guard-item">if (getBMode(o)==OpArgK)</div><div class="guard-item">if (o==OP_JMP)</div><div class="guard-item">if (o)</div><div class="guard-item">if (ISK(c))</div><div class="guard-item">if (ISK(b) || ISK(c))</div><div class="guard-item">if (ISK(b))</div><div class="guard-item">if (ISK(c))</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 133</span>       printf(&quot;\t; &quot;);</div><div class="cl"><span class="ln"> 134</span>       if (ISK(b)) PrintConstant(f,INDEXK(b)); else printf(&quot;-&quot;);</div><div class="cl"><span class="ln"> 135</span>       printf(&quot; &quot;);</div><div class="cl hit"><span class="ln"> 136</span>       if (ISK(c)) PrintConstant(f,INDEXK(c)); else printf(&quot;-&quot;);</div><div class="cl"><span class="ln"> 137</span>      }</div><div class="cl"><span class="ln"> 138</span>      break;</div><div class="cl"><span class="ln"> 139</span>     case OP_JMP:</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c17"
+  data-sev="full"
+  data-source="f  ← getline(f, pc)"
+  data-steps="2"
+  data-guards="13"
+  data-srcfile="print.c"
+  data-sinkfile="print.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#17</span>
+      <span class="same-file">print.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">13&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">f  ← getline(f, pc)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/print.c:87:12</span>
+      <span class="qf-desc">f  ← getline(f, pc)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/deps/lua/src/print.c:145:5</span>
+      <span class="qf-desc">printf(&quot;\t; %p&quot;, VOID(f-&gt;p[bx]))  (tainted arg: VOID, f, bx)  via [getline(f) at line 87]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">print.c</span>
+    <span class="pn-loc">:87</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">f  ← getline(f, pc)</summary>
+    <div class="node-guards"><div class="guard-item">if pc&lt;n</div></div>
+    <pre class="code"><div class="cl"><span class="ln">  84</span>    int c=GETARG_C(i);</div><div class="cl"><span class="ln">  85</span>    int bx=GETARG_Bx(i);</div><div class="cl"><span class="ln">  86</span>    int sbx=GETARG_sBx(i);</div><div class="cl hit"><span class="ln">  87</span>    int line=getline(f,pc);</div><div class="cl"><span class="ln">  88</span>    printf(&quot;\t%d\t&quot;,pc+1);</div><div class="cl"><span class="ln">  89</span>    if (line&gt;0) printf(&quot;[%d]\t&quot;,line); else printf(&quot;[-]\t&quot;);</div><div class="cl"><span class="ln">  90</span>    printf(&quot;%-9s\t&quot;,luaP_opnames[o]);</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">print.c</span>
+    <span class="pn-loc">:145</span>
+    <span class="guards-pill" title="12 guard(s)">12</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">printf(&quot;\t; %p&quot;, VOID(f-&gt;p[bx]))  (tainted arg: VOID, f, bx)  via [getline(f) at line 87]</summary>
+    <div class="node-guards"><div class="guard-item">if pc&lt;n</div><div class="guard-item">if (line&gt;0)</div><div class="guard-item">if (getOpMode(o))</div><div class="guard-item">if (getBMode(o)!=OpArgN)</div><div class="guard-item">if (getCMode(o)!=OpArgN)</div><div class="guard-item">if (getBMode(o)==OpArgK)</div><div class="guard-item">if (o==OP_JMP)</div><div class="guard-item">if (o)</div><div class="guard-item">if (ISK(c))</div><div class="guard-item">if (ISK(b) || ISK(c))</div><div class="guard-item">if (ISK(b))</div><div class="guard-item">if (ISK(c))</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 142</span>      printf(&quot;\t; to %d&quot;,sbx+pc+2);</div><div class="cl"><span class="ln"> 143</span>      break;</div><div class="cl"><span class="ln"> 144</span>     case OP_CLOSURE:</div><div class="cl hit"><span class="ln"> 145</span>      printf(&quot;\t; %p&quot;,VOID(f-&gt;p[bx]));</div><div class="cl"><span class="ln"> 146</span>      break;</div><div class="cl"><span class="ln"> 147</span>     case OP_SETLIST:</div><div class="cl"><span class="ln"> 148</span>      if (c==0) printf(&quot;\t; %d&quot;,(int)code[++pc]);</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c18"
+  data-sev="full"
+  data-source="(result)  ← mmap(NULL, 4096, PROT_READ, MAP_PRIVATE | MAP_ANON, -1, 0)"
+  data-steps="1"
+  data-guards="2"
+  data-srcfile="debug.c"
+  data-sinkfile="debug.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#18</span>
+      <span class="same-file">debug.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">2&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← mmap(NULL, 4096, PROT_READ, MAP_PRIVATE | MAP_ANON, -1, 0)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/debug.c:528:19</span>
+      <span class="qf-desc">(result)  ← mmap(NULL, 4096, PROT_READ, MAP_PRIVATE | MAP_ANON, -1, 0)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/debug.c:528:19</span>
+      <span class="qf-desc">(result)  ← mmap(NULL, 4096, PROT_READ, MAP_PRIVATE | MAP_ANON, -1, 0)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">debug.c</span>
+    <span class="pn-loc">:528</span>
+    <span class="guards-pill" title="2 guard(s)">2</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← mmap(NULL, 4096, PROT_READ, MAP_PRIVATE | MAP_ANON, -1, 0)</summary>
+    <div class="node-guards"><div class="guard-item">if (c-&gt;argc == 2 &amp;&amp; !strcasecmp(c-&gt;argv[1]-&gt;ptr,&quot;help&quot;))</div><div class="guard-item">if (!strcasecmp(c-&gt;argv[1]-&gt;ptr,&quot;segfault&quot;))</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 525</span>          /* Compiler gives warnings about writing to a random address</div><div class="cl"><span class="ln"> 526</span>           * e.g &quot;*((char*)-1) = 'x';&quot;. As a workaround, we map a read-only area</div><div class="cl"><span class="ln"> 527</span>           * and try to write there to trigger segmentation fault. */</div><div class="cl hit"><span class="ln"> 528</span>          char* p = mmap(NULL, 4096, PROT_READ, MAP_PRIVATE | MAP_ANON, -1, 0);</div><div class="cl"><span class="ln"> 529</span>          *p = 'x';</div><div class="cl"><span class="ln"> 530</span>      } else if (!strcasecmp(c-&gt;argv[1]-&gt;ptr,&quot;panic&quot;)) {</div><div class="cl"><span class="ln"> 531</span>          serverPanic(&quot;DEBUG PANIC called at Unix time %lld&quot;, (long long)time(NULL));</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c19"
+  data-sev="full"
+  data-source="buf  ← fread(buf, 1, sizeof(buf), fp)"
+  data-steps="2"
+  data-guards="3"
+  data-srcfile="monotonic.c"
+  data-sinkfile="monotonic.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#19</span>
+      <span class="same-file">monotonic.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">3&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">buf  ← fread(buf, 1, sizeof(buf), fp)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/monotonic.c:159:18</span>
+      <span class="qf-desc">buf  ← fread(buf, 1, sizeof(buf), fp)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/monotonic.c:164:9</span>
+      <span class="qf-desc">memcpy(&amp;be64, buf, sizeof(be64))  (tainted arg: be64, buf, be64)  via [fread(buf) at line 159]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">monotonic.c</span>
+    <span class="pn-loc">:159</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">buf  ← fread(buf, 1, sizeof(buf), fp)</summary>
+    <div class="node-guards"><div class="guard-item">if (!fp)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 156</span>          return 0;</div><div class="cl"><span class="ln"> 157</span>  </div><div class="cl"><span class="ln"> 158</span>      uint8_t buf[8] = {0};</div><div class="cl hit"><span class="ln"> 159</span>      size_t cnt = fread(buf, 1, sizeof(buf), fp);</div><div class="cl"><span class="ln"> 160</span>      fclose(fp);</div><div class="cl"><span class="ln"> 161</span>  </div><div class="cl"><span class="ln"> 162</span>      if (cnt == 8) {</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">monotonic.c</span>
+    <span class="pn-loc">:164</span>
+    <span class="guards-pill" title="2 guard(s)">2</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">memcpy(&amp;be64, buf, sizeof(be64))  (tainted arg: be64, buf, be64)  via [fread(buf) at line 159]</summary>
+    <div class="node-guards"><div class="guard-item">if (!fp)</div><div class="guard-item">if (cnt == 8)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 161</span>  </div><div class="cl"><span class="ln"> 162</span>      if (cnt == 8) {</div><div class="cl"><span class="ln"> 163</span>          uint64_t be64 = 0;</div><div class="cl hit"><span class="ln"> 164</span>          memcpy(&amp;be64, buf, sizeof(be64));</div><div class="cl"><span class="ln"> 165</span>          /* Convert be64 from big-endian to little-endian.  */</div><div class="cl"><span class="ln"> 166</span>          freq = __builtin_bswap64(be64);</div><div class="cl"><span class="ln"> 167</span>      } else if (cnt == 4) {</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c20"
+  data-sev="full"
+  data-source="buf  ← fread(buf, 1, sizeof(buf), fp)"
+  data-steps="2"
+  data-guards="4"
+  data-srcfile="monotonic.c"
+  data-sinkfile="monotonic.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#20</span>
+      <span class="same-file">monotonic.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">4&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">buf  ← fread(buf, 1, sizeof(buf), fp)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/monotonic.c:159:18</span>
+      <span class="qf-desc">buf  ← fread(buf, 1, sizeof(buf), fp)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/monotonic.c:169:9</span>
+      <span class="qf-desc">memcpy(&amp;be32, buf, sizeof(be32))  (tainted arg: be32, buf, be32)  via [fread(buf) at line 159]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">monotonic.c</span>
+    <span class="pn-loc">:159</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">buf  ← fread(buf, 1, sizeof(buf), fp)</summary>
+    <div class="node-guards"><div class="guard-item">if (!fp)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 156</span>          return 0;</div><div class="cl"><span class="ln"> 157</span>  </div><div class="cl"><span class="ln"> 158</span>      uint8_t buf[8] = {0};</div><div class="cl hit"><span class="ln"> 159</span>      size_t cnt = fread(buf, 1, sizeof(buf), fp);</div><div class="cl"><span class="ln"> 160</span>      fclose(fp);</div><div class="cl"><span class="ln"> 161</span>  </div><div class="cl"><span class="ln"> 162</span>      if (cnt == 8) {</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">monotonic.c</span>
+    <span class="pn-loc">:169</span>
+    <span class="guards-pill" title="3 guard(s)">3</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">memcpy(&amp;be32, buf, sizeof(be32))  (tainted arg: be32, buf, be32)  via [fread(buf) at line 159]</summary>
+    <div class="node-guards"><div class="guard-item">if (!fp)</div><div class="guard-item">if (cnt == 8)</div><div class="guard-item">if (cnt == 4)</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 166</span>          freq = __builtin_bswap64(be64);</div><div class="cl"><span class="ln"> 167</span>      } else if (cnt == 4) {</div><div class="cl"><span class="ln"> 168</span>          uint32_t be32 = 0;</div><div class="cl hit"><span class="ln"> 169</span>          memcpy(&amp;be32, buf, sizeof(be32));</div><div class="cl"><span class="ln"> 170</span>          /* Convert be32 from big-endian to little-endian.  */</div><div class="cl"><span class="ln"> 171</span>          freq = __builtin_bswap32(be32);</div><div class="cl"><span class="ln"> 172</span>      } else {</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c21"
+  data-sev="full"
+  data-source="(result)  ← getenv(&quot;HOME&quot;)"
+  data-steps="1"
+  data-guards="2"
+  data-srcfile="redis-cli.c"
+  data-sinkfile="redis-cli.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#21</span>
+      <span class="same-file">redis-cli.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">2&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← getenv(&quot;HOME&quot;)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:365:22</span>
+      <span class="qf-desc">(result)  ← getenv(&quot;HOME&quot;)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:365:22</span>
+      <span class="qf-desc">(result)  ← getenv(&quot;HOME&quot;)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">redis-cli.c</span>
+    <span class="pn-loc">:365</span>
+    <span class="guards-pill" title="2 guard(s)">2</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← getenv(&quot;HOME&quot;)</summary>
+    <div class="node-guards"><div class="guard-item">if (path != NULL &amp;&amp; *path != '\0')</div><div class="guard-item">if (!strcmp(&quot;/dev/null&quot;, path))</div></div>
+    <pre class="code"><div class="cl"><span class="ln"> 362</span>          /* If the env is set, return it. */</div><div class="cl"><span class="ln"> 363</span>          dotPath = sdsnew(path);</div><div class="cl"><span class="ln"> 364</span>      } else {</div><div class="cl hit"><span class="ln"> 365</span>          char *home = getenv(&quot;HOME&quot;);</div><div class="cl"><span class="ln"> 366</span>          if (home != NULL &amp;&amp; *home != '\0') {</div><div class="cl"><span class="ln"> 367</span>              /* If no override is set use $HOME/&lt;dotfilename&gt;. */</div><div class="cl"><span class="ln"> 368</span>              dotPath = sdscatprintf(sdsempty(), &quot;%s/%s&quot;, home, dotfilename);</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c22"
+  data-sev="full"
+  data-source="(result)  ← getenv(&quot;TERM&quot;)"
+  data-steps="1"
+  data-guards="0"
+  data-srcfile="redis-cli.c"
+  data-sinkfile="redis-cli.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#22</span>
+      <span class="same-file">redis-cli.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← getenv(&quot;TERM&quot;)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:1981:15</span>
+      <span class="qf-desc">(result)  ← getenv(&quot;TERM&quot;)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:1981:15</span>
+      <span class="qf-desc">(result)  ← getenv(&quot;TERM&quot;)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">redis-cli.c</span>
+    <span class="pn-loc">:1981</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← getenv(&quot;TERM&quot;)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">1978</span>  }</div><div class="cl"><span class="ln">1979</span>  </div><div class="cl"><span class="ln">1980</span>  int isColorTerm(void) {</div><div class="cl hit"><span class="ln">1981</span>      char *t = getenv(&quot;TERM&quot;);</div><div class="cl"><span class="ln">1982</span>      return t != NULL &amp;&amp; strstr(t,&quot;xterm&quot;) != NULL;</div><div class="cl"><span class="ln">1983</span>  }</div><div class="cl"><span class="ln">1984</span>  </div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c23"
+  data-sev="full"
+  data-source="(result)  ← getenv(REDIS_CLI_AUTH_ENV)"
+  data-steps="1"
+  data-guards="0"
+  data-srcfile="redis-cli.c"
+  data-sinkfile="redis-cli.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#23</span>
+      <span class="same-file">redis-cli.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← getenv(REDIS_CLI_AUTH_ENV)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:3110:18</span>
+      <span class="qf-desc">(result)  ← getenv(REDIS_CLI_AUTH_ENV)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:3110:18</span>
+      <span class="qf-desc">(result)  ← getenv(REDIS_CLI_AUTH_ENV)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">redis-cli.c</span>
+    <span class="pn-loc">:3110</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← getenv(REDIS_CLI_AUTH_ENV)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">3107</span>  </div><div class="cl"><span class="ln">3108</span>  static void parseEnv(void) {</div><div class="cl"><span class="ln">3109</span>      /* Set auth from env, but do not overwrite CLI arguments if passed */</div><div class="cl hit"><span class="ln">3110</span>      char *auth = getenv(REDIS_CLI_AUTH_ENV);</div><div class="cl"><span class="ln">3111</span>      if (auth != NULL &amp;&amp; config.conn_info.auth == NULL) {</div><div class="cl"><span class="ln">3112</span>          config.conn_info.auth = auth;</div><div class="cl"><span class="ln">3113</span>      }</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c24"
+  data-sev="full"
+  data-source="(result)  ← getenv(REDIS_CLI_CLUSTER_YES_ENV)"
+  data-steps="1"
+  data-guards="1"
+  data-srcfile="redis-cli.c"
+  data-sinkfile="redis-cli.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#24</span>
+      <span class="same-file">redis-cli.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">1&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← getenv(REDIS_CLI_CLUSTER_YES_ENV)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:3115:25</span>
+      <span class="qf-desc">(result)  ← getenv(REDIS_CLI_CLUSTER_YES_ENV)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:3115:25</span>
+      <span class="qf-desc">(result)  ← getenv(REDIS_CLI_CLUSTER_YES_ENV)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">redis-cli.c</span>
+    <span class="pn-loc">:3115</span>
+    <span class="guards-pill" title="1 guard(s)">1</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← getenv(REDIS_CLI_CLUSTER_YES_ENV)</summary>
+    <div class="node-guards"><div class="guard-item">if (auth != NULL &amp;&amp; config.conn_info.auth == NULL)</div></div>
+    <pre class="code"><div class="cl"><span class="ln">3112</span>          config.conn_info.auth = auth;</div><div class="cl"><span class="ln">3113</span>      }</div><div class="cl"><span class="ln">3114</span>  </div><div class="cl hit"><span class="ln">3115</span>      char *cluster_yes = getenv(REDIS_CLI_CLUSTER_YES_ENV);</div><div class="cl"><span class="ln">3116</span>      if (cluster_yes != NULL &amp;&amp; !strcmp(cluster_yes, &quot;1&quot;)) {</div><div class="cl"><span class="ln">3117</span>          config.cluster_manager_command.flags |= CLUSTER_MANAGER_CMD_FLAG_YES;</div><div class="cl"><span class="ln">3118</span>      }</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c25"
+  data-sev="full"
+  data-source="buf  ← read(fileno(stdin), buf, 6)"
+  data-steps="2"
+  data-guards="26"
+  data-srcfile="redis-cli.c"
+  data-sinkfile="redis-cli.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#25</span>
+      <span class="same-file">redis-cli.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">26&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">buf  ← read(fileno(stdin), buf, 6)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:7626:25</span>
+      <span class="qf-desc">buf  ← read(fileno(stdin), buf, 6)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:7681:21</span>
+      <span class="qf-desc">clusterNodeForResharding(buf, target, &amp;raise_err)  (tainted arg: buf, target, raise_err)  via [read(fileno(stdin)) at line 7626, read(fileno(stdin)) at line 7643, read(fileno(stdin)) at line 7667, read(fileno(stdin)) at line 7762]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">redis-cli.c</span>
+    <span class="pn-loc">:7626</span>
+    <span class="guards-pill" title="5 guard(s)">5</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">buf  ← read(fileno(stdin), buf, 6)</summary>
+    <div class="node-guards"><div class="guard-item">if (!getClusterHostFromCmdArgs(argc, argv, &amp;ip, &amp;port))</div><div class="guard-item">if (!clusterManagerLoadInfoFromNode(node))</div><div class="guard-item">if (cluster_manager.errors &amp;&amp; listLength(cluster_manager.errors) &gt; 0)</div><div class="guard-item">if (!slots)</div><div class="guard-item">if (slots &lt;= 0 || slots &gt; CLUSTER_MANAGER_SLOTS)</div></div>
+    <pre class="code"><div class="cl"><span class="ln">7623</span>                     CLUSTER_MANAGER_SLOTS);</div><div class="cl"><span class="ln">7624</span>              fflush(stdout);</div><div class="cl"><span class="ln">7625</span>              char buf[6];</div><div class="cl hit"><span class="ln">7626</span>              int nread = read(fileno(stdin),buf,6);</div><div class="cl"><span class="ln">7627</span>              if (nread &lt;= 0) continue;</div><div class="cl"><span class="ln">7628</span>              int last_idx = nread - 1;</div><div class="cl"><span class="ln">7629</span>              if (buf[last_idx] != '\n') {</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">redis-cli.c</span>
+    <span class="pn-loc">:7681</span>
+    <span class="guards-pill" title="21 guard(s)">21</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">clusterNodeForResharding(buf, target, &amp;raise_err)  (tainted arg: buf, target, raise_err)  via [read(fileno(stdin)) at line 7626, read(fileno(stdin)) at line 7643, read(fileno(stdin)) at line 7667, read(fileno(stdin)) at line 7762]</summary>
+    <div class="node-guards"><div class="guard-item">if (!getClusterHostFromCmdArgs(argc, argv, &amp;ip, &amp;port))</div><div class="guard-item">if (!clusterManagerLoadInfoFromNode(node))</div><div class="guard-item">if (cluster_manager.errors &amp;&amp; listLength(cluster_manager.errors) &gt; 0)</div><div class="guard-item">if (!slots)</div><div class="guard-item">if (slots &lt;= 0 || slots &gt; CLUSTER_MANAGER_SLOTS)</div><div class="guard-item">if (nread &lt;= 0)</div><div class="guard-item">if (buf[last_idx] != '\n') [⚠ tainted]</div><div class="guard-item">if ((ch = getchar()) != '\n' &amp;&amp; ch != EOF)</div><div class="guard-item">if (to == NULL)</div><div class="guard-item">if (nread &lt;= 0)</div><div class="guard-item">if (buf[last_idx] != '\n') [⚠ tainted]</div><div class="guard-item">if ((ch = getchar()) != '\n' &amp;&amp; ch != EOF)</div><div class="guard-item">if (strlen(buf) &gt; 0) [⚠ tainted]</div><div class="guard-item">if (target == NULL)</div><div class="guard-item">if (from == NULL)</div><div class="guard-item">if (1)</div><div class="guard-item">if (nread &lt;= 0)</div><div class="guard-item">if (buf[last_idx] != '\n') [⚠ tainted]</div><div class="guard-item">if ((ch = getchar()) != '\n' &amp;&amp; ch != EOF)</div><div class="guard-item">if (!strcmp(buf, &quot;done&quot;)) [⚠ tainted]</div><div class="guard-item">if (!strcmp(buf, &quot;all&quot;)) [⚠ tainted]</div></div>
+    <pre class="code"><div class="cl"><span class="ln">7678</span>                  break;</div><div class="cl"><span class="ln">7679</span>              } else {</div><div class="cl"><span class="ln">7680</span>                  clusterManagerNode *src =</div><div class="cl hit"><span class="ln">7681</span>                      clusterNodeForResharding(buf, target, &amp;raise_err);</div><div class="cl"><span class="ln">7682</span>                  if (src != NULL) listAddNodeTail(sources, src);</div><div class="cl"><span class="ln">7683</span>                  else if (raise_err) {</div><div class="cl"><span class="ln">7684</span>                      result = 0;</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c26"
+  data-sev="full"
+  data-source="buf  ← read(fileno(stdin), buf, 255)  [fills: buf]"
+  data-steps="2"
+  data-guards="30"
+  data-srcfile="redis-cli.c"
+  data-sinkfile="redis-cli.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#26</span>
+      <span class="same-file">redis-cli.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">30&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">buf  ← read(fileno(stdin), buf, 255)  [fills: buf]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:7643:21</span>
+      <span class="qf-desc">buf  ← read(fileno(stdin), buf, 255)  [fills: buf]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:7681:21</span>
+      <span class="qf-desc">clusterNodeForResharding(buf, target, &amp;raise_err)     (tainted arg: buf)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">redis-cli.c</span>
+    <span class="pn-loc">:7643</span>
+    <span class="guards-pill" title="9 guard(s)">9</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">buf  ← read(fileno(stdin), buf, 255)  [fills: buf]</summary>
+    <div class="node-guards"><div class="guard-item">if (!getClusterHostFromCmdArgs(argc, argv, &amp;ip, &amp;port))</div><div class="guard-item">if (!clusterManagerLoadInfoFromNode(node))</div><div class="guard-item">if (cluster_manager.errors &amp;&amp; listLength(cluster_manager.errors) &gt; 0)</div><div class="guard-item">if (!slots)</div><div class="guard-item">if (slots &lt;= 0 || slots &gt; CLUSTER_MANAGER_SLOTS)</div><div class="guard-item">if (nread &lt;= 0)</div><div class="guard-item">if (buf[last_idx] != '\n') [⚠ tainted]</div><div class="guard-item">if ((ch = getchar()) != '\n' &amp;&amp; ch != EOF)</div><div class="guard-item">if (to == NULL)</div></div>
+    <pre class="code"><div class="cl"><span class="ln">7640</span>      while (to == NULL) {</div><div class="cl"><span class="ln">7641</span>          printf(&quot;What is the receiving node ID? &quot;);</div><div class="cl"><span class="ln">7642</span>          fflush(stdout);</div><div class="cl hit"><span class="ln">7643</span>          int nread = read(fileno(stdin),buf,255);</div><div class="cl"><span class="ln">7644</span>          if (nread &lt;= 0) continue;</div><div class="cl"><span class="ln">7645</span>          int last_idx = nread - 1;</div><div class="cl"><span class="ln">7646</span>          if (buf[last_idx] != '\n') {</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">redis-cli.c</span>
+    <span class="pn-loc">:7681</span>
+    <span class="guards-pill" title="21 guard(s)">21</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">clusterNodeForResharding(buf, target, &amp;raise_err)     (tainted arg: buf)</summary>
+    <div class="node-guards"><div class="guard-item">if (!getClusterHostFromCmdArgs(argc, argv, &amp;ip, &amp;port))</div><div class="guard-item">if (!clusterManagerLoadInfoFromNode(node))</div><div class="guard-item">if (cluster_manager.errors &amp;&amp; listLength(cluster_manager.errors) &gt; 0)</div><div class="guard-item">if (!slots)</div><div class="guard-item">if (slots &lt;= 0 || slots &gt; CLUSTER_MANAGER_SLOTS)</div><div class="guard-item">if (nread &lt;= 0)</div><div class="guard-item">if (buf[last_idx] != '\n') [⚠ tainted]</div><div class="guard-item">if ((ch = getchar()) != '\n' &amp;&amp; ch != EOF)</div><div class="guard-item">if (to == NULL)</div><div class="guard-item">if (nread &lt;= 0)</div><div class="guard-item">if (buf[last_idx] != '\n') [⚠ tainted]</div><div class="guard-item">if ((ch = getchar()) != '\n' &amp;&amp; ch != EOF)</div><div class="guard-item">if (strlen(buf) &gt; 0) [⚠ tainted]</div><div class="guard-item">if (target == NULL)</div><div class="guard-item">if (from == NULL)</div><div class="guard-item">if (1)</div><div class="guard-item">if (nread &lt;= 0)</div><div class="guard-item">if (buf[last_idx] != '\n') [⚠ tainted]</div><div class="guard-item">if ((ch = getchar()) != '\n' &amp;&amp; ch != EOF)</div><div class="guard-item">if (!strcmp(buf, &quot;done&quot;)) [⚠ tainted]</div><div class="guard-item">if (!strcmp(buf, &quot;all&quot;)) [⚠ tainted]</div></div>
+    <pre class="code"><div class="cl"><span class="ln">7678</span>                  break;</div><div class="cl"><span class="ln">7679</span>              } else {</div><div class="cl"><span class="ln">7680</span>                  clusterManagerNode *src =</div><div class="cl hit"><span class="ln">7681</span>                      clusterNodeForResharding(buf, target, &amp;raise_err);</div><div class="cl"><span class="ln">7682</span>                  if (src != NULL) listAddNodeTail(sources, src);</div><div class="cl"><span class="ln">7683</span>                  else if (raise_err) {</div><div class="cl"><span class="ln">7684</span>                      result = 0;</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c27"
+  data-sev="full"
+  data-source="buf  ← read(fileno(stdin), buf, 255)  [fills: buf]"
+  data-steps="2"
+  data-guards="37"
+  data-srcfile="redis-cli.c"
+  data-sinkfile="redis-cli.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#27</span>
+      <span class="same-file">redis-cli.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">37&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">buf  ← read(fileno(stdin), buf, 255)  [fills: buf]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:7667:25</span>
+      <span class="qf-desc">buf  ← read(fileno(stdin), buf, 255)  [fills: buf]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:7681:21</span>
+      <span class="qf-desc">clusterNodeForResharding(buf, target, &amp;raise_err)     (tainted arg: buf)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">redis-cli.c</span>
+    <span class="pn-loc">:7667</span>
+    <span class="guards-pill" title="16 guard(s)">16</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">buf  ← read(fileno(stdin), buf, 255)  [fills: buf]</summary>
+    <div class="node-guards"><div class="guard-item">if (!getClusterHostFromCmdArgs(argc, argv, &amp;ip, &amp;port))</div><div class="guard-item">if (!clusterManagerLoadInfoFromNode(node))</div><div class="guard-item">if (cluster_manager.errors &amp;&amp; listLength(cluster_manager.errors) &gt; 0)</div><div class="guard-item">if (!slots)</div><div class="guard-item">if (slots &lt;= 0 || slots &gt; CLUSTER_MANAGER_SLOTS)</div><div class="guard-item">if (nread &lt;= 0)</div><div class="guard-item">if (buf[last_idx] != '\n') [⚠ tainted]</div><div class="guard-item">if ((ch = getchar()) != '\n' &amp;&amp; ch != EOF)</div><div class="guard-item">if (to == NULL)</div><div class="guard-item">if (nread &lt;= 0)</div><div class="guard-item">if (buf[last_idx] != '\n') [⚠ tainted]</div><div class="guard-item">if ((ch = getchar()) != '\n' &amp;&amp; ch != EOF)</div><div class="guard-item">if (strlen(buf) &gt; 0) [⚠ tainted]</div><div class="guard-item">if (target == NULL)</div><div class="guard-item">if (from == NULL)</div><div class="guard-item">if (1)</div></div>
+    <pre class="code"><div class="cl"><span class="ln">7664</span>          while (1) {</div><div class="cl"><span class="ln">7665</span>              printf(&quot;Source node #%lu: &quot;, listLength(sources) + 1);</div><div class="cl"><span class="ln">7666</span>              fflush(stdout);</div><div class="cl hit"><span class="ln">7667</span>              int nread = read(fileno(stdin),buf,255);</div><div class="cl"><span class="ln">7668</span>              if (nread &lt;= 0) continue;</div><div class="cl"><span class="ln">7669</span>              int last_idx = nread - 1;</div><div class="cl"><span class="ln">7670</span>              if (buf[last_idx] != '\n') {</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">redis-cli.c</span>
+    <span class="pn-loc">:7681</span>
+    <span class="guards-pill" title="21 guard(s)">21</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">clusterNodeForResharding(buf, target, &amp;raise_err)     (tainted arg: buf)</summary>
+    <div class="node-guards"><div class="guard-item">if (!getClusterHostFromCmdArgs(argc, argv, &amp;ip, &amp;port))</div><div class="guard-item">if (!clusterManagerLoadInfoFromNode(node))</div><div class="guard-item">if (cluster_manager.errors &amp;&amp; listLength(cluster_manager.errors) &gt; 0)</div><div class="guard-item">if (!slots)</div><div class="guard-item">if (slots &lt;= 0 || slots &gt; CLUSTER_MANAGER_SLOTS)</div><div class="guard-item">if (nread &lt;= 0)</div><div class="guard-item">if (buf[last_idx] != '\n') [⚠ tainted]</div><div class="guard-item">if ((ch = getchar()) != '\n' &amp;&amp; ch != EOF)</div><div class="guard-item">if (to == NULL)</div><div class="guard-item">if (nread &lt;= 0)</div><div class="guard-item">if (buf[last_idx] != '\n') [⚠ tainted]</div><div class="guard-item">if ((ch = getchar()) != '\n' &amp;&amp; ch != EOF)</div><div class="guard-item">if (strlen(buf) &gt; 0) [⚠ tainted]</div><div class="guard-item">if (target == NULL)</div><div class="guard-item">if (from == NULL)</div><div class="guard-item">if (1)</div><div class="guard-item">if (nread &lt;= 0)</div><div class="guard-item">if (buf[last_idx] != '\n') [⚠ tainted]</div><div class="guard-item">if ((ch = getchar()) != '\n' &amp;&amp; ch != EOF)</div><div class="guard-item">if (!strcmp(buf, &quot;done&quot;)) [⚠ tainted]</div><div class="guard-item">if (!strcmp(buf, &quot;all&quot;)) [⚠ tainted]</div></div>
+    <pre class="code"><div class="cl"><span class="ln">7678</span>                  break;</div><div class="cl"><span class="ln">7679</span>              } else {</div><div class="cl"><span class="ln">7680</span>                  clusterManagerNode *src =</div><div class="cl hit"><span class="ln">7681</span>                      clusterNodeForResharding(buf, target, &amp;raise_err);</div><div class="cl"><span class="ln">7682</span>                  if (src != NULL) listAddNodeTail(sources, src);</div><div class="cl"><span class="ln">7683</span>                  else if (raise_err) {</div><div class="cl"><span class="ln">7684</span>                      result = 0;</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c28"
+  data-sev="full"
+  data-source="buf  ← read(fileno(stdin), buf, 4)  [fills: buf]"
+  data-steps="2"
+  data-guards="60"
+  data-srcfile="redis-cli.c"
+  data-sinkfile="redis-cli.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#28</span>
+      <span class="same-file">redis-cli.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">60&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">buf  ← read(fileno(stdin), buf, 4)  [fills: buf]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:7762:21</span>
+      <span class="qf-desc">buf  ← read(fileno(stdin), buf, 4)  [fills: buf]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:7681:21</span>
+      <span class="qf-desc">clusterNodeForResharding(buf, target, &amp;raise_err)     (tainted arg: buf)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">redis-cli.c</span>
+    <span class="pn-loc">:7762</span>
+    <span class="guards-pill" title="39 guard(s)">39</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">buf  ← read(fileno(stdin), buf, 4)  [fills: buf]</summary>
+    <div class="node-guards"><div class="guard-item">if (!getClusterHostFromCmdArgs(argc, argv, &amp;ip, &amp;port))</div><div class="guard-item">if (!clusterManagerLoadInfoFromNode(node))</div><div class="guard-item">if (cluster_manager.errors &amp;&amp; listLength(cluster_manager.errors) &gt; 0)</div><div class="guard-item">if (!slots)</div><div class="guard-item">if (slots &lt;= 0 || slots &gt; CLUSTER_MANAGER_SLOTS)</div><div class="guard-item">if (nread &lt;= 0)</div><div class="guard-item">if (buf[last_idx] != '\n') [⚠ tainted]</div><div class="guard-item">if ((ch = getchar()) != '\n' &amp;&amp; ch != EOF)</div><div class="guard-item">if (to == NULL)</div><div class="guard-item">if (nread &lt;= 0)</div><div class="guard-item">if (buf[last_idx] != '\n') [⚠ tainted]</div><div class="guard-item">if ((ch = getchar()) != '\n' &amp;&amp; ch != EOF)</div><div class="guard-item">if (strlen(buf) &gt; 0) [⚠ tainted]</div><div class="guard-item">if (target == NULL)</div><div class="guard-item">if (from == NULL)</div><div class="guard-item">if (1)</div><div class="guard-item">if (nread &lt;= 0)</div><div class="guard-item">if (buf[last_idx] != '\n') [⚠ tainted]</div><div class="guard-item">if ((ch = getchar()) != '\n' &amp;&amp; ch != EOF)</div><div class="guard-item">if (!strcmp(buf, &quot;done&quot;)) [⚠ tainted]</div><div class="guard-item">if (!strcmp(buf, &quot;all&quot;)) [⚠ tainted]</div><div class="guard-item">if (src != NULL)</div><div class="guard-item">if (raise_err)</div><div class="guard-item">if ((p = strchr(from, ',')) != NULL)</div><div class="guard-item">if (!strcmp(from, &quot;all&quot;))</div><div class="guard-item">if (src != NULL)</div><div class="guard-item">if (raise_err)</div><div class="guard-item">if (!all &amp;&amp; strlen(from) &gt; 0)</div><div class="guard-item">if (!strcmp(from, &quot;all&quot;))</div><div class="guard-item">if (!all)</div><div class="guard-item">if (src != NULL)</div><div class="guard-item">if (raise_err)</div><div class="guard-item">if (all)</div><div class="guard-item">if ((ln = listNext(&amp;li)) != NULL)</div><div class="guard-item">if (n-&gt;flags &amp; CLUSTER_MANAGER_FLAG_SLAVE || n-&gt;replicate)</div><div class="guard-item">if (!sdscmp(n-&gt;name, target-&gt;name))</div><div class="guard-item">if (listLength(sources) == 0)</div><div class="guard-item">if ((ln = listNext(&amp;li)) != NULL)</div><div class="guard-item">if (!(config.cluster_manager_command.flags &amp;
+          CLUSTER_MANAGER_CMD_FLAG_YES))</div></div>
+    <pre class="code"><div class="cl"><span class="ln">7759</span>                 &quot;reshard plan (yes/no)? &quot;);</div><div class="cl"><span class="ln">7760</span>          fflush(stdout);</div><div class="cl"><span class="ln">7761</span>          char buf[4];</div><div class="cl hit"><span class="ln">7762</span>          int nread = read(fileno(stdin),buf,4);</div><div class="cl"><span class="ln">7763</span>          buf[3] = '\0';</div><div class="cl"><span class="ln">7764</span>          if (nread &lt;= 0 || strcmp(&quot;yes&quot;, buf) != 0) {</div><div class="cl"><span class="ln">7765</span>              result = 0;</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">redis-cli.c</span>
+    <span class="pn-loc">:7681</span>
+    <span class="guards-pill" title="21 guard(s)">21</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">clusterNodeForResharding(buf, target, &amp;raise_err)     (tainted arg: buf)</summary>
+    <div class="node-guards"><div class="guard-item">if (!getClusterHostFromCmdArgs(argc, argv, &amp;ip, &amp;port))</div><div class="guard-item">if (!clusterManagerLoadInfoFromNode(node))</div><div class="guard-item">if (cluster_manager.errors &amp;&amp; listLength(cluster_manager.errors) &gt; 0)</div><div class="guard-item">if (!slots)</div><div class="guard-item">if (slots &lt;= 0 || slots &gt; CLUSTER_MANAGER_SLOTS)</div><div class="guard-item">if (nread &lt;= 0)</div><div class="guard-item">if (buf[last_idx] != '\n') [⚠ tainted]</div><div class="guard-item">if ((ch = getchar()) != '\n' &amp;&amp; ch != EOF)</div><div class="guard-item">if (to == NULL)</div><div class="guard-item">if (nread &lt;= 0)</div><div class="guard-item">if (buf[last_idx] != '\n') [⚠ tainted]</div><div class="guard-item">if ((ch = getchar()) != '\n' &amp;&amp; ch != EOF)</div><div class="guard-item">if (strlen(buf) &gt; 0) [⚠ tainted]</div><div class="guard-item">if (target == NULL)</div><div class="guard-item">if (from == NULL)</div><div class="guard-item">if (1)</div><div class="guard-item">if (nread &lt;= 0)</div><div class="guard-item">if (buf[last_idx] != '\n') [⚠ tainted]</div><div class="guard-item">if ((ch = getchar()) != '\n' &amp;&amp; ch != EOF)</div><div class="guard-item">if (!strcmp(buf, &quot;done&quot;)) [⚠ tainted]</div><div class="guard-item">if (!strcmp(buf, &quot;all&quot;)) [⚠ tainted]</div></div>
+    <pre class="code"><div class="cl"><span class="ln">7678</span>                  break;</div><div class="cl"><span class="ln">7679</span>              } else {</div><div class="cl"><span class="ln">7680</span>                  clusterManagerNode *src =</div><div class="cl hit"><span class="ln">7681</span>                      clusterNodeForResharding(buf, target, &amp;raise_err);</div><div class="cl"><span class="ln">7682</span>                  if (src != NULL) listAddNodeTail(sources, src);</div><div class="cl"><span class="ln">7683</span>                  else if (raise_err) {</div><div class="cl"><span class="ln">7684</span>                      result = 0;</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c29"
+  data-sev="full"
+  data-source="obuf  ← read(STDIN_FILENO, obuf, sizeof(obuf))  [fills: obuf]"
+  data-steps="2"
+  data-guards="33"
+  data-srcfile="redis-cli.c"
+  data-sinkfile="redis-cli.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#29</span>
+      <span class="same-file">redis-cli.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">33&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">obuf  ← read(STDIN_FILENO, obuf, sizeof(obuf))  [fills: obuf]</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:9224:37</span>
+      <span class="qf-desc">obuf  ← read(STDIN_FILENO, obuf, sizeof(obuf))  [fills: obuf]</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:9202:40</span>
+      <span class="qf-desc">cliWriteConn(context, obuf+obuf_pos, obuf_len)     (tainted arg: obuf)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">redis-cli.c</span>
+    <span class="pn-loc">:9224</span>
+    <span class="guards-pill" title="19 guard(s)">19</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">obuf  ← read(STDIN_FILENO, obuf, sizeof(obuf))  [fills: obuf]</summary>
+    <div class="node-guards"><div class="guard-item">if (anetNonBlock(aneterr,context-&gt;fd) == ANET_ERR)</div><div class="guard-item">if (!done)</div><div class="guard-item">if (!eof || obuf_len != 0)</div><div class="guard-item">if (mask &amp; AE_READABLE)</div><div class="guard-item">if (!read_error &amp;&amp; redisBufferRead(context) == REDIS_ERR)</div><div class="guard-item">if (redisGetReply(context, (void **) &amp;reply) == REDIS_ERR)</div><div class="guard-item">if (reply)</div><div class="guard-item">if (reply-&gt;type == REDIS_REPLY_ERROR)</div><div class="guard-item">if (eof &amp;&amp; reply-&gt;type == REDIS_REPLY_STRING &amp;&amp;
+                                      reply-&gt;len == 20)</div><div class="guard-item">if (memcmp(reply-&gt;str,magic,20) == 0)</div><div class="guard-item">if (read_error)</div><div class="guard-item">if (mask &amp; AE_WRITABLE)</div><div class="guard-item">if (1)</div><div class="guard-item">if (obuf_len != 0)</div><div class="guard-item">if (nwritten == -1)</div><div class="guard-item">if (errno != EAGAIN &amp;&amp; errno != EINTR)</div><div class="guard-item">if (obuf_len != 0)</div><div class="guard-item">if (context-&gt;err)</div><div class="guard-item">if (obuf_len == 0 &amp;&amp; !eof)</div></div>
+    <pre class="code"><div class="cl"><span class="ln">9221</span>                  }</div><div class="cl"><span class="ln">9222</span>                  /* If buffer is empty, load from stdin. */</div><div class="cl"><span class="ln">9223</span>                  if (obuf_len == 0 &amp;&amp; !eof) {</div><div class="cl hit"><span class="ln">9224</span>                      ssize_t nread = read(STDIN_FILENO,obuf,sizeof(obuf));</div><div class="cl"><span class="ln">9225</span>  </div><div class="cl"><span class="ln">9226</span>                      if (nread == 0) {</div><div class="cl"><span class="ln">9227</span>                          /* The ECHO sequence starts with a &quot;\r\n&quot; so that if there</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">redis-cli.c</span>
+    <span class="pn-loc">:9202</span>
+    <span class="guards-pill" title="14 guard(s)">14</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">cliWriteConn(context, obuf+obuf_pos, obuf_len)     (tainted arg: obuf)</summary>
+    <div class="node-guards"><div class="guard-item">if (anetNonBlock(aneterr,context-&gt;fd) == ANET_ERR)</div><div class="guard-item">if (!done)</div><div class="guard-item">if (!eof || obuf_len != 0)</div><div class="guard-item">if (mask &amp; AE_READABLE)</div><div class="guard-item">if (!read_error &amp;&amp; redisBufferRead(context) == REDIS_ERR)</div><div class="guard-item">if (redisGetReply(context, (void **) &amp;reply) == REDIS_ERR)</div><div class="guard-item">if (reply)</div><div class="guard-item">if (reply-&gt;type == REDIS_REPLY_ERROR)</div><div class="guard-item">if (eof &amp;&amp; reply-&gt;type == REDIS_REPLY_STRING &amp;&amp;
+                                      reply-&gt;len == 20)</div><div class="guard-item">if (memcmp(reply-&gt;str,magic,20) == 0)</div><div class="guard-item">if (read_error)</div><div class="guard-item">if (mask &amp; AE_WRITABLE)</div><div class="guard-item">if (1)</div><div class="guard-item">if (obuf_len != 0)</div></div>
+    <pre class="code"><div class="cl"><span class="ln">9199</span>              while(1) {</div><div class="cl"><span class="ln">9200</span>                  /* Transfer current buffer to server. */</div><div class="cl"><span class="ln">9201</span>                  if (obuf_len != 0) {</div><div class="cl hit"><span class="ln">9202</span>                      ssize_t nwritten = cliWriteConn(context,obuf+obuf_pos,obuf_len);</div><div class="cl"><span class="ln">9203</span>  </div><div class="cl"><span class="ln">9204</span>                      if (nwritten == -1) {</div><div class="cl"><span class="ln">9205</span>                          if (errno != EAGAIN &amp;&amp; errno != EINTR) {</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c30"
+  data-sev="full"
+  data-source="obuf  ← read(STDIN_FILENO, obuf, sizeof(obuf))"
+  data-steps="2"
+  data-guards="40"
+  data-srcfile="redis-cli.c"
+  data-sinkfile="redis-cli.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#30</span>
+      <span class="same-file">redis-cli.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">2&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">40&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">obuf  ← read(STDIN_FILENO, obuf, sizeof(obuf))</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:9224:37</span>
+      <span class="qf-desc">obuf  ← read(STDIN_FILENO, obuf, sizeof(obuf))</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/redis-cli.c:9242:25</span>
+      <span class="qf-desc">memcpy(obuf, echo, sizeof(echo)-1)  (tainted arg: obuf, echo)  via [read(STDIN_FILENO) at line 9224]</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">2 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">redis-cli.c</span>
+    <span class="pn-loc">:9224</span>
+    <span class="guards-pill" title="19 guard(s)">19</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">obuf  ← read(STDIN_FILENO, obuf, sizeof(obuf))</summary>
+    <div class="node-guards"><div class="guard-item">if (anetNonBlock(aneterr,context-&gt;fd) == ANET_ERR)</div><div class="guard-item">if (!done)</div><div class="guard-item">if (!eof || obuf_len != 0)</div><div class="guard-item">if (mask &amp; AE_READABLE)</div><div class="guard-item">if (!read_error &amp;&amp; redisBufferRead(context) == REDIS_ERR)</div><div class="guard-item">if (redisGetReply(context, (void **) &amp;reply) == REDIS_ERR)</div><div class="guard-item">if (reply)</div><div class="guard-item">if (reply-&gt;type == REDIS_REPLY_ERROR)</div><div class="guard-item">if (eof &amp;&amp; reply-&gt;type == REDIS_REPLY_STRING &amp;&amp;
+                                      reply-&gt;len == 20)</div><div class="guard-item">if (memcmp(reply-&gt;str,magic,20) == 0)</div><div class="guard-item">if (read_error)</div><div class="guard-item">if (mask &amp; AE_WRITABLE)</div><div class="guard-item">if (1)</div><div class="guard-item">if (obuf_len != 0)</div><div class="guard-item">if (nwritten == -1)</div><div class="guard-item">if (errno != EAGAIN &amp;&amp; errno != EINTR)</div><div class="guard-item">if (obuf_len != 0)</div><div class="guard-item">if (context-&gt;err)</div><div class="guard-item">if (obuf_len == 0 &amp;&amp; !eof)</div></div>
+    <pre class="code"><div class="cl"><span class="ln">9221</span>                  }</div><div class="cl"><span class="ln">9222</span>                  /* If buffer is empty, load from stdin. */</div><div class="cl"><span class="ln">9223</span>                  if (obuf_len == 0 &amp;&amp; !eof) {</div><div class="cl hit"><span class="ln">9224</span>                      ssize_t nread = read(STDIN_FILENO,obuf,sizeof(obuf));</div><div class="cl"><span class="ln">9225</span>  </div><div class="cl"><span class="ln">9226</span>                      if (nread == 0) {</div><div class="cl"><span class="ln">9227</span>                          /* The ECHO sequence starts with a &quot;\r\n&quot; so that if there</div></pre>
+  </details>
+</div><div class="pipe-arrow">▼</div><div class="pipe-node pn-sink">
+  <div class="pn-header">
+    <span class="pn-icon">◆</span>
+    <span class="pn-kind">USE</span>
+    <span class="pn-file">redis-cli.c</span>
+    <span class="pn-loc">:9242</span>
+    <span class="guards-pill" title="21 guard(s)">21</span>
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">memcpy(obuf, echo, sizeof(echo)-1)  (tainted arg: obuf, echo)  via [read(STDIN_FILENO) at line 9224]</summary>
+    <div class="node-guards"><div class="guard-item">if (anetNonBlock(aneterr,context-&gt;fd) == ANET_ERR)</div><div class="guard-item">if (!done)</div><div class="guard-item">if (!eof || obuf_len != 0)</div><div class="guard-item">if (mask &amp; AE_READABLE)</div><div class="guard-item">if (!read_error &amp;&amp; redisBufferRead(context) == REDIS_ERR)</div><div class="guard-item">if (redisGetReply(context, (void **) &amp;reply) == REDIS_ERR)</div><div class="guard-item">if (reply)</div><div class="guard-item">if (reply-&gt;type == REDIS_REPLY_ERROR)</div><div class="guard-item">if (eof &amp;&amp; reply-&gt;type == REDIS_REPLY_STRING &amp;&amp;
+                                      reply-&gt;len == 20)</div><div class="guard-item">if (memcmp(reply-&gt;str,magic,20) == 0)</div><div class="guard-item">if (read_error)</div><div class="guard-item">if (mask &amp; AE_WRITABLE)</div><div class="guard-item">if (1)</div><div class="guard-item">if (obuf_len != 0)</div><div class="guard-item">if (nwritten == -1)</div><div class="guard-item">if (errno != EAGAIN &amp;&amp; errno != EINTR)</div><div class="guard-item">if (obuf_len != 0)</div><div class="guard-item">if (context-&gt;err)</div><div class="guard-item">if (obuf_len == 0 &amp;&amp; !eof)</div><div class="guard-item">if (nread == 0)</div><div class="guard-item">if j &lt; 20</div></div>
+    <pre class="code"><div class="cl"><span class="ln">9239</span>                          for (j = 0; j &lt; 20; j++)</div><div class="cl"><span class="ln">9240</span>                              magic[j] = rand() &amp; 0xff;</div><div class="cl"><span class="ln">9241</span>                          memcpy(echo+21,magic,20);</div><div class="cl hit"><span class="ln">9242</span>                          memcpy(obuf,echo,sizeof(echo)-1);</div><div class="cl"><span class="ln">9243</span>                          obuf_len = sizeof(echo)-1;</div><div class="cl"><span class="ln">9244</span>                          obuf_pos = 0;</div><div class="cl"><span class="ln">9245</span>                          printf(&quot;All data transferred. Waiting for the last reply...\n&quot;);</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+<div class="card full" id="c31"
+  data-sev="full"
+  data-source="(result)  ← getenv(&quot;UPSTART_JOB&quot;)"
+  data-steps="1"
+  data-guards="0"
+  data-srcfile="server.c"
+  data-sinkfile="server.c">
+
+  <!-- ── Card header ── -->
+  <div class="card-hdr">
+    <div class="card-hdr-left">
+      <span class="sev-pill full">FULL</span>
+      <span class="finding-num">#31</span>
+      <span class="same-file">server.c</span>
+    </div>
+    <div class="card-hdr-pills">
+      <span class="meta-pill steps-pill" title="flow steps">1&#8239;steps</span>
+      <span class="meta-pill guards-pill-hdr" title="total guards">0&#8239;guards</span>
+      <span class="meta-pill src-pill" title="taint source">(result)  ← getenv(&quot;UPSTART_JOB&quot;)</span>
+    </div>
+  </div>
+
+  <!-- ── Quick FROM→TO ── -->
+  <div class="quick-flow">
+    <div class="qf-from">
+      <span class="qf-label src">FROM</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/server.c:7573:31</span>
+      <span class="qf-desc">(result)  ← getenv(&quot;UPSTART_JOB&quot;)</span>
+    </div>
+    <div class="qf-arrow">
+      ──▶
+    </div>
+    <div class="qf-to">
+      <span class="qf-label snk">TO</span>
+      <span class="qf-loc">/Users/emile/src/github.com/redis/redis/src/server.c:7573:31</span>
+      <span class="qf-desc">(result)  ← getenv(&quot;UPSTART_JOB&quot;)</span>
+    </div>
+  </div>
+
+  <!-- ── Collapsible pipeline ── -->
+  <details class="pipeline-wrap">
+    <summary class="pipeline-toggle">
+      <span class="tog-arrow">▶</span>
+      Data flow pipeline
+      <span class="tog-sub">1 node(s) · click to expand</span>
+    </summary>
+    <div class="pipeline">
+      <div class="pipe-node pn-source">
+  <div class="pn-header">
+    <span class="pn-icon">⬤</span>
+    <span class="pn-kind">READ</span>
+    <span class="pn-file">server.c</span>
+    <span class="pn-loc">:7573</span>
+    
+  </div>
+  <details class="pn-details">
+    <summary class="pn-desc">(result)  ← getenv(&quot;UPSTART_JOB&quot;)</summary>
+    
+    <pre class="code"><div class="cl"><span class="ln">7570</span>  </div><div class="cl"><span class="ln">7571</span>  /* Attempt to set up upstart supervision. Returns 1 if successful. */</div><div class="cl"><span class="ln">7572</span>  static int redisSupervisedUpstart(void) {</div><div class="cl hit"><span class="ln">7573</span>      const char *upstart_job = getenv(&quot;UPSTART_JOB&quot;);</div><div class="cl"><span class="ln">7574</span>  </div><div class="cl"><span class="ln">7575</span>      if (!upstart_job) {</div><div class="cl"><span class="ln">7576</span>          serverLog(LL_WARNING,</div></pre>
+  </details>
+</div>
+    </div>
+  </details>
+
+</div>
+
+</div>
+
+<footer>taint — source-level data-flow tracer &nbsp;·&nbsp; 32 finding(s) for target <code>&lt;all sinks&gt;</code></footer>
+
+<script>
+const cards = Array.from(document.querySelectorAll('.card'));
+let sortKey = 'idx';
+let sortAsc = true;
+
+function applyFilters() {
+  const sev    = document.getElementById('fSev').value;
+  const src    = document.getElementById('fSrc').value;
+  const guards = parseInt(document.getElementById('fGuards').value, 10);
+  const txt    = (document.getElementById('fText').value || '').toLowerCase();
+  const group  = document.getElementById('fGroup').value;
+
+  // Remove existing group headers
+  document.querySelectorAll('.group-header').forEach(h => h.remove());
+
+  let visible = 0;
+  cards.forEach(c => {
+    const textMatch = !txt ||
+      c.dataset.source.toLowerCase().includes(txt) ||
+      c.dataset.srcfile.toLowerCase().includes(txt) ||
+      c.dataset.sinkfile.toLowerCase().includes(txt) ||
+      c.textContent.toLowerCase().includes(txt);
+    const hide =
+      (sev    && c.dataset.sev    !== sev)  ||
+      (src    && c.dataset.source !== src)  ||
+      (parseInt(c.dataset.guards,10) < guards) ||
+      !textMatch;
+    c.classList.toggle('hidden', hide);
+    if (!hide) visible++;
+  });
+  document.getElementById('fCount').textContent = visible + ' finding(s)';
+
+  // Apply grouping if requested
+  if (group) applyGrouping(group);
+}
+
+function applyGrouping(key) {
+  const container = document.getElementById('cardContainer');
+  const visible = cards.filter(c => !c.classList.contains('hidden'));
+  if (!visible.length) return;
+
+  // Group by key
+  const groups = {};
+  visible.forEach(c => {
+    const gk = key === 'source' ? c.dataset.source :
+               key === 'sinkfile' ? c.dataset.sinkfile :
+               key === 'sev' ? c.dataset.sev : '';
+    if (!groups[gk]) groups[gk] = [];
+    groups[gk].push(c);
+  });
+
+  // Re-render with group headers
+  Object.keys(groups).sort().forEach(gk => {
+    const hdr = document.createElement('div');
+    hdr.className = 'group-header';
+    hdr.innerHTML = '<span class="gh-key">' + escapeHtml(gk) + '</span>' +
+      '<span class="gh-count">' + groups[gk].length + '</span>';
+    container.appendChild(hdr);
+    groups[gk].forEach(c => container.appendChild(c));
+  });
+}
+
+const sevOrder = { full: 0, partial: 1, none: 2 };
+function sortBy(key) {
+  if (sortKey === key) { sortAsc = !sortAsc; }
+  else { sortKey = key; sortAsc = key === 'idx'; }
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('s' + key.charAt(0).toUpperCase() + key.slice(1)).classList.add('active');
+  const container = document.getElementById('cardContainer');
+  const sorted = [...cards].sort((a, b) => {
+    let av, bv;
+    if (key === 'idx')         { av = parseInt(a.id.slice(1));        bv = parseInt(b.id.slice(1)); }
+    else if (key === 'steps')  { av = parseInt(a.dataset.steps);       bv = parseInt(b.dataset.steps); }
+    else if (key === 'guards') { av = parseInt(a.dataset.guards);      bv = parseInt(b.dataset.guards); }
+    else if (key === 'sev')    { av = sevOrder[a.dataset.sev]||9;      bv = sevOrder[b.dataset.sev]||9; }
+    return sortAsc ? av - bv : bv - av;
+  });
+  sorted.forEach(c => container.appendChild(c));
+  applyFilters(); // re-apply to handle grouping
+}
+
+function clearFilters() {
+  document.getElementById('fSev').value    = '';
+  document.getElementById('fSrc').value    = '';
+  document.getElementById('fGuards').value = 0;
+  document.getElementById('fText').value   = '';
+  document.getElementById('fGroup').value  = '';
+  document.getElementById('guardVal').textContent = '0';
+  document.querySelectorAll('.group-header').forEach(h => h.remove());
+  cards.forEach(c => c.classList.remove('hidden'));
+  document.getElementById('fCount').textContent = cards.length + ' finding(s)';
+  sortKey = 'idx'; sortAsc = true;
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('sIdx').classList.add('active');
+  const container = document.getElementById('cardContainer');
+  [...cards].sort((a,b) => parseInt(a.id.slice(1)) - parseInt(b.id.slice(1)))
+    .forEach(c => container.appendChild(c));
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Keyboard shortcut: / to focus search
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'SELECT') {
+    e.preventDefault();
+    document.getElementById('fText').focus();
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+;; markdown-dsl.lun - Markdown-like syntax that compiles to HTML DSL
+;; Converts markdown syntax to S-expressions
+
+;; ============================================================================
+;; String Helpers
+;; ============================================================================
+
+(define starts-with? (lambda (str prefix)
+  (define str-parts (str-split str ""))
+  (define prefix-parts (str-split prefix ""))
+  (if (< (length str-parts) (length prefix-parts))
+      0
+      (starts-with-helper str-parts prefix-parts))))
+
+(define starts-with-helper (lambda (str-parts prefix-parts)
+  (if (empty? prefix-parts)
+      1
+      (if (= (first str-parts) (first prefix-parts))
+          (starts-with-helper (rest str-parts) (rest prefix-parts))
+          0))))
+
+(define count-leading-chars (lambda (str char)
+  (define parts (str-split str ""))
+  (count-leading-helper parts char 0)))
+
+(define count-leading-helper (lambda (parts char count)
+  (if (empty? parts)
+      count
+      (if (= (first parts) char)
+          (count-leading-helper (rest parts) char (+ count 1))
+          count))))
+
+;; ============================================================================
+;; Markdown Line Parsers
+;; ============================================================================
+
+(define parse-heading (lambda (line)
+  (define hash-count (count-leading-chars line "#"))
+  (if (> hash-count 0)
+      (if (< hash-count 7)
+          (define text (str-trim (str-replace line (str-concat (repeat-char "#" hash-count) " ") "")))
+          (list "h" hash-count text))
+      (list "p" line))))
+
+(define repeat-char (lambda (char n)
+  (if (< n 1)
+      ""
+      (str-concat char (repeat-char char (- n 1))))))
+
+;; Parse a single markdown line to HTML
+(define md-line-to-html (lambda (line)
+  (if (= (str-trim line) "")
+      ""
+      (if (starts-with? line "#")
+          (parse-heading-to-html line)
+          (if (starts-with? line "-")
+              (str-concat "<li>" (str-trim (str-replace line "-" "")) "</li>")
+              (if (starts-with? line "*")
+                  (str-concat "<li>" (str-trim (str-replace line "*" "")) "</li>")
+                  (str-concat "<p>" line "</p>")))))))
+
+(define parse-heading-to-html (lambda (line)
+  (define hash-count (count-leading-chars line "#"))
+  (if (= hash-count 1)
+      (h1 (str-trim (str-replace line "# " "")))
+      (if (= hash-count 2)
+          (h2 (str-trim (str-replace line "## " "")))
+          (if (= hash-count 3)
+              (h3 (str-trim (str-replace line "### " "")))
+              (h1 (str-trim (str-replace line "# " ""))))))))
+
+;; ============================================================================
+;; Markdown Document Parser
+;; ============================================================================
+
+(define parse-md-lines (lambda (lines)
+  (if (empty? lines)
+      ""
+      (str-concat 
+        (md-line-to-html (first lines))
+        (parse-md-lines (rest lines))))))
+
+(define markdown-to-html (lambda (md-text)
+  (define lines (str-split md-text "\n"))
+  (parse-md-lines lines)))
+
+;; ============================================================================
+;; High-level Markdown DSL
+;; ============================================================================
+
+;; Define markdown blocks using heredoc-style syntax
+(define md (lambda (text)
+  (markdown-to-html text)))
+
+(print "Markdown DSL loaded!")

@@ -1,0 +1,23 @@
+;; test-markdown-converter.lun - Test the markdown-to-lun converter
+
+(require "markdown-to-lun.lun")
+
+(print "Testing Markdown-to-Lun converter...")
+(print "")
+
+;; Test 1: Convert markdown file to HTML
+(print "Test 1: Converting test-content.md...")
+(define html-page (markdown-file-to-html "test-content.md" "Test Page"))
+(write-file "test-markdown-output.html" html-page)
+(print "✓ Generated test-markdown-output.html")
+(print "")
+
+;; Test 2: Convert markdown text directly
+(print "Test 2: Converting markdown text...")
+(define md-text "# Hello\n\nThis is a test\n\n## Subheading\n\nMore content")
+(define html-content (markdown-to-html md-text))
+(print "Result:")
+(print html-content)
+(print "")
+
+(print "✨ All tests complete!")

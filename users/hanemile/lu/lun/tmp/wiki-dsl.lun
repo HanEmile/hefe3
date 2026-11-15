@@ -1,0 +1,132 @@
+;; wiki-dsl.lun - Wiki generator using the Content DSL
+
+(require "macro-dsl.lun")
+
+(print "🚀 Generating wiki with Content DSL...")
+
+;; ============================================================================
+;; Styling
+;; ============================================================================
+
+(define wiki-style
+  "body{font-family:system-ui;max-width:900px;margin:40px auto;padding:0 40px;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh}.content{background:white;padding:40px;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,0.1)}h1{color:#2c3e50;border-bottom:3px solid #667eea;padding-bottom:15px}h2{color:#34495e;margin-top:30px}a{color:#667eea;text-decoration:none;transition:all 0.3s}a:hover{text-decoration:underline}.post-list{list-style:none;padding:0}.post-list li{margin:20px 0;padding:20px;background:#f8f9fa;border-left:4px solid #667eea;border-radius:5px}.project-card{background:#f8f9fa;padding:20px;margin:20px 0;border-radius:5px;border-left:4px solid #764ba2}nav{background:#2c3e50;padding:20px;margin:-40px -40px 40px}nav a{color:white;margin-right:20px;font-weight:bold}footer{margin-top:60px;text-align:center;color:#888;border-top:2px solid #ecf0f1;padding-top:20px}")
+
+;; ============================================================================
+;; Navigation
+;; ============================================================================
+
+(define wiki-nav
+  (nav
+    (link "index.html" "🏠 Home")
+    (link "blog.html" "📝 Blog")
+    (link "projects.html" "💻 Projects")
+    (link "about.html" "👤 About")
+    (link "events.html" "📅 Events")))
+
+;; ============================================================================
+;; Helpers
+;; ============================================================================
+
+(define clean-name (lambda (filename)
+  (str-replace (str-replace filename ".md" "") "-" " ")))
+
+;; ============================================================================
+;; Page Template
+;; ============================================================================
+
+(define wiki-page (lambda (title content)
+  (page title wiki-style
+    (str-concat
+      wiki-nav
+      (div content)
+      (footer (paragraph "✨ Generated with Lun Content DSL © 2025"))))))
+
+;; ============================================================================
+;; Generate Pages
+;; ============================================================================
+
+;; Index page
+(print "Generating index...")
+(write-file "wiki/output/index.html"
+  (wiki-page "Home"
+    (str-concat
+      (hero "Welcome to My Lun Wiki" 
+            "Built entirely with the Lun Content DSL!")
+      (section-with "Quick Links"
+        (list
+          (text (link "blog.html" "📝 Blog Posts") " - Read my latest thoughts")
+          (text (link "projects.html" "💻 Projects") " - Check out my work")
+          (text (link "about.html" "👤 About") " - Learn more about me")
+          (text (link "events.html" "📅 Events") " - Upcoming and past events")))
+      (heading 2 "About This Wiki")
+      (text "This wiki demonstrates the power of the Lun Content DSL. Every page is generated from pure Lun code using S-expressions!")
+      (heading 3 "Features")
+      (unordered-list
+        (item "🔧 Written entirely in Lun")
+        (item "📁 Reads content dynamically")
+        (item "🎨 Beautiful, modern design")
+        (item "⚡ Fast static HTML generation")))))
+(print "✓ index.html")
+
+;; Blog page
+(print "Generating blog...")
+(define blog-files (list-dir "wiki/content/blog"))
+(define blog-items (lambda (files)
+  (if (empty? files)
+      ""
+      (str-concat
+        (tag "li" (list "class" "post-list")
+          (str-concat
+            (heading 3 (clean-name (first files)))
+            (paragraph (link (str-replace (first files) ".md" ".html") "Read more →"))))
+        (blog-items (rest files))))))
+
+(write-file "wiki/output/blog.html"
+  (wiki-page "Blog"
+    (str-concat
+      (heading 1 "📝 Blog Posts")
+      (paragraph "Exploring functional programming, language design, and elegant code.")
+      (tag "ul" (list "class" "post-list") (blog-items blog-files)))))
+(print "✓ blog.html")
+
+;; Projects page
+(print "Generating projects...")
+(define project-files (list-dir "wiki/content/projects"))
+(define project-cards (lambda (files)
+  (if (empty? files)
+      ""
+      (str-concat
+        (tag "div" (list "class" "project-card")
+          (str-concat
+            (heading 3 (clean-name (first files)))
+            (paragraph (link (str-replace (first files) ".md" ".html") "View Project →"))))
+        (project-cards (rest files))))))
+
+(write-file "wiki/output/projects.html"
+  (wiki-page "Projects"
+    (str-concat
+      (heading 1 "💻 Projects")
+      (paragraph "A collection of my open source projects and experiments.")
+      (project-cards project-files))))
+(print "✓ projects.html")
+
+;; About page
+(print "Generating about...")
+(write-file "wiki/output/about.html"
+  (wiki-page "About"
+    (div (read-file "wiki/content/about.md"))))
+(print "✓ about.html")
+
+;; Events page
+(print "Generating events...")
+(write-file "wiki/output/events.html"
+  (wiki-page "Events"
+    (div (read-file "wiki/content/events.md"))))
+(print "✓ events.html")
+
+(print "")
+(print "✨ Wiki generation complete!")
+(print "📂 Output: wiki/output/")
+(print "🌐 Open wiki/output/index.html")
+
+0

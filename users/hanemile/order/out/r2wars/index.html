@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>r2wars - emile.space</title>
+  <style>
+* { word-wrap:break-word !important; font-family: monospace; margin: 0; padding: 0; }
+
+/* light/dark theme */
+@media (prefers-color-scheme: light) {
+    html { background: #ffffff; color: #040404; }
+    a:hover {
+      box-sizing: border-box;
+      -moz-box-sizing: border-box;
+      -webkit-box-sizing: border-box;
+      box-shadow:inset 0px 0px 0px 1px black;
+    }
+    :target a { color: #ffffff; background: #040404; }
+    a { color: #040404; background: #ffffff; text-decoration: none;}
+    nav a:hover, a:active { color: #ffffff; background: #040404 }
+    nav { background: #eeeeee }
+    nav a { display:block; background: #eeeeee }
+    h1 { margin: 2ex 0 1ex 0; width: 100%; background-color: #eeeeee }
+    h2 { margin: 1ex 0 1ex 0; width: 100%; background-color: #eeeeee }
+    h3 { margin: 1ex 0 1ex 0; width: 100%; font-size: 1em; background-color: #eeeeee }
+    h4 { margin: 1ex 0 1ex 0; width: 100%; font-size: 1em; }
+    h5 { margin: 1ex 0 1ex 0; width: 100%; font-size: 1em; }
+    .code { border-left: 1px solid #040404; margin-left: 2ex; padding-left: 1ex; }
+    table, th, td { border: 1px solid #040404; }
+    .object-meta { background: #fafafa; border-left: 1px solid #cccccc; }
+    .toc { background: #fafafa; border-right: 1px solid #cccccc; }
+}
+@media (prefers-color-scheme: dark) {
+    html { background: #040404; color: #dddddd; }
+    a:hover {
+      box-sizing: border-box;
+      -moz-box-sizing: border-box;
+      -webkit-box-sizing: border-box;
+      box-shadow:inset 0px 0px 0px 1px #dddddd;
+    }
+    :target a { color: #040404; background: #dddddd; }
+    a { color: #dddddd; background: #040404; text-decoration: none; }
+    nav a:hover, a:active { color: #040404; background: #dddddd }
+    nav { background: #dddddd }
+    nav a { display:block; background: #dddddd }
+    h1 { margin: 2ex 0 1ex 0; width: 100%; background-color: #dddddd }
+    h2 { margin: 1ex 0 1ex 0; width: 100%; background-color: #dddddd }
+    h3 { margin: 1ex 0 1ex 0; width: 100%; font-size: 1em; background-color: #dddddd }
+    h4 { margin: 1ex 0 1ex 0; width: 100%; font-size: 1em; }
+    h5 { margin: 1ex 0 1ex 0; width: 100%; font-size: 1em; }
+    .code { border-left: 1px solid #dddddd; margin-left: 2ex; padding-left: 1ex; }
+    .webring { -webkit-filter: invert(100%); filter: invert(100%); }
+    table, th, td { border: 1px solid #dddddd; }
+    .object-meta { background: #0a0a0a; border-left: 1px solid #333333; }
+    .toc { background: #0a0a0a; border-right: 1px solid #333333; }
+}
+
+/* mobile */
+@media only screen and (max-width: 768px) {
+  body { margin: 1ex; width: calc(100% - 2ex) !important; }
+  img { max-width: 100% !important; max-height: 500px; }
+}
+img { max-width: 100ex; max-height: 500px; }
+body { margin-left: auto; margin-right: auto; margin-top: 1ex; margin-bottom: 1ex; width: 100ex; }
+
+/* dense tables (vokobe-style) */
+table { border-collapse: collapse; }
+td, th { padding: 0 1ex; text-align: left; }
+th { font-weight: bold; }
+
+/* display internal links using [] */
+body pre a:not([class*="local"]):before,
+.query-list a:before,
+.query-table a:before,
+.backlinks a:before { content: "["; }
+body pre a:not([class*="local"]):after,
+.query-list a:after,
+.query-table a:after,
+.backlinks a:after { content: "]"; }
+/* external links use {} */
+a[href*="//"]:not([class*="icon"]):before { content: '{'; }
+a[href*="//"]:not([class*="icon"]):after { content: '}'; }
+/* don't bracket heading anchors, nav, meta, toc, or footer links */
+h1 a:before, h1 a:after,
+h2 a:before, h2 a:after,
+h3 a:before, h3 a:after,
+h4 a:before, h4 a:after,
+h5 a:before, h5 a:after,
+header a:before, header a:after,
+nav a:before, nav a:after,
+.object-meta a:before, .object-meta a:after,
+.toc a:before, .toc a:after,
+footer a:before, footer a:after { content: "" !important; }
+
+ul { list-style-type: none; }
+
+/* navigation bar */
+nav { margin: 1ex 0; }
+nav * { color: #040404; }
+nav ul { list-style: none; position: relative; display: inline-block; }
+nav ul li { display:inline-block; }
+nav ul li > a::after { content: " /"; }
+nav ul li > a:only-child::after { content: ""; }
+nav ul li:last-of-type a::after { content: ""; }
+nav + ul li { display: inline-block;}
+nav + ul.vert li { display: block; }
+
+/* headings */
+h1 a, h2 a, h3 a { padding-right: 1ex; text-decoration: none; }
+h1 { display: inline-block; text-indent: 3.3ex hanging; }
+h2 { display: inline-block; text-indent: 5.5ex hanging; }
+h3 { display: inline-block; text-indent: 7.7ex hanging; }
+h4 { display: inline-block; text-indent: 9.9ex hanging; }
+h5 { display: inline-block; text-indent: 12.1ex hanging; }
+
+pre { white-space: pre-wrap; hyphens: auto; }
+pre.code { white-space: pre-wrap; hyphens: none; }
+
+/* ---- object metadata (right sidebar on wide screens) ---- */
+.object-meta {
+  font-size: 0.9em;
+  padding: 1ex;
+  line-height: 1.2;
+}
+.object-meta .meta-item {
+  padding: 0;
+}
+.object-meta .meta-item strong::after {
+  content: " ";
+}
+.object-meta a { text-decoration: none; background: inherit; }
+.object-meta a:hover { background: inherit; }
+
+/* ---- table of contents (left sidebar on wide screens) ---- */
+.toc {
+  padding: 1ex;
+  line-height: 1.2;
+}
+.toc pre { margin: 0; line-height: 1.2; }
+.toc a { background: inherit; }
+.toc a:hover { background: inherit; }
+
+/* ---- wide screen: sidebars aligned at same height ---- */
+@media only screen and (min-width: 1360px) {
+  .toc, .object-meta {
+    position: sticky;
+    top: 1ex;
+    width: 30ex;
+    max-height: calc(100vh - 2ex);
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .toc::-webkit-scrollbar,
+  .object-meta::-webkit-scrollbar { width: 0; height: 0; }
+
+  .toc {
+    float: left;
+    margin-left: -33ex;
+  }
+  .object-meta {
+    float: right;
+    margin-right: -33ex;
+  }
+}
+
+/* query results */
+.query-table { width: 100%; margin: 0.5ex 0; }
+.query-list { list-style: none; padding: 0; }
+.query-list li { padding: 0.1ex 0; }
+
+/* backlinks */
+.backlinks { list-style: none; padding: 0; margin: 0; }
+.backlinks li { padding: 0; margin: 0; line-height: 1.4; }
+.backlinks li::before { content: "← "; }
+
+/* visibility indicators — pages */
+.page-private { border-left: 3px solid #cc3333; padding-left: 1ex; }
+.page-internal { border-left: 3px solid #cc8833; padding-left: 1ex; }
+
+/* visibility indicators — inline sections.
+   The border hangs in the left margin (via negative margin-left + matching
+   padding-left) so headings inside stay aligned with headings outside. The
+   vertical margins of the first/last children are zeroed so the border
+   hugs the content instead of the heading's top margin or trailing gap. */
+.visibility-private,
+.visibility-internal {
+  border-left: 3px solid;
+  margin: 0.5ex 0 0.5ex -1ex;
+  padding-left: calc(1ex - 3px);
+}
+.visibility-private { border-color: #cc3333; }
+.visibility-internal { border-color: #cc8833; }
+.visibility-private > :first-child,
+.visibility-internal > :first-child,
+.visibility-private > span:first-child + *,
+.visibility-internal > span:first-child + * { margin-top: 0; }
+.visibility-private > :last-child,
+.visibility-internal > :last-child { margin-bottom: 0; }
+
+/* visibility indicators — backlink items */
+.bl-private::after { content: " 🔴"; font-size: 0.7em; }
+.bl-internal::after { content: " 🟠"; font-size: 0.7em; }
+
+/* visibility indicators — inline links */
+.link-private { border-bottom: 1px dashed #cc3333; }
+.link-internal { border-bottom: 1px dashed #cc8833; }
+
+/* SVG topology diagrams */
+.topo-svg { display: block; margin: 1ex auto; }
+
+/* SVG shelf view */
+.shelf-svg { display: block; margin: 1ex auto; }
+
+/* lisp eval errors */
+.eval-error { color: #cc0000; font-style: italic; }
+
+/* search */
+header { display: flex; align-items: center; gap: 1ex; position: relative; }
+#search { font-family: monospace; font-size: 1em; border: 1px solid currentColor; background: inherit; color: inherit; padding: 0.25ex 0.5ex; margin-left: auto; width: 20ex; }
+#search:focus { outline: none; width: 30ex; }
+#search-results { display: none; position: absolute; right: 0; top: 100%; z-index: 999; font-size: 0.9em; padding: 1ex; max-height: 60vh; overflow-y: auto; width: 40ex; border: 1px solid currentColor; }
+#search-results.active { display: block; }
+#search-results a { display: block; padding: 0.3ex 0.5ex; }
+#search-results a:hover { opacity: 0.7; }
+#search-results small { opacity: 0.5; margin-left: 0.5ex; }
+@media (prefers-color-scheme: light) {
+  #search-results { background: #ffffff; }
+}
+@media (prefers-color-scheme: dark) {
+  #search-results { background: #040404; }
+
+/* code blocks */
+pre.code[data-lang]::before { content: attr(data-lang); display: block; opacity: 0.5; font-size: 0.8em; margin-bottom: 0.5ex; }
+
+/* images */
+figure { margin: 1ex 0; }
+figure img { max-width: 100%; }
+figcaption { font-size: 0.85em; opacity: 0.7; }
+
+/* footer */
+footer { margin-top: 2ex; padding-top: 0.5ex; }
+footer pre { font-size: 0.85em; }
+
+  </style>
+</head>
+<body class="page-public">
+<header>
+  <a href="/">emile.space</a>
+  <input type="text" id="search" placeholder="search..." autocomplete="off">
+  <div id="search-results"></div>
+</header>
+<nav>
+  <ul>
+  </ul>
+  <ul style="float: right">
+    <li><a href="r2wars.md">.md</a></li>
+  </ul>
+</nav>
+<div class="toc"><pre>
+<a href="#r2wars">1. r2wars</a>
+   <a href="#what-is-radare2">1.1. What is radare2?</a>
+   <a href="#what-is-r2wars">1.2. What is r2wars?</a>
+   <a href="#r2wars-in-detail">1.3. r2wars in detail</a>
+      <a href="#bots">1.3.1. Bots</a>
+      <a href="#the-arena">1.3.2. The Arena</a>
+      <a href="#allocating-memory">1.3.3. Allocating memory</a>
+      <a href="#setting-up-the-arena">1.3.4. Setting up the arena</a>
+      <a href="#generating-initial-pos">1.3.5. Generating initial pos.</a>
+      <a href="#inserting-bots">1.3.6. Inserting bots</a>
+      <a href="#rounds">1.3.7. Rounds</a>
+   <a href="#executing-an-instruction">1.4. Executing an instruction</a>
+   <a href="#actually-playing-the-game">1.5. Actually playing the "game"</a>
+</pre></div>
+<div class="object-meta">
+  <div class="meta-item"><strong>last-edited</strong> <a href="/2026/">2026</a>-<a href="/2026-04/">04</a>-<a href="/2026-04-18/">18</a></div>
+  <div class="meta-item"><strong>type</strong> <a href="/blogpost/">blogpost</a></div>
+  <div class="meta-item"><strong>visibility</strong> <a href="/public/">public</a></div>
+  <div class="meta-item"><strong>tags</strong> <a href="/r2/">r2</a>, <a href="/lowlevel/">lowlevel</a>, <a href="/esil/">ESIL</a></div>
+  <div class="meta-item"><strong>date</strong> <a href="/2020/">2020</a>-<a href="/2020-10/">10</a>-<a href="/2020-10-10/">10</a></div>
+</div>
+<pre>
+</pre><span id="r2wars"></span>
+<h1><a href="#r2wars">1. r2wars</a></h1><pre>
+Over the last few days, I’ve played around with r2wars, a competion typically between two programs that try to survive as much time as possible in a shared memory space. A python implementation of r2wars can be found on <a href="https://github.com/radareorg/radare2-extras/tree/master/r2wars">github</a> as well as a <a href="https://github.com/radareorg/r2wars">C# Implementation</a>.
+
+
+</pre><span id="what-is-radare2"></span>
+<h2><a href="#what-is-radare2">1.1. What is radare2?</a></h2><pre>
+So let's start at the beginning with a question that might help some unfamiliar people understand all of this: what <a href="https://www.radare.org/">radare2</a> actually is. According to Wikipedia,
+
+</pre><pre class="code">"Radare2 is a complete framework for reverse-engineering and analyzing binaries; composed of a set of small utilities that can be used together or independently from the command line.</pre>
+<pre>
+— <a href="https://en.wikipedia.org/wiki/Radare2">Wikipedia - Radare2</a>
+
+So we can use radare to take apart binaries, but using all the tools included, we can do much more as you'll see next.
+
+radare2 commands tend to be not so descriptive. If you don't know what a command does, you can append a question mark to the command to get some help. If you know what you want to do, but don't know the command that might be able to do what you want to do, you can use this alias to search through all radare commands interactively:
+
+</pre><pre class="code">alias r2help="r2 -qq -c '?*~...' --"</pre>
+<pre>
+</pre><span id="what-is-r2wars"></span>
+<h2><a href="#what-is-r2wars">1.2. What is r2wars?</a></h2><pre>
+Over the last few days, I’ve played around with r2wars, a competition typically between two programs that try to survive as much time as possible in a shared memory space. A python implementation of r2wars can be found on github as well as a C# implementation.
+
+There exist similar forms of games such as <a href="https://en.wikipedia.org/wiki/Core_War">Core Wars</a>, but what makes r2wars different is that the bots can be built in any architecture supported by ESIL <a href="https://radare.gitbooks.io/radare2book/content/disassembling/esil.html%22">Evaluable Strings Intermediate Language</a>, more than 2 programs can run at the same time and cyclic execution cost matters for the turns.
+
+</pre><span id="r2wars-in-detail"></span>
+<h2><a href="#r2wars-in-detail">1.3. r2wars in detail</a></h2><pre>
+So here we go, some more in detail information on how stuff works:
+
+</pre><span id="bots"></span>
+<h3><a href="#bots">1.3.1. Bots</a></h3><pre>
+The "players" are bots. A bot is a piece of assembly, written in either x86, arm or mips using either 8, 16, 32, or 64 bit registers. A super simple bot doing nothing but locating itself in memory might look like this: (x86, 32 bits)
+
+</pre><pre class="code">call me</pre>
+<pre class="code">me:</pre>
+<pre class="code">    pop eax</pre>
+<pre>
+Assembling such a bot can be done using rasm2, the radare2 assembler and disassembler tool, as displayed in the listing below.
+
+</pre><pre class="code">; rasm2 -a x86 -b 32 -f bot.asm</pre>
+<pre class="code">e80000000058</pre>
+<pre>
+The bot created can be inspected, by disassembling it again using rasm2 like below.
+
+</pre><pre class="code">; rasm2 -D e80000000058</pre>
+<pre class="code">0x00000000   5      e800000000  call 5</pre>
+<pre class="code">0x00000005   1              58  pop eax</pre>
+<pre>
+</pre><span id="the-arena"></span>
+<h3><a href="#the-arena">1.3.2. The Arena</a></h3><pre>
+So now that you know how to assemble a bot, let's define the "arena" or the shared memory space in which the bots will battle.
+
+</pre><span id="allocating-memory"></span>
+<h3><a href="#allocating-memory">1.3.3. Allocating memory</a></h3><pre>
+First of all, some memory should be allocated, for two bots, 1024 bytes should be enough. Memory can be allocated by radare as displayed below:
+
+</pre><pre class="code">; r2 malloc://1024</pre>
+<pre class="code"> -- How about Global Thermonuclear War?</pre>
+<pre class="code">[0x00000000]&gt;</pre>
+<pre>
+By doing this, we allocated 1024 bytes of memory. This is the shared space in which the bots will battle each other.
+
+</pre><pre class="code">[0x00000000]&gt; o</pre>
+<pre class="code"> 3 * rwx 0x00000400 malloc://1024</pre>
+<pre>
+As you can see, the memory allocated is mapped rwx and consists of 1024 (0x400) bytes.
+
+</pre><span id="setting-up-the-arena"></span>
+<h3><a href="#setting-up-the-arena">1.3.4. Setting up the arena</a></h3><pre>
+The next step to building the arena is to define the architecture and the size of the registers that should be used:
+
+</pre><pre class="code">[0x00000000]&gt; e asm.arch = x86</pre>
+<pre class="code">[0x00000000]&gt; e asm.bits = 32</pre>
+<pre>
+The next step is to initialize the ESIL VM state as well as the VM stack. All radare2 command for editing the ESIL VM are prefixed with ae.
+
+</pre><pre class="code">[0x00000000]&gt; aei 	# initialize ESIL VM state</pre>
+<pre class="code">[0x00000000]&gt; aeim 	# initialize ESIL VM stack</pre>
+<pre>
+</pre><span id="generating-initial-pos"></span>
+<h3><a href="#generating-initial-pos">1.3.5. Generating initial pos.</a></h3><pre>
+The arena is now set up, the next step is to insert the bots into the arena. Selecting where to insert the bots is kind of crucial, because the bots should not be inserted into each other and not to close to the end of the arena (0x400 in this case).
+
+In order to generate a random offsets where the bots can be placed, multiple addresses should be generated in the following way:
+
+</pre><pre class="code">genspace = [0x000, 0x3c0)</pre>
+<pre class="code">maxbotspace = [0x3c0, 0x400)</pre>
+<pre>
+</pre><pre class="code">0x000                        0x340              0x400</pre>
+<pre class="code">+ -------------------------- + -----------------+</pre>
+<pre class="code">|          gen space         |  max bot space   |</pre>
+<pre>
+The space in which the bots should be generated is defined as "gen space". This means we can generate a random address in the range [0, 0x340) in which we can (in theory) place the first bot.
+
+After placing the first bot at, for example, 0x40, the address space in which the address for the second bot is chosen from is shrunk to [0x40 + maxbotsize, 0x340] as displayed below.
+
+</pre><pre class="code">0x000      0x040             0x340              0x400</pre>
+<pre class="code">+ ---------+---------------- + -----------------+</pre>
+<pre class="code">| reserved |    gen space    |  max bot space   |</pre>
+<pre>
+This might not work the first time, for example when using the default example of two bots in a memory space 1024 bytes big, each bot has (in theory) 512 bytes of memory to position itself in. Doing this for n bots in x bytes of memory results in n / x bytes per bot. This gets more problematic with a greater amount of bots in a limited memory space.
+
+</pre><span id="inserting-bots"></span>
+<h3><a href="#inserting-bots">1.3.6. Inserting bots</a></h3><pre>
+Inserting the bot into the arena is as easy as writing it's assembled code into the shared memory space. The command below writes the assembled bot to the memory location 0x100.
+
+</pre><pre class="code">[0x00000000]&gt; wx e80000000058 @ 0x100</pre>
+<pre>
+(2023-04-12: btw: you can also use the following command to write an assembled
+file to the current offset):
+
+</pre><pre class="code">[0x00000000]&gt; waf bot.asm</pre>
+<pre>
+</pre><span id="rounds"></span>
+<h3><a href="#rounds">1.3.7. Rounds</a></h3><pre>
+r2wars is a round based game. This means that we need to store the state of each "player" (bot) each round, so that the others can execute their operation. When it's the players turn again, the state has to be restored, so that the player can continue execution as if nothing had happened. r2 can dump all ESIL registers using the aer command and can even print a command to set the registers, aerR.
+
+</pre><pre class="code">[0x00000000]&gt; aerR</pre>
+<pre class="code">…</pre>
+<pre class="code">aer eax = 0x00000000</pre>
+<pre class="code">…</pre>
+<pre class="code">aer esp = 0x00000000</pre>
+<pre class="code">aer ebp = 0x00000000</pre>
+<pre class="code">aer eip = 0x00000000</pre>
+<pre class="code">…</pre>
+<pre>
+By dumping these registers, we can easily restore the state of the bot, by replacing newline chars (\n) by semicolons (;) and executing the result with r2.
+
+</pre><span id="executing-an-instruction"></span>
+<h2><a href="#executing-an-instruction">1.4. Executing an instruction</a></h2><pre>
+After having created an "arena" and inserted a bot into the arena, we can execute an instruction, but before doing so, we still need to set up the"Progam Counter" (PC) and the "Stack Pointer" (SP) for the bot. We can do this by using the aer command, that can be used to manipulate the ESIL registers:
+
+</pre><pre class="code">[0x00000000]&gt; aer PC = 0x100</pre>
+<pre class="code">[0x00000000]&gt; aer SP = SP + 0x100</pre>
+<pre>
+After having done this, the VM is setup and the instruction pointer (Program Counter in ESIL slang) is pointing to the first instruction of our bot. In order to step into, we can use the aes command:
+
+</pre><pre class="code">[0x00000000]&gt; aes</pre>
+<pre>
+We haven't seen much of our bot yet, so let's look at what's happening. r2 can print the disassembly of the instructions at a specific offset using the pd command, so let's look at what is happening at the offset 0x100, that's where our bot is located.
+
+</pre><pre class="code">[0x00000105]&gt; pd 0x4 @ 0x100</pre>
+<pre class="code">0x00000100  e800000000  call 0x105</pre>
+<pre class="code">;-- eip:</pre>
+<pre class="code">0x00000105  58        pop eax</pre>
+<pre class="code">0x00000106  0000      add byte [eax], al</pre>
+<pre class="code">0x00000108  0000      add byte [eax], al</pre>
+<pre>
+What we've done above is we've printed the 0x4 instructions at the offset 0x100. As you can see, the instruction at 0x100 contains a call to 0x105, the pop eax instruction. Radare also displays the current location of the Instruction Pointer (eip) that is currently pointing to 0x105.
+
+</pre><span id="actually-playing-the-game"></span>
+<h2><a href="#actually-playing-the-game">1.5. Actually playing the "game"</a></h2><pre>
+Well, We're at the point at which you should have understood the basics. You can read the "original" description <a href="https://github.com/radareorg/r2wars">here</a>.
+
+If you have the desire to play around with this, you can clone my implementation from <a href="https://github.com/hanemile/r2wars">here</a>. It is ready to go with two example bots that you can adjust to your needs. (+ 1 2 3 4)
+
+So from here on, you're on your own. Good luck.
+
+
+</pre><br><br><br>
+<footer>
+  <pre>generated by <a href="https://github.com/hanemile/order">order</a> 2026-04-18 17:10:25</pre>
+</footer>
+<script>
+(function(){
+var d=null,i=document.getElementById('search'),r=document.getElementById('search-results');
+var matches=[];
+function hide(){r.innerHTML='';r.classList.remove('active');matches=[]}
+function doSearch(){
+  var q=i.value.toLowerCase();matches=[];
+  if(q.length<2){hide();return}
+  if(!d){fetch('/search.json').then(function(x){return x.json()}).then(function(j){d=j;doSearch()});return}
+  var h='';for(var x=0;x<d.length&&matches.length<15;x++){
+    var o=d[x];if(o.t.toLowerCase().indexOf(q)>=0||o.s.toLowerCase().indexOf(q)>=0||o.y.toLowerCase().indexOf(q)>=0||o.p.toLowerCase().indexOf(q)>=0){
+      matches.push(o);h+='<a href="'+o.u+'">'+o.t+' <small>'+o.y+'</small></a>'}}
+  r.innerHTML=matches.length?h:'<small>no results</small>';r.classList.add('active')}
+i.addEventListener('input',doSearch);
+i.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){i.value='';hide();i.blur()}
+  if(e.key==='Enter'){e.preventDefault();if(matches.length)window.location=matches[0].u}
+});
+document.addEventListener('click',function(e){if(!r.contains(e.target)&&e.target!==i)hide()});
+})();
+</script>
+</body>
+</html>

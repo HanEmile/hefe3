@@ -1,0 +1,34 @@
+# Xilebo homeserver configuration
+
+[server]
+# Address to listen on
+address = ":8080"
+# Public-facing hostname (used in handles and federation)
+hostname = "localhost"
+
+[database]
+# "sqlite" or "postgres"
+driver = "sqlite"
+# SQLite: file path. Postgres: connection string.
+dsn = "xilebo.db"
+
+[federation]
+# Enable federation with other xilebo servers
+enabled = false
+# Federation listener address (mTLS)
+address = ":8448"
+# Path to TLS certificate and key for federation
+tls_cert = ""
+tls_key = ""
+
+[media]
+# Directory for uploaded files
+upload_dir = "uploads"
+# Maximum upload size in bytes (default: 50MB)
+max_size = 52428800
+
+[sfu]
+# Enable SFU for video calls
+enabled = true
+# STUN/TURN servers for ICE
+ice_servers = ["stun:stun.l.google.com:19302"]

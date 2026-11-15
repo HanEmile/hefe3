@@ -1,0 +1,17 @@
+;; test-read-lines.lun - Test the new read-lines function
+
+(print "Testing read-lines...")
+
+(define lines (read-lines "test-content.md"))
+(print "Lines:")
+(print lines)
+(print "")
+
+(print "Number of lines:")
+(print (length lines))
+(print "")
+
+(print "First line:")
+(print (first lines))
+
+(print "✓ read-lines works!")

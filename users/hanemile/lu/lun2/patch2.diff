@@ -1,0 +1,96 @@
+--- a/lun2.lisp
++++ b/lun2.lisp
+@@ -68,7 +68,7 @@
+   (format *error-output* "[DEBUG HEADING] Called with level=~A text=~A, *current-toc*=~A~%"
+           level text (if *current-toc* "LIST" "NIL"))
+   (when (listp *current-toc*)
+-   (let ((current-num (get-current-number level)))
++    (let ((current-num (get-current-number level)))
+       (push (list :level level :number current-num :text text :id (make-heading-id text))
+          *current-toc*)
+       (format *error-output* "[DEBUG TOC] Added heading: ~A ~A~%" current-num text))
+@@ -281,9 +281,11 @@
+           (write-string content output-stream)))
+ 
+-    (setf (gethash (cons *current-lun-file* :toc)
+-                   *lun-metadata-cache*)
+-          (nreverse *current-toc*))
++    ;; Store a COPY of the reversed TOC, not a reference
++    (let ((toc-copy (reverse *current-toc*)))
++      (setf (gethash (cons *current-lun-file* :toc)
++                     *lun-metadata-cache*)
++            toc-copy))
+     
+     (format *error-output* "[DEBUG] Stored TOC for ~A: ~A entries~%"
+             *current-lun-file*
+@@ -492,20 +494,59 @@
+ (defun extract-links-from-file (file-path)
+   "Extract all render-file-link calls from a file by parsing it."
+   (let ((links nil)
+-        (*current-lun-file* file-path))
++        (*current-lun-file* file-path)
++        (file-dir (uiop:pathname-directory-pathname file-path)))
+     (format *error-output* "[DEBUG BACKLINKS] Scanning ~A for links~%" file-path)
+     (enable-lun-syntax)
+     (unwind-protect
+          (with-open-file (stream file-path :direction :input)
+            (handler-case
+                (let ((forms (read-lun-content stream)))
+                  (format *error-output* "[DEBUG BACKLINKS] Found ~A forms in ~A~%" (length forms) file-path)
+                  (labels ((extract-from-form (form)
+                             (cond
+                               ((not (consp form)) nil)
++                              
++                              ;; Handle render-file-link function calls
+                               ((eq (car form) 'render-file-link)
+                                (let ((target-form (second form)))
+                                  (format *error-output* "[DEBUG BACKLINKS] Found render-file-link: ~A~%" target-form)
+                                  (handler-case
+                                      (let ((target (eval target-form)))
+                                        (format *error-output* "[DEBUG BACKLINKS] Evaluated to: ~A~%" target)
+                                        (when (pathnamep target)
+                                          (push target links)))
+                                    (error (e)
+                                      (format *error-output* "[DEBUG BACKLINKS] Error evaluating: ~A~%" e)))))
++                              
++                              ;; Handle [text](url) markdown link syntax
++                              ((eq (car form) 'link)
++                               (let ((url-form (third form)))
++                                 (format *error-output* "[DEBUG BACKLINKS] Found link with URL: ~A~%" url-form)
++                                 (when (stringp url-form)
++                                   ;; Check if it's a .lun or .html file
++                                   (cond
++                                     ;; Direct .lun reference
++                                     ((search ".lun" url-form)
++                                      (let ((target-path (merge-pathnames url-form file-dir)))
++                                        (format *error-output* "[DEBUG BACKLINKS] Resolved .lun link to: ~A~%" target-path)
++                                        (push (truename target-path) links)))
++                                     
++                                     ;; .html reference - convert back to .lun
++                                     ((search ".html" url-form)
++                                      (let* ((lun-url (substitute-string url-form ".html" ".lun"))
++                                             (target-path (merge-pathnames lun-url file-dir)))
++                                        (handler-case
++                                            (let ((resolved (truename target-path)))
++                                              (format *error-output* "[DEBUG BACKLINKS] Resolved .html link to: ~A~%" resolved)
++                                              (push resolved links))
++                                          (error (e)
++                                            (format *error-output* "[DEBUG BACKLINKS] Could not resolve ~A: ~A~%" target-path e)))))))))
++                              
+                               (t
+                                (dolist (subform form)
+                                  (when (consp subform)
+@@ -520,6 +561,13 @@
+       (format *error-output* "[DEBUG BACKLINKS] Found ~A links in ~A~%" (length links) file-path))
+     links))
+ 
++(defun substitute-string (string old new)
++  "Replace all occurrences of OLD with NEW in STRING."
++  (let ((pos (search old string)))
++    (if pos
++        (concatenate 'string (subseq string 0 pos) new (substitute-string (subseq string (+ pos (length old))) old new))
++        string)))
++
+ (defun table-of-contents ()
+   "Generate the table of contents for the current file"
+   (format *error-output* "[DEBUG TOC] Looking up TOC for ~A~%" *current-lun-file*)

@@ -1,0 +1,28 @@
+{{define "history"}}
+{{template "layout" .}}
+{{end}}
+
+{{define "content"}}
+<h1>History of {{.Title}}</h1>
+<p><a href="/{{.Title}}">Back to Page</a></p>
+<table>
+    <thead>
+        <tr>
+            <th>Hash</th>
+            <th>Date</th>
+            <th>Author</th>
+            <th>Message</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Commits}}
+        <tr>
+            <td><a href="/{{$.Title}}?diff={{printf "%.8s" .Hash}}">{{printf "%.8s" .Hash}}</a></td>
+            <td>{{.Date}}</td>
+            <td>{{.Author}}</td>
+            <td>{{.Message}}</td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{end}}

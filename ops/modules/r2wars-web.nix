@@ -16,7 +16,7 @@ in
     # considered stable/dependable repo-wide - see the usersFilter comment in
     # the root default.nix), so only the allow-listed VM config that reaches
     # into //users is supposed to resolve it, e.g.:
-    #   package = hefe.users.hanemile.projects.go.r2wars-web;
+    #   package = hefe.users.hanemile.r2wars-web;
     package = lib.mkOption {
       type = lib.types.package;
       description = "The r2wars-web package to run.";

@@ -1,0 +1,49 @@
+(define fold (lambda (f acc l)
+  (if (empty? l) acc (fold f (f acc (first l)) (rest l)))))
+
+(define + (lambda args (fold (foreign "+") 0 args)))
+(define * (lambda args (fold (foreign "*") 1 args)))
+
+(define - (lambda args
+  (if (empty? (rest args))
+      ((foreign "-") 0 (first args))
+      ((foreign "-") (first args) (fold (foreign "+") 0 (rest args))))))
+
+(define / (lambda args
+  (if (empty? (rest args))
+      ((foreign "/") 1 (first args))
+      ((foreign "/") (first args) (fold (foreign "*") 1 (rest args))))))
+
+(define = (foreign "="))
+(define < (foreign "<"))
+(define > (foreign ">"))
+(define != (lambda (a b) (if (= a b) 0 1)))
+
+(define list (lambda args args))
+(define cons (foreign "cons"))
+(define first (foreign "car"))
+(define rest (foreign "cdr"))
+
+(define empty? (lambda (l) (if (= l (list)) 1 0)))
+
+(define length (lambda (l) 
+  (if (empty? l) 0 (+ 1 (length (rest l))))))
+
+(define car first)
+(define cdr rest)
+(define null? empty?)
+
+(define str-concat (foreign "str"))
+(define read-file (foreign "read"))
+(define write-file (foreign "write"))
+(define print (foreign "print"))
+(define list-dir (foreign "list-dir"))
+(define str-split (foreign "str-split"))
+(define str-replace (foreign "str-replace"))
+(define str-trim (foreign "str-trim"))
+(define read-lines (foreign "read-lines"))
+
+(define true 1)
+(define false 0)
+
+

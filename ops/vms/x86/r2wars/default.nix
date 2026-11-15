@@ -40,7 +40,7 @@ in
 
   services.r2wars-web = {
     enable = true;
-    package = hefe.users.hanemile.projects.go.r2wars-web;
+    package = hefe.users.hanemile.r2wars-web;
     address = ipam.v4;
     port = ipam.ports.web;
     dataDir = "/var/lib/r2wars";

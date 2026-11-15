@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KScope</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Global progress bar overlay (shows during initial load) -->
+<div id="pbar-wrap"><div id="pbar"></div></div>
+
+<!-- Context menu -->
+<div id="ctx-menu"></div>
+
+<!-- Loading screen — hidden once indexing completes or user clicks through -->
+<div id="loading">
+  <svg width="32" height="32" viewBox="0 0 32 32" style="flex-shrink:0">
+    <circle cx="16" cy="16" r="13" fill="none" stroke="var(--border2)" stroke-width="2"/>
+    <circle cx="16" cy="16" r="13" fill="none" stroke="var(--blue)" stroke-width="2"
+            stroke-dasharray="82" stroke-dashoffset="0"
+            style="transform-origin:center;animation:spin .9s linear infinite"/>
+  </svg>
+  <div id="load-title" class="load-msg">KScope starting…</div>
+  <div id="load-detail" class="load-detail"></div>
+  <div id="load-jobs"></div>
+  <button onclick="hideLoadingOverlay()"
+    style="margin-top:8px;height:26px;padding:0 14px;background:transparent;
+           border:1px solid var(--border2);border-radius:3px;color:var(--text3);
+           font-size:10px;cursor:pointer;transition:.1s"
+    onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'"
+    onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text3)'">
+    Continue to UI →
+  </button>
+</div>
+
+<!-- Modal overlay -->
+<div id="modal-bg">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<!-- Main application shell -->
+<div id="app">
+
+  <!-- Workspace tab bar -->
+  <div id="ws-bar">
+    <div class="ws-logo">K</div>
+    <div id="ws-tabs"></div>
+    <button id="ws-new" title="New workspace">+</button>
+    <div class="ws-right">
+      <button class="tb-btn" id="btn-jobs" title="Job queue" onclick="openPanelWithState('jobs',{})">⚙ Jobs</button>
+      <div class="tb-sep"></div>
+      <select id="ver-sel" class="ver-sel" title="Active kernel version"></select>
+      <button class="tb-btn" id="btn-git" title="Switch git tag / branch">⇄ Switch</button>
+      <div class="tb-sep"></div>
+      <button class="tb-btn" id="btn-diff">⇆ Diff</button>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div id="toolbar">
+    <div id="srch-wrap">
+      <span class="srch-ic">⌕</span>
+      <input id="srch" type="text" placeholder="Search symbols…  Ctrl+K"
+             autocomplete="off" spellcheck="false">
+      <div id="srch-drop"></div>
+    </div>
+    <div class="tb-sep"></div>
+    <div id="layout-btns" title="BSP splits are managed per-panel via ⇌ ⇅ ✕ buttons"></div>
+    <div style="flex:1"></div>
+    <div id="status-bar"></div>
+  </div>
+
+  <!-- Index progress bar (thin line below toolbar) -->
+  <div id="progress-row"><div id="progress-fill"></div></div>
+
+  <!-- Main area: sidebar + BSP panel area -->
+  <div id="main-area">
+    <div id="sb">
+      <div class="sb-hd">
+        <span class="sb-title">Explorer</span>
+        <button class="ic-btn" id="nav-up"     title="Up one level">↑</button>
+        <button class="ic-btn" id="sb-refresh" title="Refresh tree">⟳</button>
+      </div>
+      <div class="sb-bc" id="sb-bc">/</div>
+      <div id="ftree"></div>
+      <div id="sb-foot"></div>
+    </div>
+
+    <!-- BSP panel grid — filled entirely by bsp.js -->
+    <div id="pgrid"></div>
+  </div>
+</div>
+
+<!--
+  JS modules — loaded in dependency order.
+  core.js must come first (defines Bus, A, api, esc, etc.).
+  bsp.js must come before panels that call openPanelWithState/openFile.
+-->
+<script src="js/core.js"></script>
+<script src="js/bsp.js"></script>
+<script src="js/panels.js"></script>
+<script src="js/graph.js"></script>
+<script src="js/callgraph.js"></script>
+<script src="js/nodeed.js"></script>
+<script src="js/symbols.js"></script>
+<script src="js/structview.js"></script>
+<script src="js/popup.js"></script>
+</body>
+</html>
