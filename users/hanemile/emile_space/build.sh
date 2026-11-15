@@ -26,7 +26,7 @@ rm -rf output/
 # build once, then invoke the binary directly: skips dune exec's
 # rebuild-check and process wrapper on every run (exit codes and
 # stdout/stderr are forwarded identical to dune exec)
-GEN="cd vokobe2 && dune build bin/main.exe && ./_build/default/bin/main.exe ../input/ ../output/ emile.space $OFFLINE_ARG"
+GEN="dune build --root vokobe2 bin/main.exe && ./vokobe2/_build/default/bin/main.exe input/ output/ emile.space $OFFLINE_ARG"
 if [ "$VERBOSE" = "1" ]; then
   ./nixrun.sh "$GEN"
 else

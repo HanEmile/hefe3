@@ -7,6 +7,10 @@
   tf = "terraform";
   f = "fd";
 
+  # irssi inside a persistent tmux session (sidebars need tmux panes,
+  # see ~/.irssi/scripts/autorun)
+  irc = "tmux attach-session -t irc 2>/dev/null || tmux new-session -s irc irssi";
+
   s = "cd";
   p3 = "python3";
   t = "task";

@@ -51,6 +51,76 @@ in
       settings.show_program_with_path = true;
     };
 
+    # tmux, managed through home-manager. Replaces the previous
+    # hand-maintained ~/.tmux.conf (backed up to ~/.tmux.conf.pre-hm when
+    # HM's config landed) and mostly exists to host irssi with its
+    # left (adv_windowlist) / right (nicklist) sidebar panes, see
+    # ~/.irssi/scripts/autorun.
+    tmux = {
+      enable = true;
+      sensibleOnTop = true;
+
+      baseIndex = 1; # 0 is too far from ` ;)
+      historyLimit = 100000;
+      keyMode = "vi";
+      # prefix hjkl moves between panes, prefix HJKL resizes by 5
+      customPaneNavigationAndResize = true;
+      mouse = true;
+      focusEvents = true;
+      escapeTime = 0;
+      # tmux-256color + RGB: sane scrolling/truecolor under kitty; the
+      # terminfo ships with macOS' ncurses (checked with infocmp)
+      terminal = "tmux-256color";
+
+      extraConfig = ''
+        # advertise truecolor when the outer terminal is kitty
+        set -as terminal-features ',xterm-kitty:RGB'
+
+        # sync copy-mode selections with the macOS clipboard (OSC 52)
+        set -s set-clipboard on
+
+        # window titles
+        setw -g automatic-rename on
+        set -g set-titles on
+        set -g renumber-windows on
+
+        # --- scrolling -------------------------------------------------
+        # selecting with the mouse used to yank you out of copy-mode the
+        # moment the button was released; now it just copies and stays
+        unbind -T copy-mode-vi MouseDragEnd1Pane
+        bind -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-selection-no-clear
+        # scroll two lines per wheel tick instead of feeling jumpy
+        bind -T copy-mode-vi WheelUpPane   send-keys -N2 -X scroll-up
+        bind -T copy-mode-vi WheelDownPane send-keys -N2 -X scroll-down
+
+        # splits open in the current pane's working directory
+        bind v split-window -h -c "#{pane_current_path}"
+        bind s split-window -v -c "#{pane_current_path}"
+
+        # Alt-(h|j|k|l) with and without the prefix for pane navigation
+        # (kitty only passes the right Option key as Meta on macOS)
+        bind -r M-j resize-pane -D
+        bind -r M-k resize-pane -U
+        bind -r M-h resize-pane -L
+        bind -r M-l resize-pane -R
+        bind -n M-h select-pane -L
+        bind -n M-j select-pane -D
+        bind -n M-k select-pane -U
+        bind -n M-l select-pane -R
+        bind -n M-Left select-pane -L
+        bind -n M-Right select-pane -R
+        bind -n M-Up select-pane -U
+        bind -n M-Down select-pane -D
+
+        # shift-arrow to switch windows without the prefix
+        bind -n S-Left  previous-window
+        bind -n S-Right next-window
+
+        # reload config
+        bind r source-file ~/.config/tmux/tmux.conf
+      '';
+    };
+
     eza.enableZshIntegration = true;
 
     zsh = {

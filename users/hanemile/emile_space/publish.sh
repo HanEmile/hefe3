@@ -29,7 +29,7 @@ if [ -d map-cache/osm ]; then
     echo "[.] map regions unchanged"
   else
     echo "[ ] extracting missing map regions from local OSM dataset ..."
-    (cd vokobe2 && dune build bin/main.exe && ./_build/default/bin/main.exe ../input/ ../output/ emile.space --dump-missing-queries >/dev/null)
+    (dune build --root vokobe2 bin/main.exe && ./vokobe2/_build/default/bin/main.exe input/ output/ emile.space --dump-missing-queries >/dev/null)
     if ls map-cache/*.query >/dev/null 2>&1; then
       python3 tools/extract-map-cache.py
     fi
