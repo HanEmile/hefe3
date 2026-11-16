@@ -147,8 +147,8 @@
       "type": "Channel",
       "name": "nixos-26.05",
       "artifact": "nixexprs.tar.xz",
-      "url": "https://releases.nixos.org/nixos/26.05/nixos-26.05.9173.6713828a351e/nixexprs.tar.xz",
-      "hash": "sha256-ahDTmIBX7dGq9GgQWH0m1uEIoJhGInEpNvKVLc1j47U="
+      "url": "https://releases.nixos.org/nixos/26.05/nixos-26.05.14234.f1e5c356f35d/nixexprs.tar.xz",
+      "hash": "sha256-C0bP9ShRkxihpkAiWel93+JypO7ls9usnHRtK2VLvWA="
     },
     "nixos-unstable": {
       "type": "Channel",
