@@ -345,6 +345,7 @@ in
     nfs.server = {
       enable = true;
       exports = ''
+        /grave/img.emile.space 192.168.75.2/32(rw,async,no_root_squash,no_subtree_check)
         /grave/data            192.168.75.7/32(rw,async,no_root_squash,no_subtree_check)
         /grave/media           192.168.33.3/32(rw,async,no_root_squash,no_subtree_check)
         /grave/games/minecraft 192.168.75.20/32(rw,async,no_root_squash,no_subtree_check)

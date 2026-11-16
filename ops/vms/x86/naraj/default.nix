@@ -32,7 +32,22 @@ in
 
   systemd.tmpfiles.rules = [
     "d /var/www/emile.space 0755 nginx nginx - -"
+    "d /var/www/img.emile.space 0755 nginx nginx - -"
   ];
+
+  # img.emile.space derivatives live on medano's grave pool next to the
+  # immich originals (/grave/photos), mounted here like the photo VM does.
+  fileSystems."/var/www/img.emile.space" = {
+    device = "192.168.75.1:/grave/img.emile.space";
+    fsType = "nfs";
+    options = [
+      "nolock"
+      "_netdev"
+      "noauto"              # Don't mount automatically at boot
+      "x-systemd.automount" # Mount on first access instead
+      "x-systemd.idle-timeout=600"
+    ];
+  };
 
   security.acme = {
     acceptTerms = true;
@@ -75,12 +90,33 @@ in
                 # the .html suffix in the browser address bar.
                 try_files $uri $uri.html =404;
 
+                # html/css/js: revalidate every load (cheap 304s via etag) so
+                # edits show up immediately instead of sitting in heuristic
+                # browser caches for days
+                add_header Cache-Control "no-cache" always;
                 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
               '';
             };
             # gotosocial uses redirects from emile.space for @hanemile
             "/@hanemile".extraConfig = ''
               return 301 https://social.emile.space/@hanemile;
+            '';
+          };
+        };
+
+        # --- img.emile.space: permanent static image hosting ---
+        # Content-hashed, immutable derivatives of trip photos (published by
+        # emile_space/tools/publish-photos.py). Originals live in Immich on
+        # /grave/photos (already restic-backed-up to the storagebox); these
+        # files are regenerable, so no separate backup here.
+        "img.emile.space" = tlsify {
+          locations."/" = {
+            root = "/var/www/img.emile.space";
+            extraConfig = ''
+              try_files $uri =404;
+              # filenames carry a content hash and never change -> cache forever
+              add_header Cache-Control "public, max-age=31536000, immutable" always;
+              add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
             '';
           };
         };
