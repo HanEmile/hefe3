@@ -1,0 +1,19 @@
+{
+  "subject": "acct:hanemile@emile.space",
+  "aliases": [
+    "https://social.emile.space/users/hanemile",
+    "https://social.emile.space/@hanemile"
+  ],
+  "links": [
+    {
+      "rel": "http://webfinger.net/rel/profile-page",
+      "type": "text/html",
+      "href": "https://social.emile.space/@hanemile"
+    },
+    {
+      "rel": "self",
+      "type": "application/activity+json",
+      "href": "https://social.emile.space/users/hanemile"
+    }
+  ]
+}

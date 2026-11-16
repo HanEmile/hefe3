@@ -1,0 +1,19 @@
+# hidden files stay local only (not tracked)
+.*
+
+# except .well-known/: publicly served (webfinger, discord, webring),
+# part of the site definition like any other input file
+!input/.well-known/
+!input/.well-known/**
+
+# derived state — rebuild any time via publish.sh
+/output/
+/map-cache/
+
+# staged web derivatives for img.emile.space (source of truth: immich +
+# published-photos.json; this dir is regenerable and huge)
+/img.emile.space/
+
+# incidental runtime debris
+.DS_Store
+/img-origs/

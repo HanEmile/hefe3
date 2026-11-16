@@ -101,6 +101,14 @@ in
             "/@hanemile".extraConfig = ''
               return 301 https://social.emile.space/@hanemile;
             '';
+            # webfinger for hanemile@emile.space -> GoToSocial on
+            # social.emile.space; served as a static file from
+            # emile_space/input/.well-known, just needs the JRD content
+            # type (strict fediverse servers reject application/octet-stream)
+            "= /.well-known/webfinger" = {
+              root = "/var/www/emile.space";
+              extraConfig = "default_type application/jrd+json;";
+            };
           };
         };
 
