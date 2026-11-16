@@ -16,6 +16,21 @@ let
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINF0ZzsWifXi/LimRmT+0PVWXXtrXHqW59vmliTUKJHw root@Dream-Machine-Professional"
   ];
 
+  # prometheus + node-exporter bind to the tailscale IP (100.87.209.97).
+  # At boot they race tailscaled: the address doesn't exist yet and five
+  # immediate bind() failures hit the systemd start limit, leaving the
+  # services dead until a manual restart (observed 2026-11-16 after the
+  # 03:33 fleet-self-upgrade reboot; nginx raced the same way but
+  # recovered on its first retry). Wait for tailscaled and spread the
+  # restarts out so the start limit can't trip before the address is up.
+  # (A preStart `ip addr` poll does NOT work: the units run with
+  # RestrictAddressFamilies that exclude AF_NETLINK, so iproute2 can't
+  # open a netlink socket.)
+  waitForTailscaleAddr = {
+    after = [ "tailscaled.service" ];
+    serviceConfig.RestartSec = "10s";
+  };
+
   # Shared defaults for the restic jobs below (same CIFS storagebox target,
   # schedule, retention and password). `//` with the job-specific attrs.
   #
@@ -199,17 +214,33 @@ in
           # Feeds /crypt-ramfs exactly like cryptsetup-askpass does (rm the
           # device marker, then write the passphrase). Manual entry via
           # console or initrd sshd keeps working in parallel.
+          #
+          # 2026-11-16 lessons from the 6h stuck-at-LUKS incident:
+          #  - run until stage-2 takes over, not for 10min: after 150*4s
+          #    the loop silently died and nobody ever fed a prompt again
+          #  - never hide ssh errors behind 2>/dev/null: nothing reached
+          #    medano's sshd all night and there was NOTHING to debug
           (
             PASS=
-            for _ in $(seq 1 150); do
+            while :; do
+              # /mnt-root is mounted right before stage-1 hands over to
+              # stage-2; switch_root would kill us anyway, this is just tidy
+              grep -qw /mnt-root /proc/mounts && exit 0
               if [ -e /crypt-ramfs/device ]; then
                 dev=$(cat /crypt-ramfs/device)
                 if [ -z "$PASS" ]; then
-                  PASS=$(ssh -i /lampadas_initrd_pull_ed25519 \
+                  OUT=$(ssh -i /lampadas_initrd_pull_ed25519 \
                     -o BatchMode=yes -o ConnectTimeout=8 \
                     -o StrictHostKeyChecking=yes \
                     -o UserKnownHostsFile=/etc/medano_pull_known_hosts \
-                    fleet-unlock-pull@95.217.35.60 2>/dev/null || true)
+                    fleet-unlock-pull@95.217.35.60 2>&1)
+                  rc=$?
+                  if [ $rc -eq 0 ]; then
+                    PASS=$OUT
+                    echo "initrd-pull: fetched passphrase for $dev from medano"
+                  else
+                    echo "initrd-pull: ssh to medano failed (rc=$rc): $OUT"
+                  fi
                   [ "$PASS" = REPLACE_ME ] && PASS=
                 fi
                 if [ -n "$PASS" ] && [ -e /crypt-ramfs/device ] \
@@ -840,6 +871,11 @@ in
   # propagation list. Same pattern used in tools/status-board/default.nix.
   systemd.services."restic-backups-photos".unitConfig.RequiresMountsFor = "/mnt/storagebox-bx11";
   systemd.services."restic-backups-immich-data".unitConfig.RequiresMountsFor = "/mnt/storagebox-bx11";
+
+  # don't die at boot waiting for the tailscale address they're bound to
+  # (see waitForTailscaleAddr in the let block above)
+  systemd.services.prometheus = waitForTailscaleAddr;
+  systemd.services.prometheus-node-exporter = waitForTailscaleAddr;
   systemd.services."restic-backups-homeassistant".unitConfig.RequiresMountsFor = "/mnt/storagebox-bx11";
 
   # syswatch: posts lampadas anomaly alerts to #emile (emilespace Ergo):
