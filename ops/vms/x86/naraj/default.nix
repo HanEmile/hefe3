@@ -63,11 +63,35 @@ in
     recommendedBrotliSettings = true;
     recommendedUwsgiSettings = true;
 
+    # AI/LLM crawlers get HTTP 402 Payment Required ("pay for the
+    # content"); regular search indexing (Googlebot, Applebot, Baiduspider
+    # & co.) stays untouched. List seeded from the live access.log
+    # crawlers of 2026-11-16 (ClaudeBot, Claude-User, Claude-SearchBot,
+    # OAI-SearchBot, ChatGPT-User, CCBot, Bytespider, Amazonbot,
+    # Meta-ExternalFetcher, GrokBot, MoonshotBot, KimiBot, Qwenbot).
+    commonHttpConfig = ''
+      map $http_user_agent $ai_crawler {
+        default 0;
+        ~*(ClaudeBot|Claude-SearchBot|Claude-User|anthropic-ai) 1;
+        ~*(GPTBot|OAI-SearchBot|ChatGPT-User) 1;
+        ~*(PerplexityBot|Perplexity-User) 1;
+        ~*(CCBot|Bytespider|Amazonbot) 1;
+        ~*(Meta-ExternalAgent|Meta-ExternalFetcher|FacebookBot) 1;
+        ~*(GrokBot|MoonshotBot|KimiBot|Qwenbot) 1;
+        ~*(cohere-ai|Diffbot|ImagesiftBot) 1;
+      }
+    '';
+
     virtualHosts =
       let
         tlsify = content: content // {
           forceSSL = true;
           enableACME = true;
+          # AI crawlers don't get the content (map in commonHttpConfig).
+          # server-level `if` + `return` is one of the safe-if uses.
+          extraConfig = (content.extraConfig or "") + ''
+            if ($ai_crawler) { return 402; }
+          '';
         };
       in
       {
