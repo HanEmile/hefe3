@@ -157,6 +157,8 @@ let () =
           collect_only;
           backlinks_op_used = false;
           book_depth = 0;
+          book_image_count = ref 0;
+          book_image_total = 0;
           heading_offset = 0;
           feed =
             (match Hashtbl.find_opt feed_of_page page.Page.name with

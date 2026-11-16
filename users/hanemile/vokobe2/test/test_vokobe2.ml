@@ -60,6 +60,8 @@ let () =
         collect_only = false;
         backlinks_op_used = false;
         book_depth = 0;
+        book_image_count = ref 0;
+        book_image_total = 0;
         heading_offset = 0;
         feed = None;
       }
@@ -145,11 +147,11 @@ Second paragraph.
   assert (contains html "&lt;page&gt;");
   assert (not (contains html "\\n"));
 
-  (* (book "tag"): chapters ordered by published, self excluded,
+  (* (format book): chapters ordered by published, self excluded,
      chapter headings renumber independently *)
   let ch_old = mk_page "ch-old" "(meta (tag \"story\") (published \"2024-01-01\"))\n\n# Old\n\nold text.\n" in
   let ch_new = mk_page "ch-new" "(meta (tag \"story\") (published \"2025-01-01\"))\n\n# New\n\nnew text.\n" in
-  let book = mk_page "my-book" "(meta (tag \"story\") (published \"2026-01-01\"))\n\n# My Book\n\n(toc)\n\n(book \"story\")\n" in
+  let book = mk_page "my-book" "(meta (tag \"story\") (published \"2026-01-01\"))\n\n# My Book\n\n(toc)\n\n(query (where (tag story)) (format book))\n" in
   let pages = [book; ch_new; ch_old] in
   (* production does pass1 (collect_only) then pass2 with the collected
      dynamic headings; chapter titles must reach the (toc) above the
@@ -183,6 +185,120 @@ Second paragraph.
      them); their body text survives *)
   assert (not (contains html {|<h1 id="old"|})
           && not (contains html {|<h1 id="new"|}));
+
+  (* book chapters show a compact thumbnail strip (bookthumb), capped at
+     book_image_max (8); the rest collapse into one 'N more photos' link
+     to the full page; full-width .dw blocks stay outside books *)
+  let dimg n = Printf.sprintf "(dimg /x%d-dither.webp /x%d.webp 10 10 \"a\")\n" n n in
+  let gallery = String.concat "\n" (List.init 10 dimg) in
+  let ch_gal =
+    mk_page "ch-gal"
+      ("(meta (tag \"story\") (published \"2025-06-01\"))\n\n# Gal\n\nlook:\n\n" ^ gallery)
+  in
+  let book2 =
+    mk_page "my-book2"
+      "(meta (tag \"story\") (published \"2026-01-01\"))\n\n# Book 2\n\n(query (where (tag story)) (format book))\n"
+  in
+  let html2 =
+    Vokobe2.Render.render_body (ctx [book2; ch_gal] book2) book2.raw
+  in
+  let count_sub hay needle =
+    let n = String.length hay and m = String.length needle in
+    let rec go acc i =
+      if i + m > n then acc
+      else if String.sub hay i m = needle then go (acc + 1) (i + m)
+      else go acc (i + 1)
+    in
+    go 0 0
+  in
+  assert (count_sub html2 {|class="bookthumb"|} = 8);
+  assert (count_sub html2 {|<div class="dw"|} = 0);
+  assert (contains html2 {|href="/ch-gal"|}
+          && contains html2 "2 more photos on the full page");
+  (* the standalone chapter page keeps all 10 images, no cap link *)
+  let html3 = Vokobe2.Render.render_body (ctx [ch_gal] ch_gal) ch_gal.raw in
+  assert (count_sub html3 {|<div class="dw"|} = 10);
+  assert (not (contains html3 "book-more"));
+
+  (* auto toc: pages with >= 3 section headings get one inserted before
+     the first h2; pages with an explicit (toc) are left alone *)
+  let toc_page n_sections explicit =
+    let secs =
+      String.concat ""
+        (List.init n_sections
+           (fun i -> Printf.sprintf "## Section %d\n\nbody.\n\n" i))
+    in
+    mk_page "toc-page"
+      ("# Toc Page\n\nintro.\n\n" ^ (if explicit then "(toc)\n\n" else "")
+      ^ secs)
+  in
+  let full_html p =
+    (* production: pass1 collect (headings + dynamic), pass2 render *)
+    let c0 =
+      { (ctx [p] p) with Vokobe2.Render.collect_only = true }
+    in
+    let _ = Vokobe2.Render.render_body c0 p.raw in
+    let c2 =
+      { (ctx [p] p) with
+        Vokobe2.Render.headings =
+          Vokobe2.Heading.collect_headings p.raw @ c0.hstate.dynamic_headings;
+      }
+    in
+    let b = Vokobe2.Render.render_body c2 p.raw in
+    Vokobe2.Render.render_html "test" c2 b
+  in
+  let h_auto = full_html (toc_page 3 false) in
+  assert (contains h_auto {|<ul class="toc">|});
+  let h_few = full_html (toc_page 2 false) in
+  assert (not (contains h_few {|<ul class="toc">|}));
+  let h_explicit = full_html (toc_page 3 true) in
+  assert (count_sub h_explicit {|<ul class="toc">|} = 1);
+
+  (* book gallery filter: day/hour subsection headings never show in
+     books; oversized galleries become a stable assorted sample of 8 *)
+  let secs =
+    "## Photos\n\n### 2025-01-02\n\n#### 13:00\n\n"
+    ^ String.concat "\n" (List.init 3 dimg)
+    ^ "\n\n#### 16:00\n\n"
+    ^ String.concat "\n" (List.init 5 (fun n -> dimg (n + 3)))
+    ^ "\n\n#### 17:00\n\n"
+    ^ String.concat "\n" (List.init 2 (fun n -> dimg (n + 8)))
+    ^ "\n"
+  in
+  let ch_sec =
+    mk_page "ch-sec"
+      ("(meta (tag \"story\") (published \"2025-06-02\"))\n\n# Sec\n\nlook:\n\n" ^ secs)
+  in
+  let book3 =
+    mk_page "my-book3"
+      "(meta (tag \"story\") (published \"2026-01-01\"))\n\n# Book 3\n\n(query (where (tag story)) (format book))\n"
+  in
+  let html4 =
+    Vokobe2.Render.render_body (ctx [book3; ch_sec] book3) book3.raw
+  in
+  (* gallery headings (Photos/day/hour) never show in books *)
+  assert (not (contains html4 ">Photos<"));
+  assert (not (contains html4 "13:00") && not (contains html4 "16:00")
+          && not (contains html4 "17:00"));
+  assert (count_sub html4 {|class="bookthumb"|} = 8);
+  (* assorted != first 8: at least one of the last two images is kept *)
+  assert (contains html4 "/x8.webp" || contains html4 "/x9.webp");
+  (* deterministic: same input renders identically *)
+  let html4' =
+    Vokobe2.Render.render_body (ctx [book3; ch_sec] book3) book3.raw
+  in
+  assert (html4 = html4');
+
+  (* linkify_desc: [text](https://...) becomes an anchor, parens inside
+     the url are balanced, everything else stays escaped text *)
+  let ld = Vokobe2.Render.linkify_desc in
+  assert (ld "plain & <b>" = "plain &amp; &lt;b&gt;");
+  assert (ld "[The Big Buddha](https://en.wikipedia.org/wiki/The_Big_Buddha_(Hong_Kong))"
+          = {|<a href="https://en.wikipedia.org/wiki/The_Big_Buddha_(Hong_Kong)">The Big Buddha</a>|});
+  assert (ld "see [x](javascript:evil) ok" = "see [x](javascript:evil) ok");
+  assert (ld "[a](https://x.test) and [b](https://y.test)!"
+          = {|<a href="https://x.test">a</a> and <a href="https://y.test">b</a>!|});
+  assert (ld "[unclosed](https://x.test" = "[unclosed](https://x.test");
 
   (* /now: current events beat past, future shows as upcoming *)
   let ongoing =
