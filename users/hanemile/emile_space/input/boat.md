@@ -2,7 +2,7 @@
   (date "")
   (tag "project")
   (published "2022-01-01")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (author "Emile")
   (info "tag")
 )
@@ -58,5 +58,4 @@ When sailing in Germany, you seem to need a license, in order to get one, you ha
 
 - [condensed "sailing the atlantik" list](https://www.deepsailing.com/blog/sail-across-the-atlantic)
   - contains checklists!
-
 

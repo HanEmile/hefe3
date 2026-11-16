@@ -2,7 +2,7 @@
   (date "")
   (tag "ctf" "writeup")
   (published "2019-01-01")
-  (modified "2026-11-13")
+  (modified "2026-11-15")
   (author "Emile")
   (info "tag" "published")
 )
@@ -12,7 +12,6 @@
 (toc)
 
 [https://archive.ooo/c/know_your_mem/359/](https://archive.ooo/c/know_your_mem/359/)
-
 
 ## Given files
 
@@ -39,9 +38,7 @@ CFLAGS += -m64 -std=gnu99
 # Just making sure
 HARDENING_FLAGS += -pie -fPIE -Wl,-z,relro -Wl,-z,now -fstack-protector-all -D_FORTIFY_SOURCE=2 -Wformat=2 -Werror=format-security
 
-
 all: know_your_mem simplified
-
 
 know_your_mem: LDLIBS += -lseccomp
 know_your_mem: CFLAGS += -O3 -march=native -s $(HARDENING_FLAGS)
@@ -49,10 +46,8 @@ know_your_mem: CFLAGS += -O3 -march=native -s $(HARDENING_FLAGS)
 simplified: LDLIBS += -lseccomp -ldl
 simplified: CFLAGS += -DSIMPLIFIED -g3 -ggdb $(HARDENING_FLAGS)
 
-
 %.so: CFLAGS += -shared -fPIC
 %.so: LDFLAGS += -shared -fPIC
-
 
 check: all flag simplified_shellcode.so shellcode.bin.pkt
         ./simplified
@@ -60,12 +55,10 @@ check: all flag simplified_shellcode.so shellcode.bin.pkt
         ./know_your_mem < shellcode.bin.pkt | tee | fgrep --text 'OOO{theflagwillbehere}'
         @echo "Perfect! Now go get that flag :)"
 
-
 mycheck: all flag solution.so solution.bin.pkt
         ./simplified ./solution.so
         ./know_your_mem < solution.bin.pkt | tee | fgrep --text 'OOO{theflagwillbehere}'
         @echo "Good, my solution worked :)"
-
 
 %.bin: %.c
         gcc -nostdlib -static -fPIC -Os -Wall -DNDEBUG -fno-exceptions -fno-asynchronous-unwind-tables -fno-unwind-tables -s -o $*.elf $<
@@ -74,7 +67,6 @@ mycheck: all flag solution.so solution.bin.pkt
 
 %.bin.pkt: %.bin
         ./topkt.py $<
-
 
 flag:
         @echo 'Creating a fake flag for testing convenience'
@@ -137,7 +129,6 @@ typedef void* (*shellcodefn)();
 # define hint(x, ...)
 #endif
 
-
 #define ADDR_MIN   0x0000100000000000UL  // Low-ish
 #define ADDR_MASK  0x00000ffffffff000UL  // Page-aligns
 #define N_FAKES   30
@@ -166,7 +157,6 @@ static void *map_page(void *addr)
     return ret;
 }
 
-
 static void* put_secret_somewhere_in_memory()
 {
     fprintf(stderr, "[ ] Putting the flag somewhere in memory...\n");
@@ -192,7 +182,6 @@ static void* put_secret_somewhere_in_memory()
     return pg;
 }
 
-
 static void put_fakes_in_memory()
 {
     fprintf(stderr, "[ ] Putting red herrings in memory...\n");
@@ -202,7 +191,6 @@ static void put_fakes_in_memory()
         hint("Red herring at %p\n", pg);
     }
 }
-
 
 static void filter_syscalls()
 {
@@ -280,7 +268,6 @@ static shellcodefn load_shellcode()
 }
 #endif
 
-
 int main(int argc, char *argv[])
 {
 #ifdef SIMPLIFIED
@@ -297,13 +284,11 @@ int main(int argc, char *argv[])
     if (setrlimit(RLIMIT_AS, &as_limit) != 0)
         warn("RLIMIT_AS");
 
-
     struct utsname un;
     uname(&un);
     printf("[ ] This challenge may be slightly easier in Linux 4.17+. "
             "Here, we're running on %s %s (%s)\n",
             un.sysname, un.release, un.machine);
-
 
 #ifdef SIMPLIFIED
     shellcodefn shellcode = load_shellcode((argc >= 2) ? argv[1] : "./simplified_shellcode.so");
@@ -312,13 +297,11 @@ int main(int argc, char *argv[])
     shellcodefn shellcode = load_shellcode();
 #endif
 
-
 #ifdef SIMPLIFIED
     void *secret_addr =
 #endif
         put_secret_somewhere_in_memory();
     put_fakes_in_memory();
-
 
     fflush(NULL);
     filter_syscalls();
@@ -352,16 +335,13 @@ int main(int argc, char *argv[])
 //       If you want them you'll have to adjust the Makefile.
 //       They're not really necessary to solve this challenge though.
 
-
 // From https://chromium.googlesource.com/ctf-foo-linux-syscall-support/
 static int my_errno = 0;
 #define SYS_ERRNO my_errno
 #include "linux-syscall-support/ctf-foo-linux_syscall_support.h"
 
-
 #define ADDR_MIN   0x0000100000000000UL
 #define ADDR_MASK  0x00000ffffffff000UL
-
 
 void _start()
 {
@@ -403,7 +383,6 @@ typedef void* (*shellcodefn)();
 # define hint(x, ...)
 #endif
 
-
 #define ADDR_MIN   0x0000100000000000UL  // Low-ish
 #define ADDR_MASK  0x00000ffffffff000UL  // Page-aligns
 #define N_FAKES   30
@@ -432,7 +411,6 @@ static void *map_page(void *addr)
     return ret;
 }
 
-
 static void* put_secret_somewhere_in_memory()
 {
     fprintf(stderr, "[ ] Putting the flag somewhere in memory...\n");
@@ -458,7 +436,6 @@ static void* put_secret_somewhere_in_memory()
     return pg;
 }
 
-
 static void put_fakes_in_memory()
 {
     fprintf(stderr, "[ ] Putting red herrings in memory...\n");
@@ -468,7 +445,6 @@ static void put_fakes_in_memory()
         hint("Red herring at %p\n", pg);
     }
 }
-
 
 static void filter_syscalls()
 {
@@ -546,7 +522,6 @@ static shellcodefn load_shellcode()
 }
 #endif
 
-
 int main(int argc, char *argv[])
 {
 #ifdef SIMPLIFIED
@@ -563,13 +538,11 @@ int main(int argc, char *argv[])
     if (setrlimit(RLIMIT_AS, &as_limit) != 0)
         warn("RLIMIT_AS");
 
-
     struct utsname un;
     uname(&un);
     printf("[ ] This challenge may be slightly easier in Linux 4.17+. "
             "Here, we're running on %s %s (%s)\n",
             un.sysname, un.release, un.machine);
-
 
 #ifdef SIMPLIFIED
     shellcodefn shellcode = load_shellcode((argc >= 2) ? argv[1] : "./simplified_shellcode.so");
@@ -578,13 +551,11 @@ int main(int argc, char *argv[])
     shellcodefn shellcode = load_shellcode();
 #endif
 
-
 #ifdef SIMPLIFIED
     void *secret_addr =
 #endif
         put_secret_somewhere_in_memory();
     put_fakes_in_memory();
-
 
     fflush(NULL);
     filter_syscalls();
@@ -613,7 +584,6 @@ int main(int argc, char *argv[])
 
 #define ADDR_MIN   0x0000100000000000UL
 #define ADDR_MASK  0x00000ffffffff000UL
-
 
 void *shellcode()
 {

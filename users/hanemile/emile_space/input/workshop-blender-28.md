@@ -1,7 +1,7 @@
 (meta
   (tag "workshop")
   (published "2019-09-28")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (date "2020-09-28")
   (author "Emile")
   (info "tag" "date")

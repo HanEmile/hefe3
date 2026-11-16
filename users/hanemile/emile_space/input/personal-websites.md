@@ -2,7 +2,7 @@
   (date "")
   (tag "blog")
   (published "2021-06-14")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (author "Emile")
   (info "tag" "published")
 )
@@ -117,9 +117,7 @@ Resources
 /emile.space/6a50e9a7...-writeup-2020-nahamconctf-full-leak/
 ```
 
-
 My idea here is to treat the resources like binaries. Like in the nix store, executing a binary by providing the whole path isn't really nice and adding every single resource to the "PATH" also isn't really nice, so there needs to be a better way. The nix store manages this in profiles. The profiles contain symlinks to "activated" packages, the analogy can be transferred here in a way that published resources can be seen as "activated". This would mean that if I've got a resource that I'm currenly writing, I can add it to the "draft" profile, allowing me to see it, but not others (I'll have to figure out how to handle authorization and how to filter what entities can access that profile, but that's a problem for later).
-
 
 Profiles
 
@@ -137,6 +135,5 @@ Profiles
 		└── talk-2021-betreutes-hacken ->
 /emile.space/9ef931a0...-talk-2021-betreutes-hacken/
 ```
-
 
 Now can we drive this even further? Can we use nix itself for this, creating packages from our articles that can then be referenced? Well, ... yes.

@@ -2,7 +2,7 @@
   (date "")
   (tag "blog" "rust" "stdlib")
   (published "2022-01-03")
-  (modified "2026-11-13")
+  (modified "2026-11-15")
   (author "Emile"))
 
 # offline rust stdlib docs

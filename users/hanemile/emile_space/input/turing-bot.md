@@ -2,7 +2,7 @@
   (date "")
   (tag "blog" "ai" "rust")
   (published "2021-02-05")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (author "Emile")
   (info "tag" "published")
 )
@@ -38,7 +38,6 @@ There were more learnings than "writing a telegram bot is fairly easy": Watching
 The complete code is a bit more than 100 lines of pure code, I've added a lot of comments for making it easier to understand, even for beginners.
 
 Beware: this code was written down in a matter of minutes, there are a lot of things wrong with it (such as everything being in the main function), but it works for a minimal prototype which was the goal of all of this.
-
 
 ```go
 package main

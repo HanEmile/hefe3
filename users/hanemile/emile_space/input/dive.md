@@ -2,7 +2,7 @@
   (date "")
   (tag "sport")
   (published "2022-01-01")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (author "Emile")
   (info "tag")
 )
@@ -36,5 +36,4 @@ Underwater
 ### 2025
 
 ### 2026
-
 

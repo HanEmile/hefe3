@@ -2,7 +2,7 @@
   (date "")
   (tag "blog" "lisp")
   (published "2024-05-11")
-  (modified "2026-11-13")
+  (modified "2026-11-15")
   (author "Emile")
   (info "tag" "published")
 )
@@ -41,7 +41,6 @@ sdc (128GB SSD)
   sdc2
     fat32 (boot)
 ```
-
 
 ## Installation
 

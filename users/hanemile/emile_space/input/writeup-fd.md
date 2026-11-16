@@ -2,7 +2,7 @@
   (date "")
   (tag "ctf" "writeup")
   (published "2020-01-01")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (author "Emile")
   (info "tag" "published")
 )
@@ -23,7 +23,6 @@
 We get a file called fd.c, the corresponding binary fd and a flag flag.
 
 As we get the sourcecode, let's inspect it:
-
 
 ```
 fd@pwnable:~$ cat fd.c
@@ -50,11 +49,9 @@ int main(int argc, char* argv[], char* envp[]){
 }
 ```
 
-
 ## Understanding the source
 
 Let's look at the file line by line:
-
 
 ```
 #include <stdio.h>
@@ -62,17 +59,13 @@ Let's look at the file line by line:
 #include <string.h>
 ```
 
-
 Just some imports, nothing really interesting.
-
 
 ```
 char buf[32];
 ```
 
-
 A chat buffer get's defined, we will probably write stuff into here...
-
 
 ```
 int main(int argc, char* argv[], char* envp[]){
@@ -82,40 +75,31 @@ int main(int argc, char* argv[], char* envp[]){
     }
 ```
 
-
 This is the definition of the main function with some code checking if the right amount of arguments was supplied... still not really interesting.
-
 
 ```
     int fd = atoi( argv[1] ) - 0x1234;
 ```
 
-
 Now this get's interesting: The first command line argument (argv[1]) is passed to atoi (execute man atoi for more information on atoi). In a nutshell, atoi converts out input to an integer (Ascii TO Integer) and then subtracts 0x1234 from it. This means that we can control the content of the fd variable: If we want to insert a value n into the var, we insert n + 0x1234.
-
 
 ```
     int len = 0;
 ```
 
-
 Some var len is initialized as 0, nothing we can do here.
-
 
 ```
     len = read(fd, buf, 32);
 ```
 
-
 Now here, the read function is used to "read from a file descriptor" (read the manpage `man 2 read` for more info on the read function).
 
 Looking into the manpage, the read functions signature is the following:
 
-
 ```
 ssize_t read(int fd, void *buf, size_t count);
 ```
-
 
 From the manpage:
 
@@ -125,7 +109,6 @@ This means that the address of the buffer defined in the beginning ist passed in
 
 As we control the file descriptor, we can read 32 bytes of data from an arbitrary file descriptor into the buffer.
 
-
 ```
     if(!strcmp("LETMEWIN\n", buf)){
         printf("good job :)\n");
@@ -134,9 +117,7 @@ As we control the file descriptor, we can read 32 bytes of data from an arbitrar
     }
 ```
 
-
 This checks if the content of the buffer is LETMEWIN. If so, it prints the content of the flag file and exists...
-
 
 ```
     printf("learn about Linux file IO\n");
@@ -145,9 +126,7 @@ This checks if the content of the buffer is LETMEWIN. If so, it prints the conte
 }
 ```
 
-
 ...but if not, It tells us to learn about Linux file IO.
-
 
 ## Solving the challenge
 
@@ -161,15 +140,12 @@ Now that we can control the file pointer, we probably want to use the file descr
 
 In order to get the fd value to 0, we need to insert 0 + 0x1234 which is:
 
-
 ```
 >>> 0 + 0x1234
 4660
 ```
 
-
 With this information we can get the flag like this:
-
 
 ```
 fd@pwnable:~$ ./fd 4660

@@ -1,7 +1,7 @@
 (meta
   (tag "event" "ccc")
   (published "2023-04-01")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (date "2023-04-07" "2023-04-10")
   (author "Emile")
   (location "Hamburg" "Germany")
@@ -43,7 +43,6 @@ CTF (CaptureTheFlag) is ein wunderbares Konzept um in die Welt der IT-Security e
 - [ctf_beginner.pdf](ctf_beginner.pdf)
 - [/writeup-pseudo-key](/writeup-pseudo-key)
 
-
 ## Nix - ein spannendes Ökosystem
 
 2023-04-09 16:15 50min
@@ -56,7 +55,6 @@ Alle reden von nix, aber was ist das eigentlich? Eine Einführung in das Betrieb
 - [slides (weird pdf export)](nix.pdf)
 - [slides (nice html export)](.nix/presentation.htm)
 
-
 ## r2wars - battle bots in shared memory
 
 2023-04-09 17:30 50min
@@ -68,6 +66,4 @@ Programme gleichzeitig im selben Speicher ausführen: was könnte schon schiefge
 
 - [https://github.com/hanemile/r2wars](https://github.com/hanemile/r2wars)
 - [slides (nice html export)](.r2wars/presentation.htm)
-
-
 

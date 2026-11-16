@@ -1,7 +1,7 @@
 (meta
   (tag "wood")
   (published "2026-10-25")
-  (modified "2026-11-13")
+  (modified "2026-11-15")
   (date "2026-10-25")
   (author "Emile")
   (info "published" "tag"))

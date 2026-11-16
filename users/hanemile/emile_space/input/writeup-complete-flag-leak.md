@@ -2,7 +2,7 @@
   (date "")
   (tag "ctf" "writeup")
   (published "2020-06-01")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (author "Emile")
   (info "tag" "published")
 )
@@ -35,13 +35,11 @@ lsblk output
 
 The leak is actually so simple that I'm always astonised that it actually works. Let me present:
 
-
 ```
 ; nc jh2i.com 50026
 cat /dev/vda1 | grep -ao "flag{.*}"
 …
 ```
-
 
 So what we do, is we read from the blockdevice and grep for the flag format. It's literally as simple as that.
 
@@ -53,11 +51,9 @@ So after taking this screenshot, I waited about a minute to see if there was mor
 
 I extracted all flags from the dump like this:
 
-
 ```
 ; cat flagleak.txt | grep -o "flag\{\w{1,50}\}" | sort | uniq > flagleak_clean.txt
 ```
-
 
 and proceeded to tweet the sha256sum of the flagleak_clean.txt file (functioning as a proof this happened about 1.5h after the CTF started):
 
@@ -69,7 +65,6 @@ Here a screenshot of the flag leak for verification:
 
 (Sidenote: the CTF did contain flags starting with the flag format JCTF{.*}. These aren't included in the leak, as I simply grepped for the other flag format flag{}. Also, flags not following a flag format are not in the leak. All of these could have been found, but dumping all of the data accessible (600GB+) wasn't my intention).
 
-
 ## Disclosure
 
 So as you might realize, leaking all flags isn't good, not even a bit. It is "sort of a game-critical thing".
@@ -80,12 +75,10 @@ After about 10 seconds, an admin reached out to me regarding this. I disclosed l
 
 Overall, the response from the admins was great and I'd love to see such a response whenever something like this happens.
 
-
 ## Learnings
 
 As mentioned before, I started reaching out to the admins directly in the main thread even mentioning that I'd leaked all flags. The admin I then PMd told me to please delete this message, as it might discourage other players from playing the CTF when knowning that all flags had been leaked.
 I deleted the message as soon as I got the message, realizing that informing all players that all flags had been leaked might really not be the best thing to do, as it really might ruin the CTF for a lot of people.
-
 
 ### What to do if you leak flags
 
@@ -93,7 +86,6 @@ So here some points on what you should do when finding out you've leaked all fla
 
 - contact the admins ASAP
 - don't inform all players publicly, if you do, coordinate this with the admins
-
 
 ### The stream
 

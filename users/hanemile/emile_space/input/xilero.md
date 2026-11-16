@@ -2,7 +2,7 @@
   (date "")
   (tag "project")
   (published "2022-01-01")
-  (modified "2026-11-13")
+  (modified "2026-11-15")
   (author "Emile")
   (info "tag")
 )
@@ -10,7 +10,6 @@
 # xilero
 
 Minimal python script generating random names for projects
-
 
 ```
 from random import randint

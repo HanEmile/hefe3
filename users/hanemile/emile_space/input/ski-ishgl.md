@@ -1,7 +1,7 @@
 (meta
   (tag "event" "ski")
   (published "2023-12-01")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (date "2023-12-07" "2023-12-10")
   (author "Emile")
   (info "tag" "date" "location")
@@ -13,5 +13,4 @@
 Ski in Ischgl with my father and brothers.
 
 Turns out: if you're a qualified audio technician, you could do some amazing work by configuring the speakers they've got on those huts. They completely overdrive and sound horrible (sound wise, people just drink enough to make it bearable).
-
 

@@ -1,7 +1,7 @@
 (meta
   (tag "event" "ski")
   (published "2022-01-01")
-  (modified "2026-09-23")
+  (modified "2026-11-15")
   (date "2022-01-01")
   (author "Emile")
   (info "tag" "date" "location")
@@ -18,8 +18,7 @@ distance  down: 334.6km   up: 222.8km       total: 557.4km
 
 ## Day 1 (2022-01-02 (sun))
 
-![](/ski-fiss-ladis-IMG_20220102_084023_mini.jpg)
-[full-res-image (8 MB)](/ski-fiss-ladis-IMG_20220102_084023.jpg)
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-d19f3ca3cd2c-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-d19f3ca3cd2c-1600w.webp 1600 633 "IMG_20220102_084023")
 
 speed     min: 0.0 km/h   max: 101.1 km/h   avg: 11.5 km/h
 altitude  min: 1264m      max: 2869m        avg: 2126m
@@ -32,8 +31,7 @@ misc.     runs: 19        min slope: 12.1°  max slope: 38°
 
 ## Day 2 (2022-01-03 (mon))
 
-![](/ski-fiss-ladis-IMG_20220103_120424_mini.jpg)
-[full-res-image (1.9 MB)](/ski-fiss-ladis-IMG_20220103_120424.jpg)
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-31774791a6b7-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-31774791a6b7-1600w.webp 1600 800 "IMG_20220103_120424_02")
 
 speed     min: 0.0 km/h   max: 91.4 km/h    avg: 11.8 km/h
 altitude  min: 1269m      max: 2878m        avg: 2028m
@@ -46,8 +44,7 @@ misc.     runs: 20        min slope: 8.4°   max slope: 16.8°
 
 ## Day 3 (2022-01-04 (tue))
 
-![](/ski-fiss-ladis-IMG_20220104_123448_mini.jpg)
-[full-res-image (2.7 MB)](/ski-fiss-ladis-IMG_20220104_123448.jpg)
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-4150e7fe3f7e-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-4150e7fe3f7e-1600w.webp 1600 800 "IMG_20220104_123447")
 
 speed     min: 0.0 km/h   max: 86.9 km/h    avg: 12.5 km/h
 altitude  min: 1275m      max: 2862m        avg: 2075m
@@ -61,7 +58,6 @@ misc.     runs: 21        min slope: 10.7°  max slope: 26.0°
 ## Day 4 (2022-01-05 (wed))
 
 ![](/ski-fiss-ladis-IMG_20220105_080027_mini.jpg)
-[full-res-image (3.8 MB)](/ski-fiss-ladis-IMG_20220105_080027.jpg)
 
 speed     min: 0.0 km/h   max: 75.0 km/h    avg: 14.2 km/h
 altitude  min: 1274m      max: 2549m        avg: 2070m
@@ -74,10 +70,8 @@ misc.     runs: 22        min slope: 11.6°  max slope: 47.5°
 
 ## Day 5 (2022-01-06 (thu))
 
-![](/ski-fiss-ladis-IMG_20220106_124442_mini.jpg)
-[full-res-image (2.1 MB)](/ski-fiss-ladis-IMG_20220106_124442.jpg)
-![](/ski-fiss-ladis-IMG_20220106_135737.jpg)
-[full-res-image (2.2 MB)](/ski-fiss-ladis-IMG_20220106_135737.jpg)
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-86ce64aad9cb-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-86ce64aad9cb-1600w.webp 1600 800 "IMG_20220106_124442")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-048df3eb6cd8-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-048df3eb6cd8-1600w.webp 1600 800 "IMG_20220106_135737")
 
 speed     min: 0.0 km/h   max: 85.4 km/h    avg: 15.7 km/h
 altitude  min: 1258m      max: 2798m        avg: 2028m
@@ -90,8 +84,7 @@ misc.     runs: 24        min slope: 9.1°   max slope: 13.4°
 
 ## Day 6 (2022-01-07 (fri))
 
-![](/ski-fiss-ladis-IMG_20220107_125406_mini.jpg)
-[full-res-image (2.3 MB)](/ski-fiss-ladis-IMG_20220107_125406.jpg)
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-283e5194cc04-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-283e5194cc04-1600w.webp 1600 800 "IMG_20220107_125406")
 
 speed     min: 0.0 km/h   max: 106.0 km/h   avg: 17.3 km/h
 altitude  min: 1333m      max: 2868m        avg: 2118m
@@ -101,3 +94,62 @@ misc.     runs: 27        min slope: 12.2°  max slope: 61.9°
 
 (details "The conditions were perfect in the morning, grippy snow and no ice. Until around 14:30, there were almost no clouds and a lot of sun, then the weather got cloudier and the contrast dropped.")
 [gpx track](/ski-fiss-ladis-sportler_track_1-7-22.gpx)
+
+## Photos
+
+### 2022-01-01
+
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-b119cc760ca3-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-b119cc760ca3-1600w.webp 1600 800 "IMG_20220101_223758")
+
+### 2022-01-02
+
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-d19f3ca3cd2c-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-d19f3ca3cd2c-1600w.webp 1600 633 "IMG_20220102_084023")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-37c747644d23-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-37c747644d23-1600w.webp 1600 549 "IMG_20220102_114048")
+
+### 2022-01-03
+
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-b06e3367c772-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-b06e3367c772-1600w.webp 1600 800 "IMG_20220103_114545")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-adb61dfc85d6-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-adb61dfc85d6-1600w.webp 1600 800 "IMG_20220103_114547_02")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-b9a9f3c4c75b-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-b9a9f3c4c75b-1600w.webp 1600 800 "IMG_20220103_114547_03")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-8d35662bc1cd-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-8d35662bc1cd-1600w.webp 1600 800 "IMG_20220103_114548_02")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-9b83fc0f4414-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-9b83fc0f4414-1600w.webp 1600 395 "panorama5")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-474f28aa4a89-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-474f28aa4a89-1600w.webp 1600 800 "IMG_20220103_114555_01")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-4c1bdbc23671-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-4c1bdbc23671-1600w.webp 1600 800 "IMG_20220103_114601")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-31774791a6b7-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-31774791a6b7-1600w.webp 1600 800 "IMG_20220103_120424_02")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-6a0c10e86ad7-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-6a0c10e86ad7-1600w.webp 1600 800 "IMG_20220103_120425")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-5f5a6e612bf4-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-5f5a6e612bf4-1600w.webp 1600 800 "IMG_20220103_120427")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-861b81234bcb-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-861b81234bcb-1600w.webp 1600 533 "panorama6")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-05e1f8f71829-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-05e1f8f71829-1600w.webp 1600 800 "IMG_20220103_153310_01")
+
+### 2022-01-04
+
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-89a694b49155-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-89a694b49155-1600w.webp 1600 800 "IMG_20220104_121731")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-c006ae4e3533-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-c006ae4e3533-1600w.webp 1600 308 "panorama7")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-5c2fda5348c9-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-5c2fda5348c9-1600w.webp 1600 358 "panorama8")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-fb2a0d9761fc-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-fb2a0d9761fc-1600w.webp 1600 800 "IMG_20220104_123328")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-4150e7fe3f7e-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-4150e7fe3f7e-1600w.webp 1600 800 "IMG_20220104_123447")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-4a31f5479b58-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-4a31f5479b58-1600w.webp 1600 994 "IMG_20220104_154842")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-99bf90112da3-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-99bf90112da3-1600w.webp 1600 800 "IMG_20220104_160041")
+
+### 2022-01-05
+
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-3642d1bacad2-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-3642d1bacad2-1600w.webp 1600 1109 "IMG_20220105_150728")
+
+### 2022-01-06
+
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-1242b260f39e-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-1242b260f39e-1600w.webp 1600 800 "IMG_20220106_100939")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-c4cfa31c1d37-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-c4cfa31c1d37-1600w.webp 1600 800 "IMG_20220106_102322")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-de465c543e37-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-de465c543e37-1600w.webp 1600 800 "IMG_20220106_112652")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-7015e5694967-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-7015e5694967-1600w.webp 1600 800 "IMG_20220106_124431")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-f9f973a88cf9-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-f9f973a88cf9-1600w.webp 1600 800 "IMG_20220106_124440")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-86ce64aad9cb-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-86ce64aad9cb-1600w.webp 1600 800 "IMG_20220106_124442")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-ef2ca53099a8-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-ef2ca53099a8-1600w.webp 1600 800 "IMG_20220106_124451")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-048df3eb6cd8-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-048df3eb6cd8-1600w.webp 1600 800 "IMG_20220106_135737")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-9f9eb481a1c0-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-9f9eb481a1c0-1600w.webp 1600 800 "IMG_20220106_135739")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-e89e71a7008f-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-e89e71a7008f-1600w.webp 1600 800 "IMG_20220106_141257")
+
+### 2022-01-07
+
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-ca56546f2f84-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-ca56546f2f84-1600w.webp 1600 170 "panorama9")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-283e5194cc04-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-283e5194cc04-1600w.webp 1600 800 "IMG_20220107_125406")
+(dimg https://img.emile.space/2022-01-serfaus-fiss-ladis-3912cd19eba7-dither.webp https://img.emile.space/2022-01-serfaus-fiss-ladis-3912cd19eba7-1600w.webp 1600 283 "panorama10")

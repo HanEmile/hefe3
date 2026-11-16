@@ -1,7 +1,7 @@
 (meta
   (tag "event" "ctf")
   (published "2025-02-28")
-  (modified "2026-11-13")
+  (modified "2026-11-15")
   (date "2025-02-28" "2025-03-02")
   (author "Emile")
   (location "Wülfrath" "Germany")
@@ -31,5 +31,4 @@
 - [run.sh](/hackimpott-run.sh) (nsjail config)
 - [hof.c](/hackimpott-hof.c) (source)
 - [compile.sh](/hackimpott-compile.sh) (compile script)
-
 

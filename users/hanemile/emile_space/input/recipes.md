@@ -1,7 +1,7 @@
 (meta
   (tag "kitchen")
   (published "2026-10-05")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (date "2026-10-05")
   (author "Emile")
   (info "tag"))

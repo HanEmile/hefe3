@@ -69,6 +69,74 @@
 }
 img { max-width: 100ex; max-height: 500px; }
 
+/* (dimg dither real w h alt): dithered photo, real image swaps in on
+   hover (fetched only when :hover matches - inline --real url) */
+.dw {
+  width: 100%; max-width: 100ex; margin: 1em 0;
+  position: relative;
+}
+/* both layers lazy-load; the real one reveals on hover, the dither
+   stays beneath and never flashes while it decodes */
+.dw img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; max-width: none; max-height: none;
+  object-fit: cover; margin: 0;
+}
+.dw img.dwd { image-rendering: pixelated; }
+/* sticky reveal, css-only: the real layer fades back out with a
+   ~11.5-day transition delay, so once a hover fetched it, it stays
+   visible (the best version already loaded stays the best version) */
+.dw img.dwr { opacity: 0; transition: opacity 0s linear 999999s; }
+/* build-time [full-res: n MB] link under a (dimg ...) photo */
+p.fullres { margin-top: -0.5em; font-size: 0.9em; }
+/* build-time Immich description, one line below the info line;
+   same gap as between photo and info line (margin collapse:
+   1em + -0.5em = 0.5em, matching .dw's 1em + fullres' -0.5em) */
+p.photodesc { margin-top: -0.5em; font-size: 0.9em; }
+/* book-format chapter image cap: link replacing the rest of a gallery */
+p.book-more { font-size: 0.9em; opacity: 0.8; }
+/* book-format chapter galleries: undithered thumbnail strip (card.webp
+   previews) in a 4-wide grid, clicking a thumb opens the full image.
+   grid (not float/inline-block): exact 25% widths round up over 100%
+   on fractional containers and wrap to 3, whitespace text nodes eat
+   inline-block rows, and unequal heights staircase floats — grid rows
+   have none of these failure modes */
+.bookstrip {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 0.6ex; margin: 1em 0;
+}
+a.bookthumb {
+  display: block; aspect-ratio: 4/3;
+  background-size: cover; background-position: center;
+}
+a.bookthumb:before, a.bookthumb:after { content: none !important; }
+.dw:hover img.dwr { opacity: 1; transition: none; }
+
+/* card grids: (query ... (format gallery)) and backlink galleries */
+.cardgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 2em 1.5em;
+  margin: 1.5em 0;
+}
+@media only screen and (min-width: 900px) {
+  .cardgrid { grid-template-columns: repeat(4, 1fr); }
+}
+a.card { display: block; color: inherit; }
+a.card:hover { text-decoration: none; }
+a.card:hover .cardtitle { color: #ffffff; }
+.cardimg {
+  width: 100%; aspect-ratio: 4/3; margin-bottom: 0.8ex;
+  background-size: cover; background-position: center;
+}
+.cardtitle {
+  font-weight: bold; text-decoration: underline; margin-bottom: 0.4ex;
+}
+.carddesc { font-size: 0.95em; opacity: 0.75; }
+/* cards are not inline text links: no [ ] / { } marker decorations */
+main .cardgrid a.card:before, main .cardgrid a.card:after,
+p .cardgrid a.card:before, p .cardgrid a.card:after { content: none !important; }
+
 figure.roughmap { margin: 1em auto; width: 100%; }
 figure.roughmap figcaption { margin-top: 0.5ex; text-align: center; }
 svg.roughmap { display: block; width: 100%; height: auto; }
@@ -242,7 +310,7 @@ td.section { background-color: #bbbbbb; color: #000000; }
 span.green { background-color: #228B22; color: #ffffff; }
 td.year-group { padding-top: 1.5em; font-weight: bold; color: #888; font-size: 0.85em; border: none; }
 
-/* (book "tag") reading-mode pages */
+/* (format book) reading-mode pages */
 .chapter { margin-top: 3ex; }
 @media print {
   header, nav, footer, .toc, .backlinks { display: none; }

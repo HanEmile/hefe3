@@ -1,7 +1,7 @@
 (meta
   (tag "event" "jufo")
   (published "2022-05-28")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (date "2022-05-28")
   (author "Emile")
   (info "tag" "date" "location")
@@ -35,5 +35,4 @@ presented were packed quite tight leading to the spaces between them being
 really packed.
 
 Met a few known faces and had some nice discussions.
-
 

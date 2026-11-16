@@ -2,7 +2,7 @@
   (date "")
   (tag "project")
   (published "2026-09-14")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (author "Emile")
   (info "published"))
 

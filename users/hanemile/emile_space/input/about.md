@@ -2,7 +2,7 @@
   (date "")
   (tag "navbar")
   (published "2026-09-14")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (author "Emile"))
 
 # about
@@ -40,7 +40,6 @@ Here's how I'd decrypt it, mostly as a note for myself:
 ```
 age -d -i ~/.ssh/id_ed25519 crypted.txt.age > plaintext.txt
 ```
-
 
 ## Doings
 

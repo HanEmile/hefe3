@@ -2,7 +2,7 @@
   (date "")
   (tag "workshop")
   (published "2023-01-01")
-  (modified "2026-11-13")
+  (modified "2026-11-15")
   (author "Emile")
 )
 

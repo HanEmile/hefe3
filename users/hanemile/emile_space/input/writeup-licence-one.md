@@ -2,7 +2,7 @@
   (date "")
   (tag "ctf" "writeup")
   (published "2021-11-01")
-  (modified "2026-11-13")
+  (modified "2026-11-15")
   (author "Emile")
   (info "tag" "published")
 )

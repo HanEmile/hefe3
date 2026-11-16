@@ -1,7 +1,7 @@
 (meta
   (tag "workshop" "ctf")
   (published "2022-07-09")
-  (modified "2026-09-22")
+  (modified "2026-11-15")
   (date "2022-07-09")
   (author "Emile")
   (info "tag" "date")

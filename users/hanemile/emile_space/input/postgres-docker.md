@@ -2,7 +2,7 @@
   (date "")
   (tag "files")
   (published "2022-01-01")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (author "Emile")
   (info "tag")
 )
@@ -14,7 +14,6 @@ This is a basic docker-compose file for quickly setting up a postgres database a
 Make sure to change the passwords!
 
 [docker-compose.yml](/postgres-docker-docker-compose.yml)
-
 
 ```yaml
 version: "3"

@@ -2,11 +2,10 @@
   (date "")
   (tag "index")
   (published "2026-09-15")
-  (modified "2026-11-13")
+  (modified "2026-11-15")
   (author "Emile"))
 
 # emile.space
-
 
 Welcome to my share of the internet.
 

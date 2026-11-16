@@ -2,13 +2,16 @@
   (date "")
   (tag "project" "vokobe")
   (published "2026-09-16")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (author "Emile")
-  (info "published" "tag"))
+  (info "published" "tag")
+)
 
 # vokobe2
 
 [vokobe](/vokobe), rewritten in [OCaml](https://ocaml.org).
+
+(toc)
 
 ## s-expressions
 
@@ -23,10 +26,9 @@
   (info "published" "tag"))
 ```
 
-Event dates go in `(date "START" ["END"])`; pages without one are
-listed under their published date and reported during the build.
-`(date "")` marks a page as intentionally dateless (no date pages,
-no warning).
+- event dates go in `(date "START" ["END"])`
+- pages without one are listed under their published date and reported during the build
+- `(date "")` marks a page as intentionally dateless (no date pages, no warning)
 
 ### queries
 
@@ -42,24 +44,73 @@ For example this is what creates the list on the [blog](/blog) page:
   (format table))
 ```
 
+All clauses are optional; the defaults select every page, unsorted,
+as a two-column title/date table.
+
+### filtering: `(where COND)`
+
+- `true` — every page
+- `(tag "t")` — page tagged "t"
+- `(eq "key" "value")` — first value of the attr equals
+- `(contains "key" "needle")` — attr value contains the substring
+- `(has "key" "needle")` — the attr's value list contains the entry
+- `(has-photos)` — the page body contains a `(dimg ...)` op
+- `(and C1 C2 ...)`, `(or C1 C2 ...)`, `(not C)` — combinators
+
+### sorting: `(sort "key" asc|desc)`
+
+- sorts by any attr
+- `"date"` is virtual and falls back to the published date for dateless pages
+
+### columns: `(cols ...)`
+
+- either bare attrs (`title`, auto-capitalized) or `("Label" "field")` pairs
+- a field is any attr plus the virtual keys `title`, `name`, `link` and `date` (the date-start/published fallback chain)
+- a `title` column is rendered as the link to the page
+- values matching another page's name become local links automatically
+
+### formats: `(format table|list|gallery)`
+
+- `table` (default) — an attribute table
+- `list` — a plain `<ul>` of linked titles
+- `gallery` — a card grid: the page's first image as preview (an undithered ~200px thumbnail for photos), title and description/date; `(limit N)` caps a gallery at N cards
+
+### grouping: `(group ...)`
+
+Splits a table into labeled sections:
+
+- `(group year "field" [desc])` — one section per year of a date-ish field
+- `(group field "attr" ["pair-attr"])` — one section per value of a (multi-valued) attr; with a pair attr, values are kept only where the pair attr at the same index equals the current page's title
+- `(group tag ["skip-me" ...])` — one section per tag, promoted to real numbered headings (so they land in the page TOC), skipping the listed tags; this mode replaces the table and its year/field groupings entirely. Example: the [all](/all) page `(where true) ... (group tag)` sections everything by tag, and [sport](/sport) skips its own section with `(group tag "sport")`
+
 ### maps
 
 Renders a minimal outline map (major roads as thick lines, rivers
-and lakes as thin ones) as inline SVG. `(center LAT LON WIDTH_KM)`
-puts the map center at the given coordinates and makes the map
-WIDTH_KM kilometers wide; any number of
-`(marker LAT LON "optional label")` adds markers:
+and lakes as thin ones) as inline SVG.
+
+The map is framed by latitude/longitude tick marks and captioned
+with the coordinates and a link to the shown segment on
+openstreetmap.org. It is monochrome: everything uses
+`currentColor`, so it follows the page's text colour — minimal
+black on white, or white-ish lines on black in the dark theme.
+
+### center maps
+
+`(center LAT LON WIDTH_KM)` puts the map center at the given
+coordinates and makes the map WIDTH_KM kilometers wide; any number
+of `(marker LAT LON "optional label")` adds markers:
 
 ```lisp
 (map (center 51.235 6.785 3)
      (marker 51.235 6.785 "my favourite spot"))
 ```
 
-Optional directives: `(aspect 16:9)` sets the map's width:height
-ratio (the default is a 3:1 banner spanning the full page width;
-maps whose natural shape is taller than that, like country
-outlines, keep their shape and are area-capped instead), and
-`(scale 0.5)` shrinks the map to a fraction of the page width.
+Optional directives:
+
+- `(aspect 16:9)` sets the map's width:height ratio (the default is a 3:1 banner spanning the full page width; maps whose natural shape is taller than that, like country outlines, keep their shape and are area-capped instead)
+- `(scale 0.5)` shrinks the map to a fraction of the page width
+
+### country maps
 
 Instead of a center, `(country NAME)` renders a country outline
 (no roads/rivers), using precomputed simplified borders of all
@@ -70,37 +121,28 @@ countries (Natural Earth, in `map-cache/country-outlines.json`):
      (marker 21.028 105.854 "Hanoi"))
 ```
 
-The generated location pages use this automatically: a country's
-page shows its outline, a city's page shows the country outline
-with a marker on the city — or a local map around the city when
-it lies outside the country's outline (islands). City coordinates
-and country name aliases live in `map-cache/places.json`; both
-files are regenerated by `./tools/update-map-geodata.py`.
+### location pages + geodata
+
+- the generated location pages use maps automatically: a country's page shows its outline, a city's page shows the country outline with a marker on the city — or a local map around the city when it lies outside the country's outline (islands)
+- city coordinates and country name aliases live in `map-cache/places.json`; both files are regenerated by `./tools/update-map-geodata.py`
+- the geometry for center-based maps is fetched from the Overpass API (OpenStreetMap data) the first time a region is built (the build prints `[map] fetching ...`), and cached in `map-cache/` (committed to the repo), so later builds need no network; streams are only included for small regions
+- `./build.sh --offline` builds without any network access; regions without a cached download render a placeholder until the next online build
+
+### table of contents
+
+- `(toc)` renders the page's headings as a linked, numbered outline -
+  this page has one
+- pages with 3 or more section headings get a table of contents
+  automatically, inserted before their first section; pages invoking
+  `(toc)` themselves are left alone
 
 ### books
 
-`(book "tag")` concatenates every visible page with that tag into
-one reading-mode page: a chapter table of contents, each page as its
-own chapter (ordered by published date, own heading numbering, linked
-back to the standalone page). Books can't contain books. Print CSS
-gives every chapter a page break, so the browser's print dialog turns
-a book straight into a PDF. Example: [asia 2025 — the book](/asia-2025-book).
+`(query (where (tag asia-2025)) (format book))` concatenates every
+matched page into one reading-mode page. Example: [asia
+2025](/asia-2025).
 
-The map is framed by latitude/longitude tick marks and captioned
-with the coordinates and a link to the shown segment on
-openstreetmap.org. It is monochrome: everything uses
-`currentColor`, so it follows the page's text colour — minimal
-black on white, or white-ish lines on black in the dark theme.
-
-The geometry for center-based maps is fetched from the Overpass
-API (OpenStreetMap data) the first time a region is built (the
-build prints `[map] fetching ...`), and cached in `map-cache/`
-(committed to the repo), so later builds need no network. Streams
-are only included for small regions.
-
-`./build.sh --offline` builds without any network access; regions
-without a cached download render a placeholder until the next online
-build.
-
-
-
+- each page becomes its own chapter: ordered chronologically (event date, then published date), own heading numbering, linked back to the standalone page
+- book pages can't contain book pages
+- chapter photo galleries show as a 4-wide thumbnail strip of up to 8 assorted undithered previews (clicking one opens the full image); the rest collapse into a link to the standalone page
+- print CSS gives every chapter a page break, so the browser's print dialog turns a book straight into a PDF

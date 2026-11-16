@@ -1,7 +1,7 @@
 (meta
   (tag "event" "ccc")
   (published "2023-08-01")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (date "2023-08-01")
   (author "Emile")
   (info "tag" "date" "location")
@@ -40,7 +40,6 @@ milliways workshop dome
 
 > [de]
 > Programme gleichzeitig im selben Speicher ausführen: was könnte schon schiefgehen? Hier geht's um das wie und anschließend selber mal hands-on damit spielen. Wir schauen uns den Unterbau an, bauen eigene kleine Programme die dann gegenseitig versuchen sich zu überschreiben.
-
 
 ### Links
 

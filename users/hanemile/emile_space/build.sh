@@ -26,7 +26,8 @@ rm -rf output/
 # build once, then invoke the binary directly: skips dune exec's
 # rebuild-check and process wrapper on every run (exit codes and
 # stdout/stderr are forwarded identical to dune exec)
-GEN="dune build --root vokobe2 bin/main.exe && ./vokobe2/_build/default/bin/main.exe input/ output/ emile.space $OFFLINE_ARG"
+CSS_V=$(stat -c %Y input/style.css 2>/dev/null || stat -f %m input/style.css)
+GEN="export VOKOBE_CSS_VERSION=$CSS_V; dune build --root vokobe2 bin/main.exe && ./vokobe2/_build/default/bin/main.exe input/ output/ emile.space $OFFLINE_ARG"
 if [ "$VERBOSE" = "1" ]; then
   ./nixrun.sh "$GEN"
 else

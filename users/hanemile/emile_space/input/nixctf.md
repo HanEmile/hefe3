@@ -2,7 +2,7 @@
   (date "")
   (tag "blog" "nix" "ctf")
   (published "2020-11-15")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (author "Emile")
   (info "tag" "published")
 )
@@ -36,7 +36,6 @@ A possible popular solution to this is called "Dynamic Scoring". Using this conc
 ### Dynamic scoring
 
 So when implementing dynamic scoring, we need to keep track of how often a challenge was solved and the challenges the individual teams have solved. Using this, we can calculate the amount of points a challenge is worth:
-
 
 ```
 MAX     : 500      No solves
@@ -89,16 +88,13 @@ From the examples at the bottom of the nsjail man --help page:
 
 Wait on a port 31337 for connections, and run /bin/sh
 
-
 ```
 nsjail -Ml --port 31337 --chroot / -- /bin/sh -i
 ```
 
-
 That's exactly what we need to host a ctf: an service that, opon connecting to, executes a binary. Gone are the times of starting a completely new container for each participant (at least for most challenges)!
 
 Hosting a challenge in the CTF looked a bit like this:
-
 
 ```
 nsjail -Ml \
@@ -119,7 +115,6 @@ nsjail -Ml \
 	/usr/bin/python3 /home/user/main.py
 ```
 
-
 But all of this still has to be hosted, so let's get into that a bit...
 
 ## Infra
@@ -127,7 +122,6 @@ But all of this still has to be hosted, so let's get into that a bit...
 ### Container foo
 
 First of all, all dynamic challenges should be containerized for example as below:
-
 
 ```
 FROM nsjailcontainer
@@ -142,7 +136,6 @@ COPY main.py /home/user/main.py
 
 ENTRYPOINT [ "/bin/nsjail" ]
 ```
-
 
 As the entrypoint is set to nsjail, we can provide the nsjail arguments when running the container, but let's first look at how nixos comes into this, as it does play a crucial role...
 
@@ -164,7 +157,6 @@ TL;DR of the nixops blogpost:
 
 Create a target.nix file containing information on where the host is running
 
-
 ```
 {
   target = { config, pkgs, ... }: {
@@ -173,9 +165,7 @@ Create a target.nix file containing information on where the host is running
 }
 ```
 
-
 Create a config.nix file containing the configuration for that host:
-
 
 ```
 {
@@ -189,9 +179,7 @@ Create a config.nix file containing the configuration for that host:
 };
 ```
 
-
 Create the deployment:
-
 
 ```
 ; nixops create ./target.nix ./config.nix -d target
@@ -200,9 +188,7 @@ created deployment ‘6883071e-df3c-11ea-bd95-0242dcf913a0’
 6883071e-df3c-11ea-bd95-0242dcf913a0
 ```
 
-
 List your deployments:
-
 
 ```
 ; nixops list
@@ -213,9 +199,7 @@ List your deployments:
 +--------------------------------------+--------+------------------------+------------+------+
 ```
 
-
 Deploy!
-
 
 ```
 ; nixops deploy -d target
@@ -223,11 +207,9 @@ Deploy!
 targetdeployment finished successfully
 ```
 
-
 ### Challenge definitions
 
 In order to host our challenges, we need to somehow instruct nixos to fetch the docker images containing the individual challenges from somewhere and run them. For doing this, I setup a small directory structure in order to split up the config a bit:
-
 
 ```
 .
@@ -260,9 +242,7 @@ In order to host our challenges, we need to somehow instruct nixos to fetch the 
    └── virtualisation.nix
 ```
 
-
 First of all, let's look into config.nix:
-
 
 ```
 {
@@ -285,9 +265,7 @@ First of all, let's look into config.nix:
 };
 ```
 
-
 So we import ctf.nix, let's look into there:
-
 
 ```
 {
@@ -302,9 +280,7 @@ So we import ctf.nix, let's look into there:
 }
 ```
 
-
 This imports all the container definitions, let's look into a single challenge container, as this is the part that get's interesting:
-
 
 ```
 {
@@ -343,7 +319,6 @@ This imports all the container definitions, let's look into a single challenge c
 }
 ```
 
-
 What we do here, is we instruct nixos to run a docker container using the image with the given name (honestly, it would be practical to just use a private registry here, but due to some time constraints and me not bothering with diving into that rabbit hole, I just build the images and moved them to the host...).
 
 The container is run as privileged which would normally be a huge no-go, but we have to allow nsjail to do it's magic.
@@ -363,7 +338,6 @@ services.nix imports all the services in the modules/services/ folder, including
 nginx.nix imports all the virtualhosts defined in modules/services/nginx/ folder, including ctf.emile.space.nix
 Ok, so ctf.emile.space.nix contains the definition for an nginx virtualhost:
 
-
 ```
 {
   services.nginx.virtualHosts = {
@@ -380,7 +354,6 @@ Ok, so ctf.emile.space.nix contains the definition for an nginx virtualhost:
   };
 }
 ```
-
 
 All we do here is to proxy ctf.emile.space to the internal service exposing the scoreboard allowing user to access it.
 

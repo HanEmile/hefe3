@@ -8,6 +8,7 @@ in
 	  packages = with pkgs; [
 	  	ocaml opam dune            # vokobe2 site generator
 	  	python3                    # content scripts (stdlib only)
+	  	python3Packages.pillow     # publish-photos.py
 	  	python3Packages.pyosmium   # extract-map-cache.py
 	  	osmium-tool                # fetch-osm-dataset.sh, extract-map-cache.py
 	  ];

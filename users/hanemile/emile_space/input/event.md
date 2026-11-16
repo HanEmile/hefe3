@@ -2,7 +2,7 @@
   (date "")
   (tag "docs" "navbar")
   (published "2026-09-14")
-  (modified "2026-11-13")
+  (modified "2026-11-15")
   (author "Emile"))
 
 # events

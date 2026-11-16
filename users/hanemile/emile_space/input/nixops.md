@@ -2,7 +2,7 @@
   (date "")
   (tag "blog" "nix")
   (published "2020-09-26")
-  (modified "2026-11-13")
+  (modified "2026-11-15")
   (author "Emile")
   (info "tag" "published")
 )
@@ -24,7 +24,6 @@ So the goal we want to achieve is to deploy the config located on the target ser
 
 Let's start with the target.nix file, as it is fairly simple:
 
-
 ```
 {
   target = { config, pkgs, ... }: {
@@ -33,11 +32,9 @@ Let's start with the target.nix file, as it is fairly simple:
 }
 ```
 
-
 All you do here, is define the target nixos should deploy to.
 
 The config.nix file contains the complete configuration (although a partial one should do) of the target system. A caveat here is that the configuration cannot be copied over, but has to be inserted into a predefined scheme:
-
 
 ```
 {
@@ -50,11 +47,9 @@ The config.nix file contains the complete configuration (although a partial one 
 };
 ```
 
-
 ## Creating the deployment
 
 The deployment can be created using the nixops create command:
-
 
 ```
 ; nixops create ./target.nix ./config.nix -d target
@@ -64,7 +59,6 @@ The deployment can be created using the nixops create command:
 created deployment ‘6883071e-df3c-11ea-bd95-0242dcf913a0’
 6883071e-df3c-11ea-bd95-0242dcf913a0
 ```
-
 
 In this command, we create a new deployment called target using the config files described above as input.
 
@@ -79,7 +73,6 @@ We can now list all deployments using the nixops list command:
 +--------------------------------------+--------+------------------------+------------+------+
 ```
 
-
 As you can see, the deployment was created, but no machine is assigned. Let's deploy something...
 
 ## Deploying
@@ -87,7 +80,6 @@ As you can see, the deployment was created, but no machine is assigned. Let's de
 Deploying can be done using the nixops deploy command. This will build the machine configuration and copy the paths from the nix-store to the remote nix-store.
 
 The output should look something like this:
-
 
 ```
 ; nixops deploy -d target
@@ -129,7 +121,6 @@ target> starting the following units: nscd.service
 target> activation finished successfully
 target> deployment finished successfully
 ```
-
 
 A few things happen here:
 

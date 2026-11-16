@@ -2,7 +2,7 @@
   (date "")
   (tag "blog" "security" "r2wars")
   (published "2020-10-10")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (author "Emile")
   (info "published" "tag"))
 
@@ -28,7 +28,6 @@ So we can use radare to take apart binaries, but using all the tools included, w
 
 ## What is r2wars?
 
-
 There exist similar forms of games such as [Core Wars](https://en.wikipedia.org/wiki/Core_War), but what makes r2wars different is that the bots can be built in any architecture supported by ESIL [Evaluable Strings Intermediate Language](https://radare.gitbooks.io/radare2book/content/disassembling/esil.html), more than 2 programs can run at the same time and cyclic execution cost matters for the turns.
 
 ## r2wars in detail
@@ -39,32 +38,26 @@ So here we go, some more in detail information on how stuff works:
 
 The "players" are bots. A bot is a piece of assembly, written in either x86, arm or mips using either 8, 16, 32, or 64 bit registers. A super simple bot doing nothing but locating itself in memory might look like this: (x86, 32 bits)
 
-
 ```
 call me
 me:
     pop eax
 ```
 
-
 Assembling such a bot can be done using rasm2, the radare2 assembler and disassembler tool, as displayed in the listing below.
-
 
 ```
 ; rasm2 -a x86 -b 32 -f bot.asm
 e80000000058
 ```
 
-
 The bot created can be inspected, by disassembling it again using rasm2 like below.
-
 
 ```
 ; rasm2 -D e80000000058
 0x00000000   5      e800000000  call 5
 0x00000005   1              58  pop eax
 ```
-
 
 ### The Arena
 
@@ -74,22 +67,18 @@ So now that you know how to assemble a bot, let's define the "arena" or the shar
 
 First of all, some memory should be allocated, for two bots, 1024 bytes should be enough. Memory can be allocated by radare as displayed below:
 
-
 ```
 ; r2 malloc://1024
  -- How about Global Thermonuclear War?
 [0x00000000]>
 ```
 
-
 By doing this, we allocated 1024 bytes of memory. This is the shared space in which the bots will battle each other.
-
 
 ```
 [0x00000000]> o
  3 * rwx 0x00000400 malloc://1024
 ```
-
 
 As you can see, the memory allocated is mapped rwx and consists of 1024 (0x400) bytes.
 
@@ -97,28 +86,23 @@ As you can see, the memory allocated is mapped rwx and consists of 1024 (0x400) 
 
 The next step to building the arena is to define the architecture and the size of the registers that should be used:
 
-
 ```
 [0x00000000]> e asm.arch = x86
 [0x00000000]> e asm.bits = 32
 ```
 
-
 The next step is to initialize the ESIL VM state as well as the VM stack. All radare2 command for editing the ESIL VM are prefixed with ae.
-
 
 ```
 [0x00000000]> aei 	# initialize ESIL VM state
 [0x00000000]> aeim 	# initialize ESIL VM stack
 ```
 
-
 ### Generating initial pos.
 
 The arena is now set up, the next step is to insert the bots into the arena. Selecting where to insert the bots is kind of crucial, because the bots should not be inserted into each other and not to close to the end of the arena (0x400 in this case).
 
 In order to generate a random offsets where the bots can be placed, multiple addresses should be generated in the following way:
-
 
 ```
 genspace = [0x000, 0x3c0)
@@ -128,11 +112,9 @@ maxbotspace = [0x3c0, 0x400)
 |          gen space         |  max bot space   |
 ```
 
-
 The space in which the bots should be generated is defined as "gen space". This means we can generate a random address in the range [0, 0x340) in which we can (in theory) place the first bot.
 
 After placing the first bot at, for example, 0x40, the address space in which the address for the second bot is chosen from is shrunk to [0x40 + maxbotsize, 0x340] as displayed below.
-
 
 ```
 0x000      0x040             0x340              0x400
@@ -140,13 +122,11 @@ After placing the first bot at, for example, 0x40, the address space in which th
 | reserved |    gen space    |  max bot space   |
 ```
 
-
 This might not work the first time, for example when using the default example of two bots in a memory space 1024 bytes big, each bot has (in theory) 512 bytes of memory to position itself in. Doing this for n bots in x bytes of memory results in x / n bytes per bot. This gets more problematic with a greater amount of bots in a limited memory space.
 
 ### Inserting bots
 
 Inserting the bot into the arena is as easy as writing it's assembled code into the shared memory space. The command below writes the assembled bot to the memory location 0x100.
-
 
 ```
 [0x00000000]> wx e80000000058 @ 0x100
@@ -163,7 +143,6 @@ file to the current offset):
 
 r2wars is a round based game. This means that we need to store the state of each "player" (bot) each round, so that the others can execute their operation. When it's the players turn again, the state has to be restored, so that the player can continue execution as if nothing had happened. r2 can dump all ESIL registers using the aer command and can even print a command to set the registers, aerR.
 
-
 ```
 [0x00000000]> aerR
 …
@@ -175,30 +154,24 @@ aer eip = 0x00000000
 …
 ```
 
-
 By dumping these registers, we can easily restore the state of the bot, by replacing newline chars (\n) by semicolons (;) and executing the result with r2.
 
 ## Executing an instruction
 
 After having created an "arena" and inserted a bot into the arena, we can execute an instruction, but before doing so, we still need to set up the"Program Counter" (PC) and the "Stack Pointer" (SP) for the bot. We can do this by using the aer command, that can be used to manipulate the ESIL registers:
 
-
 ```
 [0x00000000]> aer PC = 0x100
 [0x00000000]> aer SP = SP + 0x100
 ```
 
-
 After having done this, the VM is setup and the instruction pointer (Program Counter in ESIL slang) is pointing to the first instruction of our bot. In order to step into, we can use the aes command:
-
 
 ```
 [0x00000000]> aes
 ```
 
-
 We haven't seen much of our bot yet, so let's look at what's happening. r2 can print the disassembly of the instructions at a specific offset using the pd command, so let's look at what is happening at the offset 0x100, that's where our bot is located.
-
 
 ```
 [0x00000105]> pd 0x4 @ 0x100
@@ -208,7 +181,6 @@ We haven't seen much of our bot yet, so let's look at what's happening. r2 can p
 0x00000106  0000      add byte [eax], al
 0x00000108  0000      add byte [eax], al
 ```
-
 
 What we've done above is we've printed the 0x4 instructions at the offset 0x100. As you can see, the instruction at 0x100 contains a call to 0x105, the pop eax instruction. Radare also displays the current location of the Instruction Pointer (eip) that is currently pointing to 0x105.
 

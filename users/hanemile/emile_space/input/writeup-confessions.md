@@ -2,7 +2,7 @@
   (date "")
   (tag "ctf" "writeup")
   (published "2020-10-01")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (author "Emile")
   (info "tag" "published")
 )
@@ -81,11 +81,9 @@ After slightly inspecting the page, the next step would be to look into the page
 </html>
 ```
 
-
 The page doesn't consist of much, there's some static html content, some css and some javascript. The static content doesn't do anything, so let's not even bother looking into it. The interesting part is the javascript, in this case, the confessions.js file. Let's go through it block by block:
 
 The part below "talks with the GraphQL endpoint", so it communicates with the GraphQL system in the backend sending a JSON body containing the operation name (hardcoded to null), a query (more regarding that in the next block) and variables to the backend. It then reads the response and returns the response data.
-
 
 ```
 // talk to the GraphQL endpoint
@@ -110,9 +108,7 @@ const gql = async (query, variables={}) => {
 };
 ```
 
-
 This block below defines the queries sent to the backend, these are used in the code above when sent to the backend. More on them later on.
-
 
 ```
 // some queries/mutations
@@ -124,9 +120,6 @@ const previewHash = async (title, message) => gql('mutation M($title: String, $m
 
 The next block is just a misleading comment, as this is just random foo not relevant in any way.
 
-
-
-
 ```
 // the important elements
 const title = document.querySelector('#title');
@@ -136,9 +129,6 @@ const preview = document.querySelector('#preview');
 ```
 
 The block below renders a given confession. Nothing of interest here.
-
-
-
 
 ```
 // render a confession
@@ -154,9 +144,7 @@ const show = async confession => {
 };
 ```
 
-
 And the next block updates the preview.
-
 
 ```
 // update the confession preview
@@ -172,9 +160,7 @@ title.oninput = update;
 message.oninput = update;
 ```
 
-
 This block publishes the confession, it adds the confession to the backend and uses the given id to redirect to the url with the appended id that is used.
-
 
 ```
 // publish a confession
@@ -189,9 +175,7 @@ publish.onclick = async () => {
 };
 ```
 
-
 This block uses the confession id given in the url and displays that confession.
-
 
 ```
 // show a confession when one is given in the location hash
@@ -201,7 +185,6 @@ if (location.hash) {
     getConfessionWithMessage(id).then(show).catch(() => document.write('F'));
 }
 ```
-
 
 Now after having some basic understanding of what this javascript does, we need a better understanding of how this actually works, as in: what can we do?, what can we break?
 
@@ -216,7 +199,6 @@ Well, we can insert a title and a message. While entering this, we get a live pr
 ## Inspecting the sent requests
 
 The requests sent while entering stuff look like this:
-
 
 ```
 POST /graphql HTTP/1.1
@@ -243,7 +225,6 @@ Cache-Control: no-cache
 }
 ```
 
-
 The interesting part here is the query, so from here on, I won't insert all headers into all requests.
 
 ## Playing with graphql
@@ -253,7 +234,6 @@ The [GraphQL](https://graphql.org/) documentation has a [great learning section]
 ### Getting the schema
 
 One of the first things I tried, was getting the schema used. this can be done using [graphql introspection](https://graphql.org/learn/introspection/):
-
 
 ```
 POST /graphql HTTP/1.1
@@ -293,9 +273,7 @@ Cookie: session=s%3A9wDzGivuPGi2__m1CaDR5rRuZw_DN4m1.htC5hdkX0sr4eYWb9CdTRidgXDQ
 }
 ```
 
-
 here all the "name" values:
-
 
 ```
 "Query"
@@ -317,11 +295,9 @@ here all the "name" values:
 "Int"
 ```
 
-
 ### Getting the object fields
 
 With the schema information acquired, we can get the fields for the objects:
-
 
 ```
 POST /graphql HTTP/1.1
@@ -362,15 +338,11 @@ Cookie: session=s%3A9wDzGivuPGi2__m1CaDR5rRuZw_DN4m1.htC5hdkX0sr4eYWb9CdTRidgXDQ
 }
 ```
 
-
 We've already got this information: we can extract if from the queries defined in the javascript, but never the less, It's nice to know that there aren't more fields that we're possibly overlooking.
-
 
 ### Getting the types
 
-
 When listing all types in the schema, we get an interesting result:
-
 
 ```
 POST /graphql HTTP/1.1
@@ -408,13 +380,11 @@ Cookie: session=s%3A9wDzGivuPGi2__m1CaDR5rRuZw_DN4m1.htC5hdkX0sr4eYWb9CdTRidgXDQ
 }
 ```
 
-
 The "accessLog" contains a description hinting that this should be removed before taking the application into production.
 
 ### Getting all access logs
 
 As the "accessLog" should not be in production, there seems to be an error that is somehow critical. Thus, getting the accessLog seems like a logical next step. In order to get the accessLog, we first need to get the name of the fields in the accessLog, as we want to fetch all fields.
-
 
 ```
 POST /graphql HTTP/1.1
@@ -472,9 +442,7 @@ Cache-Control: no-cache
 }
 ```
 
-
 As you can see, there are three fields: "timestamp", "name" and "args". With this information, we can now fetch the access log:
-
 
 ```
 POST /graphql HTTP/1.1
@@ -535,7 +503,6 @@ Cookie: session=s%3A9wDzGivuPGi2__m1CaDR5rRuZw_DN4m1.htC5hdkX0sr4eYWb9CdTRidgXDQ
 }
 ```
 
-
 Now this is interesting. My first through was to use one of the predefined query strings in order to leak the message, but the provided function taking in a hash doesn't return the message, but just the title of the message, so we need to find another solution...
 
 ## Extracting the message
@@ -545,7 +512,6 @@ One of the first things to do when getting a hash, is to throw it into crackstat
 ![](/writeup-confessions-crackstation.png)
 
 As you can see, the first n hashes consist of the first n chars from the flag. Due to crackstations wordlist not knowing the rest of the flag format, it can't show us a result. But we've got the next hashes, so in order to find out what that next char after flag is, we can simply try out all possible combinations (flaga, flagb, ...), hash them and compare the hash with the hash we've got:
-
 
 ```
 import hashlib
@@ -605,6 +571,5 @@ print(flag)
 ```
 flag{but_pls_d0nt_t3ll_any1}
 ```
-
 
 And finally, we get the flag!

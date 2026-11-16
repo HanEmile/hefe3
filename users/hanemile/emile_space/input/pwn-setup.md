@@ -2,7 +2,7 @@
   (date "")
   (tag "files" "ctf")
   (published "2022-01-01")
-  (modified "2026-11-14")
+  (modified "2026-11-15")
   (author "Emile")
   (info "tag")
 )
@@ -15,14 +15,11 @@ My setup for solving pwn challenges in CTFs consists of a docker image that is h
 - [aliases.txt](aliases.txt)
 - [aliases_fish.txt](aliases_fish.txt)
 
-
 ```
 docker build . -t ctf:ubuntu20.10
 ```
 
-
 ## Dockerfile
-
 
 ```
 FROM ubuntu:20.10
@@ -45,11 +42,9 @@ git clone https://github.com/radare/radare2 && cd radare2 && sys/install.sh && \
 cd .. && git clone https://github.com/pwndbg/pwndbg && cd pwndbg && ./setup.sh
 ```
 
-
 ## bash aliases
 
 These are the bash aliases you can use to create the containers.
-
 
 ```
 # aliases.txt
@@ -66,11 +61,9 @@ alias pls='function _dockerls(){docker ps -a -f ancestor=ctf:ubuntu20.10 \
 --format "{{.Names}}";};_dockerls'
 ```
 
-
 ## fish functions
 
 These are the fish aliases you can use to create the containers.
-
 
 ```
 # aliases_fish.txt
