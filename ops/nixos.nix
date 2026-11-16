@@ -223,21 +223,27 @@ let
       # target with services stopped and no autostart (lampadas 2026-11-15
       # twice incl. an interactive deploy). Run it as a transient unit
       # owned by PID1; poll completion over fresh short ssh calls.
+      # Record the switch's exit status in a state file instead of querying
+      # the transient unit afterwards: systemd-run --collect GCs the unit the
+      # moment it stops and `systemctl show` on a collected unit happily
+      # reports ExecMainStatus=0, turning a FAILED switch into "activation
+      # OK" (lampadas 2026-11-16 rebooted onto a half-activated config).
       ssh ${sshOpts} root@${target} \
-        "systemd-run --collect --unit=hefe-deploy-switch \
-           /nix/var/nix/profiles/system/bin/switch-to-configuration switch"
+        "rm -f /run/hefe-deploy-switch.rc; \
+         systemd-run --collect --unit=hefe-deploy-switch \
+           /run/current-system/sw/bin/bash -c \
+           '/nix/var/nix/profiles/system/bin/switch-to-configuration switch; echo \$? > /run/hefe-deploy-switch.rc'"
       echo "activation running detached as hefe-deploy-switch.service; polling..."
+      rc=
       for _ in $(seq 1 120); do
-        st=$(ssh -o ConnectTimeout=10 ${sshOpts} root@${target} \
-          "systemctl show hefe-deploy-switch.service -p ActiveState --value" 2>/dev/null || echo unknown)
-        [ "$st" = activating ] || [ "$st" = active ] || [ "$st" = unknown ] || break
+        rc=$(ssh -o ConnectTimeout=10 ${sshOpts} root@${target} \
+          "cat /run/hefe-deploy-switch.rc 2>/dev/null" || true)
+        [ -n "$rc" ] && break
         sleep 5
       done
       ssh -o ConnectTimeout=10 ${sshOpts} root@${target} \
         "journalctl -u hefe-deploy-switch.service --no-pager -n 30" || true
-      rc=$(ssh -o ConnectTimeout=10 ${sshOpts} root@${target} \
-        "systemctl show hefe-deploy-switch.service -p ExecMainStatus --value" 2>/dev/null || echo ssh-failed)
-      [ "$rc" = 0 ] || { echo "activation FAILED (ExecMainStatus=$rc)"; exit 1; }
+      [ "$rc" = 0 ] || { echo "activation FAILED (rc=''${rc:-timeout})"; exit 1; }
       echo "activation OK"
     ''
     else
@@ -264,21 +270,27 @@ let
       echo "[STEP 4/4]: Switching to configuration (detached)"
       # See the buildOnTarget variant: the switch restarts sshd/tailscaled
       # and would otherwise be killed when this ssh session drops.
+      # Record the switch's exit status in a state file instead of querying
+      # the transient unit afterwards: systemd-run --collect GCs the unit the
+      # moment it stops and `systemctl show` on a collected unit happily
+      # reports ExecMainStatus=0, turning a FAILED switch into "activation
+      # OK" (lampadas 2026-11-16 rebooted onto a half-activated config).
       ssh ${sshOpts} root@${target} \
-        "systemd-run --collect --unit=hefe-deploy-switch \
-           /nix/var/nix/profiles/system/bin/switch-to-configuration switch --verbose --show-trace"
+        "rm -f /run/hefe-deploy-switch.rc; \
+         systemd-run --collect --unit=hefe-deploy-switch \
+           /run/current-system/sw/bin/bash -c \
+           '/nix/var/nix/profiles/system/bin/switch-to-configuration switch --verbose --show-trace; echo \$? > /run/hefe-deploy-switch.rc'"
       echo "activation running detached as hefe-deploy-switch.service; polling..."
+      rc=
       for _ in $(seq 1 120); do
-        st=$(ssh -o ConnectTimeout=10 ${sshOpts} root@${target} \
-          "systemctl show hefe-deploy-switch.service -p ActiveState --value" 2>/dev/null || echo unknown)
-        [ "$st" = activating ] || [ "$st" = active ] || [ "$st" = unknown ] || break
+        rc=$(ssh -o ConnectTimeout=10 ${sshOpts} root@${target} \
+          "cat /run/hefe-deploy-switch.rc 2>/dev/null" || true)
+        [ -n "$rc" ] && break
         sleep 5
       done
       ssh -o ConnectTimeout=10 ${sshOpts} root@${target} \
         "journalctl -u hefe-deploy-switch.service --no-pager -n 30" || true
-      rc=$(ssh -o ConnectTimeout=10 ${sshOpts} root@${target} \
-        "systemctl show hefe-deploy-switch.service -p ExecMainStatus --value" 2>/dev/null || echo ssh-failed)
-      [ "$rc" = 0 ] || { echo "activation FAILED (ExecMainStatus=$rc)"; exit 1; }
+      [ "$rc" = 0 ] || { echo "activation FAILED (rc=''${rc:-timeout})"; exit 1; }
       echo "activation OK"
     '';
 
