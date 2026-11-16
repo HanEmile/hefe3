@@ -73,6 +73,9 @@ in
 
   # === photo ===
   "photo_immich_secrets_file.age" = for [ photo ];
+  # api key for emile_space/tools/publish-photos.py (runs locally on the
+  # admin machine; no host decrypts it)
+  "immich_api_key.age" = for [ ];
 
   # === social ===
   "gotosocial_environment_file.age" = for [ social ];
