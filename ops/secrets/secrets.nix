@@ -132,4 +132,9 @@ in
   # domain=u331921.your-storagebox.de
   # password=...
   "storagebox_bx11_connection_config.age" = for [ medano mail lampadas auth md photo data naraj git miki social rss tmp amalthea minecraft factorio r2wars irc pretix nomos ];
+
+  # Cold-storage only: WIF of the BTC address naraj quotes in the HTTP 402
+  # "AI crawler paywall" body (ops/vms/x86/naraj/default.nix). Never
+  # deployed to any host - encrypted for emile@caladan alone.
+  "btc_wallet_402_wif.age" = for [ ];
 }
