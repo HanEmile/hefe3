@@ -7,6 +7,12 @@
 <style>
   :root { --bg:#090e13; --panel:#101820; --border:#2c3a48; --fg:#e6edf3; --dim:#7d8b9c; --acc:#4cc2ff; --ok:#39d353; --bad:#ff6a5e; --warn:#e3b341; --dim2:#48525e; }
   * { box-sizing:border-box; border-radius:0 !important; }
+
+  #topnav { display:flex; gap:4px; align-items:center; margin-left:8px; }
+  #topnav a { text-decoration:none; border:1px solid var(--border); padding:2px 10px; color:var(--dim); font-size:11px; }
+  #topnav a:hover { color:var(--acc); border-color:var(--acc); }
+  #topnav a.on { color:var(--fg); border-color:var(--acc); background:#16232e; }
+
   html,body { height:100%; }
   body { margin:0; background:var(--bg); color:var(--fg); font:12px/1.4 ui-monospace,Menlo,monospace; overflow:hidden; }
 
@@ -64,7 +70,7 @@
   .framrow td[data-v]:hover { background:#1d2833; color:var(--acc); }
 
   /* ctx menus */
-  #ctxmenu { position:fixed; z-index:99; background:#161d26; border:1px solid var(--border); border-radius:6px; padding:4px; display:none; box-shadow:0 8px 24px rgba(0,0,0,.5); }
+  #ctxmenu { position:fixed; z-index:99; background:#161d26; border:1px solid var(--border); padding:4px; display:none; box-shadow:0 8px 24px rgba(0,0,0,.5); max-height:72vh; overflow-y:auto; overflow-x:hidden; max-width:min(560px, calc(100vw - 32px)); }
   #ctxmenu .ctx-item { padding:3px 10px; font-size:11px; cursor:pointer; border-radius:4px; }
   #ctxmenu .ctx-item:hover { background:#223140; color:var(--acc); }
   #ctxmenu .ctx-title { padding:3px 10px 2px; font-size:9px; text-transform:uppercase; color:var(--dim); letter-spacing:.08em; border-bottom:1px solid var(--border); margin-bottom:2px; }
@@ -116,12 +122,17 @@
 <div id="app">
   <header id="topbar">
     <h1>lora8</h1>
-    <span class="topkv">R11e-LR8 · SX1301</span>
+  <nav id="topnav">
+    <a href="/">lite</a>
+    <a class="on" href="/pro">power</a>
+    <a href="/mesh">mesh</a>
+  </nav>
     <span class="topkv" id="eui" style="color:var(--ok)"></span>
     <span class="topkv"><span class="dot" id="dot-dev"></span><span id="dot-dev-t">dev</span></span>
     <span class="topkv"><span class="dot" id="dot-run"></span><span id="dot-run-t">rx</span></span>
     <span class="topkv"><span class="dot" id="dot-fwd"></span><span id="dot-fwd-t">ttn</span></span>
-    <span class="topkv" id="top-uptime"></span><span class="topkv"><a href="/" style="color:var(--dim);text-decoration:none;border:1px solid var(--border);padding:1px 7px">lite view</a></span>
+    <span class="topkv">R11e-LR8 · SX1301</span>
+    <span class="topkv" id="top-uptime"></span>
     <span class="spacer"></span>
     <span id="msg"></span>
   </header>
@@ -228,22 +239,22 @@
 </div>
         <div class="card wide" id="meshcard">
           <h2>mesh <span class="tools"><span id="meshstate" style="color:var(--dim)"></span></span></h2>
-          <div id="meshcols" style="display:grid;grid-template-columns:1fr 1fr 280px;gap:10px">
-            <div>
-              <div id="ppeers"><table><thead><tr><th>name</th><th>id</th><th>hw</th><th>snr</th><th>last</th><th>batt</th></tr></thead><tbody id="peertbody"></tbody></table></div>
+          <div id="meshclient" style="display:grid;grid-template-columns:200px 1fr 260px;gap:10px;min-height:340px">
+            <div id="chanside" style="border-right:1px solid var(--border);padding-right:4px">
+              <div id="meshchans"></div>
+              <div style="font-size:10px;color:var(--dim);padding-top:6px">channels from the node&apos;s config</div>
             </div>
-            <div>
-              <div id="pmessages" style="max-height:240px;overflow-y:auto;font-size:11px"></div>
-            </div>
-            <div>
-              <label>to</label>
-              <select id="meshTo" style="width:100%"><option value="broadcast">broadcast</option></select>
-              <label>text</label>
-              <input id="meshText" placeholder="message">
-              <div class="btnrow">
-                <button onclick="meshSend()">send text</button>
+            <div id="meshchatpane" style="display:flex;flex-direction:column;min-height:0">
+              <div id="pmessages" style="flex:1;overflow-y:auto;font-size:12px;padding:4px"></div>
+              <div style="display:flex;gap:4px;padding-top:4px">
+                <select id="meshTo" style="flex:0 0 140px"><option value="broadcast">all</option></select>
+                <input id="meshText" placeholder="say something..." style="flex:1">
+                <button onclick="meshSend()">send</button>
               </div>
-              <div id="meshsendstate" style="color:var(--dim);font-size:10px;margin-top:4px"></div>
+            </div>
+            <div style="border-left:1px solid var(--border);padding-left:8px">
+              <div style="font-size:10px;color:var(--dim);padding-bottom:4px">peers last 12h</div>
+              <div id="ppeers"><table><thead><tr><th>name</th><th>snr</th><th>last</th></tr></thead><tbody id="peertbody"></tbody></table></div>
             </div>
           </div>
         </div>
@@ -432,6 +443,17 @@ $('filter').addEventListener('keydown', e => { if (e.key === 'Enter') applyFilte
 
 // click-a-field → apply-as-filter mini menu (wireshark style)
 const ctx = $('ctxmenu');
+function placeCtx(el, x, y) {
+  el.style.display='block';
+  requestAnimationFrame(() => {
+    const r = el.getBoundingClientRect();
+    let nx = x, ny = y;
+    if (nx + r.width > innerWidth - 8) nx = Math.max(8, innerWidth - r.width - 8);
+    if (ny + r.height > innerHeight - 8) ny = Math.max(8, innerHeight - r.height - 8);
+    el.style.left = nx + 'px';
+    el.style.top = ny + 'px';
+  });
+}
 function hideMenu(){ ctx.style.display='none'; }
 document.addEventListener('click', e => { if (!ctx.contains(e.target)) hideMenu(); });
 function showCtx(x, y, field, value, ascii) {
@@ -730,11 +752,14 @@ function hexToUtf16le(n) {
 
 function showPayloadInspector(x, y, hex, ascii) {
   const fc = frameStore.find(f => f.hex === hex);
-  if (fc && fc.class === 'unknown' && hex.length > 40) { showPayloadLab(x, y, hex); return; }
+  const cls = fc ? fc.class : null;
+  // Shape-based route: our MQTT frames are JSON hex regardless of the class tag
+  // (pre-restarter hal precias entries have no class populated).
+  const head = hex && hex.length >= 2 ? String.fromCharCode(parseInt(hex.substr(0, 2), 16)) : '';
+  if (cls === 'mqtt' || head === '{') { showMqttInspector(x, y, hex, ascii, fc); return; }
+  if (head !== '{' && fc && fc.class === 'unknown' && hex.length > 40) { showPayloadLab(x, y, hex); return; }
   // class-directed parse: don't let MQTT JSON get mangled as LoRaWAN
   let lw = null, ret = null, mc = null, mt = null;
-  const cls = fc ? fc.class : null;
-  if (cls === 'mqtt') { showMqttInspector(x, y, hex, ascii, fc); return; }
   if (cls === 'lorawan') lw = lorawanParse(hex);
   else if (cls === 'reticulum') ret = reticulumParse(hex);
   else if (cls === 'meshcore') mc = meshCoreParse(hex);
@@ -785,7 +810,8 @@ devnonce ${lw.devNonce}`;
     m += `</div>`;
     info += m;
   }
-  info += `<div class="ctx-ascii" style="max-width:300px;word-break:break-all;color:var(--dim)">${hex}</div>`;
+  { const tx = hexTrunc(hex, 640);
+    info += `<div class="ctx-ascii" data-hexbox="" style="max-width:420px;word-break:break-all;color:var(--dim)">${tx.text}${tx.more?'…':''}${tx.more?`<button class="ctx-btn" data-act="expandfull">full ${Math.floor(hex.length/2)}B</button>`:''}</div>`; }
   const isDataUp = lw && (lw.mtype === 2 || lw.mtype === 4) && lw.frm && lw.frm.length > 0;
   if (isDataUp) {
     info += `<div class="ctx-ascii">decrypt with AppSKey:<br>
@@ -797,10 +823,15 @@ devnonce ${lw.devNonce}`;
   info += `<div style="display:flex;gap:4px;padding:4px 8px 6px">` +
     acts.map(a=>`<button class="ctx-btn" data-act="${a[1]}">${a[0]}</button>`).join('') + `</div>`;
   ctx.innerHTML = info;
-  ctx.style.left = Math.min(x, innerWidth-340)+'px'; ctx.style.top = y+'px'; ctx.style.display='block';
+  placeCtx(ctx, x, y);
+  ctx.style.display='block';
   ctx.querySelectorAll('[data-act]').forEach(el => el.addEventListener('click', ev => {
     ev.stopPropagation();
     const act = el.dataset.act;
+    if (act === 'expandfull') {
+      const tgt = ctx.querySelector('.ctx-ascii[data-hexbox=""]');
+      if (tgt) tgt.innerHTML = hex;
+    }
     if (act === 'copyhex') navigator.clipboard.writeText(hex).then(()=>{el.textContent='copied ✓';});
     if (act === 'copyascii') navigator.clipboard.writeText(ascii).then(()=>{el.textContent='copied ✓';});
     if (act === 'fand') { addFilter('and','hex','>=',hex); hideMenu(); }
@@ -870,10 +901,16 @@ function byteHistogram(hex) {
   }
   return `<div style="display:flex;align-items:flex-end;gap:0;height:36px;overflow:hidden">${out}</div>`;
 }
+function hexTrunc(hex, n=700) {
+  if (!hex || hex.length <= n) return {text:hex||'', more:false};
+  return {text: hex.substr(0, n), more:true};
+}
 function showPayloadLab(x, y, hex) {
   const same = frameStore.filter(f => f.hex && f.hex !== hex && (f.hex.substr(0,4) === hex.substr(0,4))).slice(-8);
+  const tx = hexTrunc(hex, 720);
   ctx.innerHTML = `<div class="ctx-title">payload lab · unknown framing</div>
-    <div class="ctx-ascii" style="max-width:420px;word-break:break-all">${hex}</div>
+    <div class="ctx-ascii" style="max-width:470px;word-break:break-all">${tx.text}${tx.more?'…':''}
+      ${tx.more?`<span class="ctx-item" data-act="expand" style="font-size:10px;color:var(--acc);cursor:pointer;padding:1px 8px;margin-left:6px;border:1px solid var(--border)">show full (${Math.floor(hex.length/2)} B)</span>`:''}</div>
     <div class="ctx-ascii">ascii: "${(printableAscii(hex)||'').replace(/"/g,'&quot;')}" · entropy ${entropyOf(hex)} bits/byte · similar-prefix frames: ${same.length}</div>
     <div style="padding:4px 8px">${byteHistogram(hex)}</div>
     ${same.map(s=>`<div class="ctx-ascii" style="color:var(--dim)">≈ ${s.time} ${s.hex.substr(0,48)}${s.hex.length>48?'…':''}</div>`).join('')}
@@ -881,9 +918,14 @@ function showPayloadLab(x, y, hex) {
       <button class="ctx-btn" data-act="copyhex">copy hex</button>
       <button class="ctx-btn" data-act="fand">filter AND hex ≥ …</button>
     </div>`;
-  ctx.style.left = Math.min(x, innerWidth-460)+'px'; ctx.style.top = y+'px'; ctx.style.display='block';
+  placeCtx(ctx, x, y);
+  ctx.style.display='block';
   ctx.querySelectorAll('[data-act]').forEach(el => el.addEventListener('click', ev => {
     ev.stopPropagation();
+    if (el.dataset.act === 'expand') {
+      const tgt = ctx.querySelector('.ctx-ascii');
+      if (tgt) tgt.innerHTML = hex;
+    }
     if (el.dataset.act === 'copyhex') navigator.clipboard.writeText(hex).then(()=>{el.textContent='copied ✓';});
     if (el.dataset.act === 'fand') { addFilter('and','hex','>=',hex); hideMenu(); }
   }));
@@ -997,6 +1039,8 @@ poll();
 // -------- mesh UI --------
 let meshPeers = [];
 let meshLastMsgTs = 0;
+let meshChannels = [];
+let meshActiveChan = 0;
 
 function fmtElapsed(ts) {
   if (!ts) return '—';
@@ -1007,7 +1051,26 @@ function fmtElapsed(ts) {
   return Math.floor(diff/86400)+'d';
 }
 
+function chanName(i){ const c = meshChannels.find(x=>x.index===i); return c?c.name:('ch'+(i||0)); }
+function renderChans(){
+  const el = $('meshchans');
+  el.innerHTML = meshChannels.map(c => `<div class="chanbtn${c.index===meshActiveChan?' active':''}" data-ch="${c.index}" style="padding:6px 8px;margin:2px 0;border:1px solid var(--border);cursor:pointer;${c.index===meshActiveChan?'border-color:var(--acc);color:var(--acc);background:#16232e;':''}">
+    ${c.index} · ${c.name}${c.encrypted?' ·':''}${(c.role===1?' <span style="color:var(--ok)">(primary)</span>':'')}</div>`).join('');
+  el.querySelectorAll('[data-ch]').forEach(d => d.addEventListener('click', () => { meshActiveChan = parseInt(d.dataset.ch, 10); renderChans(); renderMessages(); }));
+}
+
 async function meshPoll() {
+  const chs = await get('/api/mesh/channels');
+  if (chs && chs.channels && chs.channels.length) {
+    meshChannels = chs.channels;
+    if (!document.getElementById('meshchans').dataset.init) {
+      document.getElementById('meshchans').dataset.init = '1';
+      renderChans();
+    } else {
+      // refresh highlight only
+      renderChans();
+    }
+  }
   const st = await get('/api/status');
   const pe = await get('/api/mesh/peers');
   if (pe && !pe.error) {
@@ -1031,25 +1094,28 @@ async function meshPoll() {
   }
   const ms = await get('/api/mesh/messages');
   if (ms && !ms.error) {
-    const arr = ms.messages || [];
-    const fresh = arr.filter(m => m.when > meshLastMsgTs);
-    for (const m of fresh) meshLastMsgTs = Math.max(meshLastMsgTs, m.when);
-    if (fresh.length || !document.getElementById('pmessages').dataset.init) {
-      document.getElementById('pmessages').dataset.init = '1';
-      const el = document.getElementById('pmessages');
-      const rows = arr.slice(-40).reverse().map(m => {
-        const t = new Date((m.when||0)*1000).toLocaleTimeString('de-DE',{hour12:false});
-        const fromName = findPeerName(m.from);
-        return `<div class="msgrow${m.from==='self'?' mine':''}">
-          <span class="dimv">${t}</span> <b style="color:${m.from==='self'?'var(--acc)':'var(--ok)'}">${fromName}</b><span class="dimv">${m.portnum||''}</span>
-          <div style="white-space:pre-wrap;word-break:break-word">${esc(m.text||'[packet]')}</div>
-        </div>`;
-      }).join('');
-      el.innerHTML = rows;
-    }
+    window._meshMsgs = ms.messages || [];
+    renderMessages();
   }
   const stt = await get('/api/mesh/status');
   if (stt && stt.error) { /* ui shows in state */ }
+}
+
+function renderMessages(){
+  const arr = (window._meshMsgs || []).filter(m => (m.channel||0) === meshActiveChan || meshActiveChan === 0 && (m.channel===undefined || m.channel===0));
+  const el = $('pmessages');
+  el.innerHTML = arr.slice(-50).map(m => {
+    const t = new Date((m.when||0)*1000).toLocaleTimeString('de-DE',{hour12:false});
+    const fromName = findPeerName(m.from);
+    const mine = m.from === 'self';
+    return `<div class="msgrow${mine?' mine':''}" style="margin:3px 0;padding:4px 8px;background:var(--panel);border-left:2px solid ${mine?'var(--acc)':'var(--ok)'}">
+      <div>
+        <b style="color:${mine?'var(--acc)':'var(--ok)'}">${fromName}</b>
+        <span style="color:var(--dim);font-size:10px">${t} · ${m.portnum||''}${m.hopStart?' · '+m.hopStart+' hops':''}</span>
+      </div>
+      <div style="white-space:pre-wrap;word-break:break-word">${esc(m.text||'[packet]')}</div>
+    </div>`;
+  }).join('');
 }
 
 function findPeerName(num) {
@@ -1062,7 +1128,8 @@ async function meshSend() {
   const text = $('meshText').value.trim();
   if (!text) return;
   const to = $('meshTo').value;
-  const r = await post('/api/mesh/send', {to, text});
+  const channel = meshActiveChan;
+  const r = await post('/api/mesh/send', {to, text, channel});
   $('meshsendstate').textContent = r && r.error ? 'error: ' + r.error : (r && r.ok ? 'sent' : (r && r.ok === false ? 'failed' : 'sent'));
   $('meshText').value = '';
   setTimeout(() => { $('meshsendstate').textContent=''; }, 4000);

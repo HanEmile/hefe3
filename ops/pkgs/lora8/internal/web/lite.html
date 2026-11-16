@@ -20,6 +20,12 @@
   .sub { font-size:11px; color:var(--dim); margin-top:4px; }
   .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; background:var(--bad); vertical-align:baseline; }
   .dot.on { background:var(--ok); }
+
+  #topnav { display:flex; gap:4px; align-items:center; margin-left:8px; }
+  #topnav a { text-decoration:none; border:1px solid var(--border); padding:2px 10px; color:var(--dim); font-size:11px; }
+  #topnav a:hover { color:var(--acc); border-color:var(--acc); }
+  #topnav a.on { color:var(--fg); border-color:var(--acc); background:#16232e; }
+
   .dot.warn { background:var(--warn); }
   #events { background:var(--panel); border:1px solid var(--border); }
   #events h2 { padding:12px 14px 6px; font-size:11px; text-transform:uppercase; color:var(--dim); letter-spacing:.08em; font-weight:600; }
@@ -40,9 +46,13 @@
 <body>
 <header>
   <h1>lora8</h1>
-  <span style="color:var(--dim)" id="eui"></span>
+  <nav id="topnav">
+    <a class="on" href="/">lite</a>
+    <a href="/pro">power</a>
+    <a href="/mesh">mesh</a>
+  </nav>
   <span style="flex:1"></span>
-  <a href="/pro">power user view →</a>
+  <span style="color:var(--dim)" id="eui"></span>
 </header>
 <main>
   <div class="cards">

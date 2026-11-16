@@ -26,6 +26,9 @@ var indexHTML []byte
 //go:embed lite.html
 var liteHTML []byte
 
+//go:embed mesh.html
+var meshHTML []byte
+
 // Server holds the dependencies for the UI.
 type Server struct {
 	G   *gw.Gateway
@@ -103,6 +106,10 @@ func (s *Server) Handler() http.Handler {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(indexHTML)
 	})
+	mux.HandleFunc("GET /mesh", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(meshHTML)
+	})
 	mux.HandleFunc("GET /index.html", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/pro", http.StatusTemporaryRedirect)
 	})
@@ -124,6 +131,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/mesh/peers", s.meshPeers)
 	mux.HandleFunc("GET /api/mesh/messages", s.meshMessages)
 	mux.HandleFunc("GET /api/mesh/status", s.meshStatus)
+	mux.HandleFunc("GET /api/mesh/channels", s.meshChannels)
 	mux.HandleFunc("POST /api/mesh/send", s.meshSend)
 	mux.HandleFunc("GET /metrics", s.metrics)
 	mux.HandleFunc("GET /healthz", s.healthz)
@@ -544,6 +552,7 @@ func meshPost(w http.ResponseWriter, r *http.Request, path string) {
 func (s *Server) meshPeers(w http.ResponseWriter, r *http.Request)    { meshGet(w, "/api/peers") }
 func (s *Server) meshMessages(w http.ResponseWriter, r *http.Request) { meshGet(w, "/api/messages") }
 func (s *Server) meshStatus(w http.ResponseWriter, r *http.Request)   { meshGet(w, "/api/status") }
+func (s *Server) meshChannels(w http.ResponseWriter, r *http.Request) { meshGet(w, "/api/channels") }
 func (s *Server) meshSend(w http.ResponseWriter, r *http.Request)     { meshPost(w, r, "/api/send") }
 
 // metrics exposes the concentrator + forwarder state in Prometheus text
