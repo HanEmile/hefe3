@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# fleet-self-upgrade - lampadas upgrades and reboots itself, 03:30 nightly.
+# fleet-self-upgrade - lampadas upgrades itself, 03:30 nightly.
 #
 # Own unit so the fleet-upgrade.service never kills itself mid-run when the
-# switch restarts services. Before rebooting we arm the unlock watcher on
-# medano, which feeds the LUKS passphrase when lampadas' initrd sshd appears.
+# switch restarts services. Never reboot lampadas here: its LUKS unlock is not
+# reliable enough for unattended reboots, so kernel switches require a manual,
+# attended reboot.
 
 set -uo pipefail
 
@@ -23,25 +24,9 @@ if ! "$STATE/result-lampadas/bin/deploy" >>"$LOG" 2>&1; then
   exit 0
 fi
 
-# kernel (or initrd) changed?
-if [ "$(readlink /run/booted-system/kernel)" = "$(readlink /run/current-system/kernel)" ]; then
-  echo "kernel unchanged; no reboot" | tee -a "$LOG"
-  exit 0
+# A changed kernel is activated only by the next manual reboot. Never call
+# systemctl reboot from this unattended job (2026-11-17: another overnight
+# outage ended at the interactive LUKS prompt).
+if [ "$(readlink /run/booted-system/kernel)" != "$(readlink /run/current-system/kernel)" ]; then
+  echo "kernel changed; manual reboot required" | tee -a "$LOG"
 fi
-
-echo "kernel changed - rebooting" | tee -a "$LOG"
-
-# lampadas' initrd PULLS its LUKS passphrase from medano itself since
-# 2026-11-15 (forced-command fleet-unlock-pull user; the old medano-side
-# fleet-unlock-lampadas push watcher could never reach the initrd). As
-# long as medano is up, the reboot is self-unlocking; medano's own
-# standby unlock is covered by medano-watch on lampadas.
-
-# record our own reboot intent for the 08:00 report
-if [ -f "$STATE/results.json" ]; then
-  tmp=$(mktemp)
-  jq '. + {lampadas_self: {rebooted: "yes", at: (now|todate)}}' "$STATE/results.json" > "$tmp" && mv "$tmp" "$STATE/results.json"
-fi
-
-sleep 5
-systemctl reboot

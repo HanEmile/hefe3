@@ -10,9 +10,9 @@
 #            4. virsh reboot every VM whose toplevel changed
 #            5. write results.json + ship it to medano for status-board
 #   03:30  fleet-self-upgrade.service
-#            lampadas upgrades (switch) and reboots ITSELF when its own
-#            kernel changed, after arming the fleet-unlock-lampadas watcher
-#            on medano so the LUKS passphrase is fed remotely.
+#            lampadas upgrades (switch) but NEVER reboots itself. Its LUKS
+#            unlock is not reliable enough for unattended reboots; a changed
+#            kernel is activated by the next manual, attended reboot.
 #   08:00  fleet-report.service
 #            posts a summary into #emile via syswatch --say: upgrade result,
 #            who is back up, stale backups, kernel freshness (kernel.org).
@@ -233,7 +233,7 @@ in
     };
 
     systemd.services.fleet-self-upgrade = {
-      description = "lampadas upgrades + reboots itself (medano unlocks it)";
+      description = "lampadas upgrades itself without rebooting";
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
       # Load-bearing (2026-11-15 incident): this service RUNS a
