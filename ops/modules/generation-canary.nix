@@ -2,9 +2,10 @@
 #
 #   every boot + 2min  -> run checks (sshd up + :22 accepting + no failed units)
 #   checks pass        -> done until next boot
-#   checks fail        -> switch-to-configuration the PREVIOUS generation and
-#                         reboot; stamp /var/lib/generation-canary/done-* so we
-#                         never boot-loop on the same failure pair twice
+#   checks fail        -> switch-to-configuration the PREVIOUS generation and,
+#                         when allowReboot is true, reboot; stamp
+#                         /var/lib/generation-canary/done-* so we never
+#                         boot-loop on the same failure pair twice
 #
 # Why in-guest: the failure we protect against is precisely the one where the
 # machine becomes unreachable (fleet-upgrade 2026-11: initrd unlock worked,
@@ -23,6 +24,12 @@ in
       type = lib.types.bool;
       default = true;
       description = "Also roll back when any systemd unit is failed after boot.";
+    };
+
+    allowReboot = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Reboot after a rollback; disable on hosts requiring attended reboots.";
     };
 
     extraChecks = lib.mkOption {
@@ -102,8 +109,12 @@ in
           echo "rollback switch failed - staying up (manual review needed)"
           exit 0
         }
-        # a reboot is the cleanest way out of any residual weirdness
+        ${if cfg.allowReboot then ''
+        # A reboot is the cleanest way out of any residual weirdness.
         systemctl reboot
+        '' else ''
+        echo "generation-canary: rollback activated; manual reboot required"
+        ''}
       '';
     };
   };

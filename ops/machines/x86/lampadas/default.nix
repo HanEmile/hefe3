@@ -914,6 +914,9 @@ in
   generationCanary = {
     enable = true;
     checkFailedUnits = false;
+    # LUKS requires attended recovery; never let a transient canary failure
+    # reboot this host unattended. Rollback activation remains available.
+    allowReboot = false;
   };
 
   # needed by the fleet-upgrade deploy scripts (nix copy/nix command syntax);
